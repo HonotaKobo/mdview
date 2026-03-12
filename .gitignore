@@ -17,8 +17,6 @@ docs/
 *.swp
 *.swo
 
-# Setup script
-setup-github.command
 
 # Environment
 .env
