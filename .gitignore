@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# Auto-generated
+src-tauri/gen/
+
+# Design docs / local docs
+docs/
+
+# Tool/IDE
+.cocoindex_code/
+.DS_Store
+*.swp
+*.swo
+
+# Setup script
+setup-github.command
+
+# Environment
+.env
+.env.*

@@ -1,0 +1,195 @@
+#content h1,
+#content h2,
+#content h3,
+#content h4,
+#content h5,
+#content h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+#content h1 {
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#content h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#content h3 {
+  font-size: 1.25em;
+}
+
+#content h4 {
+  font-size: 1em;
+}
+
+#content p {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+#content a {
+  color: var(--link-color);
+  text-decoration: none;
+}
+
+#content a:hover {
+  text-decoration: underline;
+}
+
+#content ul,
+#content ol {
+  margin-bottom: 16px;
+  padding-left: 2em;
+}
+
+#content li {
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+#content li + li {
+  margin-top: 4px;
+}
+
+#content blockquote {
+  margin-bottom: 16px;
+  padding: 0 1em;
+  color: var(--text-secondary);
+  border-left: 3px solid var(--border-color);
+}
+
+#content pre {
+  margin-bottom: 16px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background: var(--code-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+#content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+#content code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background: var(--code-bg);
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+}
+
+#content table {
+  margin-bottom: 16px;
+  border-collapse: collapse;
+  width: 100%;
+  overflow: auto;
+}
+
+#content table th,
+#content table td {
+  padding: 6px 13px;
+  border: 1px solid var(--border-color);
+}
+
+#content table th {
+  font-weight: 600;
+  background: var(--bg-secondary);
+}
+
+#content table tr:nth-child(2n) {
+  background: var(--bg-secondary);
+}
+
+#content hr {
+  height: 2px;
+  margin: 24px 0;
+  background: var(--border-color);
+  border: none;
+}
+
+#content img {
+  max-width: 100%;
+  height: auto;
+}
+
+#content .task-list-item {
+  list-style: none;
+  margin-left: -1.5em;
+}
+
+#content .task-list-item input[type='checkbox'] {
+  margin-right: 0.5em;
+}
+
+/* highlight.js overrides for theme integration */
+#content pre.hljs {
+  background: var(--code-bg);
+}
+
+/* Code block copy button */
+.code-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+#content pre:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+/* Mermaid diagrams */
+.mermaid-container {
+  margin-bottom: 16px;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  color: #d73a49;
+  border-color: #d73a49;
+}
+
+/* KaTeX */
+.katex-display {
+  margin: 16px 0;
+}
+
+.katex-display > .katex {
+  overflow-x: auto;
+  padding: 2px 0;
+}

@@ -1,0 +1,348 @@
+use std::io::{Read, Write};
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
+
+use crate::cli::CliArgs;
+use crate::state::AppState;
+
+fn socket_dir() -> PathBuf {
+    let uid = unsafe { libc::getuid() };
+    let dir = std::env::temp_dir().join(format!("mdview-{}", uid));
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).ok();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).ok();
+        }
+    }
+    dir
+}
+
+pub fn socket_path(id: &str) -> PathBuf {
+    socket_dir().join(format!("{}.sock", id))
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum IpcRequest {
+    Update { body: Option<String>, title: Option<String> },
+    Query { property: String },
+    Grep { pattern: String },
+    Lines { start: usize, end: usize },
+    Delete { ranges: Vec<(usize, usize)> },
+    Insert { line: usize, content: String },
+    Replace { start: usize, end: usize, content: String },
+}
+
+#[derive(Serialize, Deserialize)]
+struct IpcResponse {
+    ok: bool,
+    value: Option<String>,
+}
+
+/// \n → newline, \\ → backslash
+fn unescape_content(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => result.push('\n'),
+                Some('\\') => result.push('\\'),
+                Some(other) => { result.push('\\'); result.push(other); }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// "199-200" → (199, 200), "42" → (42, 42)
+fn parse_single_range(s: &str) -> Result<(usize, usize), String> {
+    if let Some((a, b)) = s.split_once('-') {
+        let start = a.trim().parse::<usize>().map_err(|_| format!("Invalid range: {}", s))?;
+        let end = b.trim().parse::<usize>().map_err(|_| format!("Invalid range: {}", s))?;
+        Ok((start, end))
+    } else {
+        let n = s.trim().parse::<usize>().map_err(|_| format!("Invalid line number: {}", s))?;
+        Ok((n, n))
+    }
+}
+
+/// "199-200,203,210-215" → [(199,200),(203,203),(210,215)]
+fn parse_ranges(s: &str) -> Result<Vec<(usize, usize)>, String> {
+    s.split(',').map(|part| parse_single_range(part.trim())).collect()
+}
+
+pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
+    let path = socket_path(id);
+    let mut stream = UnixStream::connect(&path)?;
+
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+    stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
+
+    let request = if let Some(ref query) = args.query {
+        let prop = format!("{:?}", query).to_lowercase();
+        serde_json::json!({ "type": "Query", "property": prop })
+    } else if let Some(ref pattern) = args.grep {
+        serde_json::json!({ "type": "Grep", "pattern": pattern })
+    } else if let Some(ref range) = args.lines {
+        let (start, end) = parse_single_range(range)?;
+        serde_json::json!({ "type": "Lines", "start": start, "end": end })
+    } else if let Some(ref ranges) = args.delete {
+        let parsed = parse_ranges(ranges)?;
+        serde_json::json!({ "type": "Delete", "ranges": parsed })
+    } else if let Some(line) = args.insert {
+        let content = args.content.as_ref().ok_or("mdview: --content is required with --insert")?;
+        let content = unescape_content(content);
+        serde_json::json!({ "type": "Insert", "line": line, "content": content })
+    } else if let Some(ref range) = args.replace {
+        let (start, end) = parse_single_range(range)?;
+        let content = args.content.as_ref().ok_or("mdview: --content is required with --replace")?;
+        let content = unescape_content(content);
+        serde_json::json!({ "type": "Replace", "start": start, "end": end, "content": content })
+    } else {
+        serde_json::json!({ "type": "Update", "body": args.body, "title": args.title })
+    };
+
+    stream.write_all(request.to_string().as_bytes())?;
+    stream.shutdown(std::net::Shutdown::Write)?;
+
+    let mut response_buf = String::new();
+    stream.read_to_string(&mut response_buf)?;
+
+    let resp = serde_json::from_str::<IpcResponse>(&response_buf)?;
+
+    // Read operations: output result to stdout
+    if args.query.is_some() || args.grep.is_some() || args.lines.is_some() {
+        if resp.ok {
+            if let Some(value) = resp.value {
+                println!("{}", value);
+            }
+            std::process::exit(0);
+        } else {
+            if let Some(value) = resp.value {
+                eprintln!("mdview: {}", value);
+            }
+            std::process::exit(1);
+        }
+    }
+
+    // Write operations: exit code only
+    if !resp.ok {
+        if let Some(value) = resp.value {
+            eprintln!("mdview: {}", value);
+        }
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+pub fn start_listener(id: String, app: AppHandle) {
+    let path = socket_path(&id);
+    std::fs::remove_file(&path).ok();
+
+    std::thread::spawn(move || {
+        let listener = match UnixListener::bind(&path) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("mdview: Failed to bind socket: {}", e);
+                return;
+            }
+        };
+
+        for stream in listener.incoming() {
+            if let Ok(mut stream) = stream {
+                let mut buf = String::new();
+                if stream.read_to_string(&mut buf).is_ok() {
+                    if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
+                        let response = match req {
+                            IpcRequest::Update { body, title } => handle_update(&app, body, title),
+                            IpcRequest::Query { property } => handle_query(&app, &property),
+                            IpcRequest::Grep { pattern } => handle_grep(&app, &pattern),
+                            IpcRequest::Lines { start, end } => handle_lines(&app, start, end),
+                            IpcRequest::Delete { ranges } => handle_delete(&app, ranges),
+                            IpcRequest::Insert { line, content } => handle_insert(&app, line, &content),
+                            IpcRequest::Replace { start, end, content } => handle_replace(&app, start, end, &content),
+                        };
+
+                        let resp_json = serde_json::to_string(&response).unwrap_or_default();
+                        stream.write_all(resp_json.as_bytes()).ok();
+                    }
+                }
+            }
+        }
+    });
+}
+
+fn handle_update(app: &AppHandle, body: Option<String>, title: Option<String>) -> IpcResponse {
+    let _ = app.emit("content-update", serde_json::json!({ "body": body, "title": title }));
+    {
+        let state = app.state::<AppState>();
+        let mut state = state.lock().unwrap();
+        if let Some(ref b) = body {
+            state.current_content = b.clone();
+            state.dirty = true;
+        }
+        if let Some(ref t) = title {
+            state.title = t.clone();
+        }
+    }
+    IpcResponse { ok: true, value: None }
+}
+
+fn handle_query(app: &AppHandle, property: &str) -> IpcResponse {
+    let state = app.state::<AppState>();
+    let state = state.lock().unwrap();
+
+    match property {
+        "path" => {
+            if !state.path_disclosure {
+                return IpcResponse { ok: false, value: None };
+            }
+            if let Some(ref path) = state.saved_path {
+                IpcResponse { ok: true, value: Some(path.clone()) }
+            } else {
+                IpcResponse { ok: false, value: None }
+            }
+        }
+        "body" => IpcResponse { ok: true, value: Some(state.current_content.clone()) },
+        "title" => IpcResponse { ok: true, value: Some(state.title.clone()) },
+        "status" => {
+            let status = serde_json::json!({
+                "path": if state.path_disclosure { state.saved_path.clone() } else { None::<String> },
+                "title": state.title,
+                "saved": state.saved_path.is_some(),
+                "dirty": state.dirty,
+                "path_disclosure": state.path_disclosure,
+            });
+            IpcResponse { ok: true, value: Some(status.to_string()) }
+        }
+        "linecount" => {
+            let count = state.current_content.split('\n').count();
+            let count = if state.current_content.ends_with('\n') { count - 1 } else { count };
+            IpcResponse { ok: true, value: Some(count.to_string()) }
+        }
+        _ => IpcResponse { ok: false, value: None },
+    }
+}
+
+fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
+    let state = app.state::<AppState>();
+    let state = state.lock().unwrap();
+
+    let regex = match regex::Regex::new(pattern) {
+        Ok(r) => r,
+        Err(e) => return IpcResponse { ok: false, value: Some(format!("Invalid regex: {}", e)) },
+    };
+
+    let mut results = Vec::new();
+    for (i, line) in state.current_content.split('\n').enumerate() {
+        if regex.is_match(line) {
+            results.push(format!("{}:{}", i + 1, line));
+        }
+    }
+
+    if results.is_empty() {
+        IpcResponse { ok: false, value: None }
+    } else {
+        IpcResponse { ok: true, value: Some(results.join("\n")) }
+    }
+}
+
+fn handle_lines(app: &AppHandle, start: usize, end: usize) -> IpcResponse {
+    let state = app.state::<AppState>();
+    let state = state.lock().unwrap();
+
+    let lines: Vec<&str> = state.current_content.split('\n').collect();
+    let total = lines.len();
+
+    if start < 1 || start > total || end < start || end > total {
+        return IpcResponse {
+            ok: false,
+            value: Some(format!("Line range {}-{} out of bounds (1-{})", start, end, total)),
+        };
+    }
+
+    let mut results = Vec::new();
+    for i in (start - 1)..end {
+        results.push(format!("{}:{}", i + 1, lines[i]));
+    }
+
+    IpcResponse { ok: true, value: Some(results.join("\n")) }
+}
+
+/// Apply an edit to current_content and notify frontend
+fn apply_edit(app: &AppHandle, editor: impl FnOnce(&mut Vec<String>) -> Result<(), String>) -> IpcResponse {
+    let state = app.state::<AppState>();
+    let mut state = state.lock().unwrap();
+
+    let mut lines: Vec<String> = state.current_content.split('\n').map(String::from).collect();
+
+    if let Err(e) = editor(&mut lines) {
+        return IpcResponse { ok: false, value: Some(e) };
+    }
+
+    let new_content = lines.join("\n");
+    state.current_content = new_content.clone();
+    state.dirty = true;
+
+    let _ = app.emit("content-update", serde_json::json!({ "body": new_content }));
+
+    IpcResponse { ok: true, value: None }
+}
+
+fn handle_delete(app: &AppHandle, mut ranges: Vec<(usize, usize)>) -> IpcResponse {
+    ranges.sort_by(|a, b| b.0.cmp(&a.0));
+
+    apply_edit(app, |lines| {
+        for (start, end) in &ranges {
+            if *start < 1 || *end > lines.len() || *start > *end {
+                return Err(format!("Range {}-{} out of bounds (1-{})", start, end, lines.len()));
+            }
+            lines.drain((start - 1)..*end);
+        }
+        Ok(())
+    })
+}
+
+fn handle_insert(app: &AppHandle, line: usize, content: &str) -> IpcResponse {
+    let new_lines: Vec<String> = content.split('\n').map(String::from).collect();
+
+    apply_edit(app, |lines| {
+        if line < 1 || line > lines.len() + 1 {
+            return Err(format!("Line {} out of bounds (1-{})", line, lines.len() + 1));
+        }
+        let insert_pos = line - 1;
+        for (i, new_line) in new_lines.iter().enumerate() {
+            lines.insert(insert_pos + i, new_line.clone());
+        }
+        Ok(())
+    })
+}
+
+fn handle_replace(app: &AppHandle, start: usize, end: usize, content: &str) -> IpcResponse {
+    let new_lines: Vec<String> = if content.is_empty() {
+        Vec::new()
+    } else {
+        content.split('\n').map(String::from).collect()
+    };
+
+    apply_edit(app, |lines| {
+        if start < 1 || end > lines.len() || start > end {
+            return Err(format!("Range {}-{} out of bounds (1-{})", start, end, lines.len()));
+        }
+        lines.drain((start - 1)..end);
+        for (i, new_line) in new_lines.iter().enumerate() {
+            lines.insert(start - 1 + i, new_line.clone());
+        }
+        Ok(())
+    })
+}
