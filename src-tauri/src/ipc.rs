@@ -1,5 +1,4 @@
 use std::io::{Read, Write};
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -8,22 +7,96 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::cli::CliArgs;
 use crate::state::AppState;
 
-fn socket_dir() -> PathBuf {
-    let uid = unsafe { libc::getuid() };
-    let dir = std::env::temp_dir().join(format!("mdview-{}", uid));
-    if !dir.exists() {
-        std::fs::create_dir_all(&dir).ok();
-        #[cfg(unix)]
-        {
+// --- Platform-specific transport ---
+
+#[cfg(unix)]
+mod transport {
+    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::path::PathBuf;
+
+    pub type Stream = UnixStream;
+    pub type Listener = UnixListener;
+    pub const INSTANCE_EXT: &str = "sock";
+
+    pub fn instance_dir() -> PathBuf {
+        let uid = unsafe { libc::getuid() };
+        let dir = std::env::temp_dir().join(format!("mdview-{}", uid));
+        if !dir.exists() {
+            std::fs::create_dir_all(&dir).ok();
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).ok();
         }
+        dir
     }
-    dir
+
+    pub fn instance_file(id: &str) -> PathBuf {
+        instance_dir().join(format!("{}.{}", id, INSTANCE_EXT))
+    }
+
+    pub fn connect(id: &str) -> std::io::Result<Stream> {
+        let path = instance_file(id);
+        let stream = UnixStream::connect(&path)?;
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+        stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
+        Ok(stream)
+    }
+
+    pub fn bind(id: &str) -> std::io::Result<Listener> {
+        let path = instance_file(id);
+        std::fs::remove_file(&path).ok();
+        UnixListener::bind(&path)
+    }
 }
 
-pub fn socket_path(id: &str) -> PathBuf {
-    socket_dir().join(format!("{}.sock", id))
+#[cfg(windows)]
+mod transport {
+    use std::net::{TcpListener, TcpStream};
+    use std::path::PathBuf;
+
+    pub type Stream = TcpStream;
+    pub type Listener = TcpListener;
+    pub const INSTANCE_EXT: &str = "port";
+
+    pub fn instance_dir() -> PathBuf {
+        let username = std::env::var("USERNAME").unwrap_or_else(|_| "default".into());
+        let dir = std::env::temp_dir().join(format!("mdview-{}", username));
+        if !dir.exists() {
+            std::fs::create_dir_all(&dir).ok();
+        }
+        dir
+    }
+
+    pub fn instance_file(id: &str) -> PathBuf {
+        instance_dir().join(format!("{}.{}", id, INSTANCE_EXT))
+    }
+
+    pub fn connect(id: &str) -> std::io::Result<Stream> {
+        let port_path = instance_file(id);
+        let port_str = std::fs::read_to_string(&port_path)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e))?;
+        let port: u16 = port_str
+            .trim()
+            .parse()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let stream = TcpStream::connect(("127.0.0.1", port))?;
+        stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+        stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
+        Ok(stream)
+    }
+
+    pub fn bind(id: &str) -> std::io::Result<Listener> {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let port = listener.local_addr()?.port();
+        let port_path = instance_file(id);
+        std::fs::write(&port_path, port.to_string())?;
+        Ok(listener)
+    }
+}
+
+// --- Public API ---
+
+pub fn instance_file(id: &str) -> PathBuf {
+    transport::instance_file(id)
 }
 
 #[derive(Deserialize)]
@@ -81,11 +154,7 @@ fn parse_ranges(s: &str) -> Result<Vec<(usize, usize)>, String> {
 }
 
 pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
-    let path = socket_path(id);
-    let mut stream = UnixStream::connect(&path)?;
-
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
-    stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
+    let mut stream = transport::connect(id)?;
 
     let request = if let Some(ref query) = args.query {
         let prop = format!("{:?}", query).to_lowercase();
@@ -146,41 +215,93 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
 }
 
 pub fn start_listener(id: String, app: AppHandle) {
-    let path = socket_path(&id);
-    std::fs::remove_file(&path).ok();
-
     std::thread::spawn(move || {
-        let listener = match UnixListener::bind(&path) {
+        let listener = match transport::bind(&id) {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("mdview: Failed to bind socket: {}", e);
+                eprintln!("mdview: Failed to start IPC listener: {}", e);
                 return;
             }
         };
 
         for stream in listener.incoming() {
             if let Ok(mut stream) = stream {
-                let mut buf = String::new();
-                if stream.read_to_string(&mut buf).is_ok() {
-                    if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
-                        let response = match req {
-                            IpcRequest::Update { body, title } => handle_update(&app, body, title),
-                            IpcRequest::Query { property } => handle_query(&app, &property),
-                            IpcRequest::Grep { pattern } => handle_grep(&app, &pattern),
-                            IpcRequest::Lines { start, end } => handle_lines(&app, start, end),
-                            IpcRequest::Delete { ranges } => handle_delete(&app, ranges),
-                            IpcRequest::Insert { line, content } => handle_insert(&app, line, &content),
-                            IpcRequest::Replace { start, end, content } => handle_replace(&app, start, end, &content),
-                        };
-
-                        let resp_json = serde_json::to_string(&response).unwrap_or_default();
-                        stream.write_all(resp_json.as_bytes()).ok();
-                    }
-                }
+                handle_stream(&app, &mut stream);
             }
         }
     });
 }
+
+fn handle_stream(app: &AppHandle, stream: &mut (impl Read + Write)) {
+    let mut buf = String::new();
+    if stream.read_to_string(&mut buf).is_ok() {
+        if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
+            let response = match req {
+                IpcRequest::Update { body, title } => handle_update(app, body, title),
+                IpcRequest::Query { property } => handle_query(app, &property),
+                IpcRequest::Grep { pattern } => handle_grep(app, &pattern),
+                IpcRequest::Lines { start, end } => handle_lines(app, start, end),
+                IpcRequest::Delete { ranges } => handle_delete(app, ranges),
+                IpcRequest::Insert { line, content } => handle_insert(app, line, &content),
+                IpcRequest::Replace { start, end, content } => handle_replace(app, start, end, &content),
+            };
+
+            let resp_json = serde_json::to_string(&response).unwrap_or_default();
+            stream.write_all(resp_json.as_bytes()).ok();
+        }
+    }
+}
+
+pub fn list_instances() {
+    let dir = transport::instance_dir();
+    if !dir.exists() {
+        std::process::exit(1);
+    }
+
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(_) => {
+            std::process::exit(1);
+        }
+    };
+
+    let mut found = false;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
+            if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
+                if let Ok(mut stream) = transport::connect(id) {
+                    let req = r#"{"type":"Query","property":"title"}"#;
+                    if stream.write_all(req.as_bytes()).is_ok()
+                        && stream.shutdown(std::net::Shutdown::Write).is_ok()
+                    {
+                        let mut buf = String::new();
+                        if stream.read_to_string(&mut buf).is_ok() {
+                            if let Ok(resp) =
+                                serde_json::from_str::<serde_json::Value>(&buf)
+                            {
+                                let title = resp
+                                    .get("value")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Untitled");
+                                println!("{}\t{}", id, title);
+                                found = true;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                // Stale entry — skip
+            }
+        }
+    }
+
+    if !found {
+        std::process::exit(1);
+    }
+}
+
+// --- Handler functions ---
 
 fn handle_update(app: &AppHandle, body: Option<String>, title: Option<String>) -> IpcResponse {
     let _ = app.emit("content-update", serde_json::json!({ "body": body, "title": title }));

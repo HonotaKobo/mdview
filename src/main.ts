@@ -45,7 +45,7 @@ async function renderMarkdownWithScrollKeep(content: string): Promise<void> {
 // Open a file via dialog or path
 async function openFile(filePath: string) {
   const content = await invoke<string>('read_file', { path: filePath });
-  const fileName = filePath.split('/').pop() || 'Untitled';
+  const fileName = filePath.split(/[\\/]/).pop() || 'Untitled';
   currentContent = content;
   currentTitle = fileName;
   const container = document.getElementById('content')!;

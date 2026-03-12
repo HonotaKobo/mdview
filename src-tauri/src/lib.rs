@@ -43,8 +43,7 @@ pub fn run() {
         std::process::exit(2);
     }
     if args.list {
-        // List mode: scan socket directory
-        list_instances();
+        ipc::list_instances();
         return;
     }
 
@@ -112,7 +111,7 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(move |_app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                let path = ipc::socket_path(&id_for_exit);
+                let path = ipc::instance_file(&id_for_exit);
                 std::fs::remove_file(&path).ok();
             }
         });
@@ -143,60 +142,3 @@ fn rand_u16() -> u16 {
     u16::from_le_bytes(buf)
 }
 
-fn list_instances() {
-    let uid = unsafe { libc::getuid() };
-    let dir = std::env::temp_dir().join(format!("mdview-{}", uid));
-
-    if !dir.exists() {
-        std::process::exit(1);
-    }
-
-    let entries = match std::fs::read_dir(&dir) {
-        Ok(e) => e,
-        Err(_) => {
-            std::process::exit(1);
-        }
-    };
-
-    let mut found = false;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().map(|e| e == "sock").unwrap_or(false) {
-            if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
-                // Try to query the instance for its title
-                if let Ok(mut stream) =
-                    std::os::unix::net::UnixStream::connect(&path)
-                {
-                    use std::io::{Read, Write};
-                    stream
-                        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
-                        .ok();
-                    let req = r#"{"type":"Query","property":"title"}"#;
-                    if stream.write_all(req.as_bytes()).is_ok()
-                        && stream.shutdown(std::net::Shutdown::Write).is_ok()
-                    {
-                        let mut buf = String::new();
-                        if stream.read_to_string(&mut buf).is_ok() {
-                            if let Ok(resp) =
-                                serde_json::from_str::<serde_json::Value>(&buf)
-                            {
-                                let title = resp
-                                    .get("value")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("Untitled");
-                                println!("{}\t{}", id, title);
-                                found = true;
-                                continue;
-                            }
-                        }
-                    }
-                }
-                // Stale socket — skip
-            }
-        }
-    }
-
-    if !found {
-        std::process::exit(1);
-    }
-}
