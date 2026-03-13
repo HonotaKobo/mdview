@@ -14,16 +14,14 @@ export class ThemeManager {
     });
   }
 
-  toggle(): void {
-    const order: Theme[] = ['auto', 'light', 'dark'];
-    const idx = order.indexOf(this.currentTheme);
-    this.setTheme(order[(idx + 1) % order.length]);
-  }
-
   setTheme(theme: Theme): void {
     this.currentTheme = theme;
     this.applyTheme();
     localStorage.setItem('mdview-theme', theme);
+  }
+
+  getTheme(): Theme {
+    return this.currentTheme;
   }
 
   private applyTheme(): void {
@@ -35,12 +33,5 @@ export class ThemeManager {
       'data-theme',
       isDark ? 'dark' : 'light'
     );
-
-    const iconMoon = document.getElementById('icon-moon');
-    const iconSun = document.getElementById('icon-sun');
-    if (iconMoon && iconSun) {
-      iconMoon.style.display = isDark ? 'none' : 'inline';
-      iconSun.style.display = isDark ? 'inline' : 'none';
-    }
   }
 }

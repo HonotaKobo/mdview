@@ -1,6 +1,8 @@
 mod cli;
 mod commands;
+mod i18n;
 mod ipc;
+mod menu;
 mod state;
 mod watcher;
 
@@ -104,6 +106,8 @@ pub fn run() {
     let id_for_setup = id.clone();
     let id_for_exit = id.clone();
 
+    let i18n = i18n::I18n::new();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -115,8 +119,15 @@ pub fn run() {
             commands::notify_saved,
             commands::get_saved_path,
             commands::get_initial_content,
+            commands::rename_file,
+            commands::get_translations,
         ])
         .setup(move |app| {
+            let menu = menu::build_menu(app.handle(), &i18n)?;
+            app.set_menu(menu)?;
+
+            app.manage(i18n);
+
             ipc::start_listener(id_for_setup.clone(), app.handle().clone());
 
             // Start file watcher for file mode
@@ -128,6 +139,9 @@ pub fn run() {
             }
 
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            menu::handle_menu_event(app, event);
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -163,4 +177,3 @@ fn rand_u16() -> u16 {
     buf[1] = ((t >> 8) & 0xFF) as u8;
     u16::from_le_bytes(buf)
 }
-
