@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nickel-org/nickel.rs/master/examples/example_json/schema.json",
   "productName": "mdview",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.mdview.viewer",
   "build": {
     "beforeDevCommand": "npm run dev",
