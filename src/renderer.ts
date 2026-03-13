@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it';
 import markdownItAnchor from 'markdown-it-anchor';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import markdownItFootnote from 'markdown-it-footnote';
+import markdownItFrontMatter from 'markdown-it-front-matter';
 import texmath from 'markdown-it-texmath';
 import katex from 'katex';
 import hljs from 'highlight.js';
@@ -23,6 +24,8 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
+let capturedFrontMatter = '';
+
 const md: MarkdownIt = new MarkdownIt({
   html: true,
   linkify: true,
@@ -43,6 +46,9 @@ const md: MarkdownIt = new MarkdownIt({
     return `<pre class="hljs"><code>${escapeHtml(str)}</code></pre>`;
   },
 })
+  .use(markdownItFrontMatter, (fm: string) => {
+    capturedFrontMatter = fm;
+  })
   .use(markdownItAnchor, {
     permalink: false,
     slugify: (s: string) =>
@@ -60,8 +66,14 @@ export async function renderMarkdown(
   content: string,
   container: HTMLElement
 ): Promise<void> {
+  capturedFrontMatter = '';
   const html = md.render(content);
-  container.innerHTML = html;
+  let fmHtml = '';
+  if (capturedFrontMatter) {
+    const highlighted = hljs.highlight(capturedFrontMatter, { language: 'yaml' }).value;
+    fmHtml = `<pre class="hljs"><code>${highlighted}</code></pre>`;
+  }
+  container.innerHTML = fmHtml + html;
   await renderMermaidDiagrams(container);
   addCopyButtons(container);
 }

@@ -54,6 +54,8 @@ brew install --cask mdview
 
 ### Windows（Scoop）
 
+[Scoop](https://scoop.sh/) が未インストールの場合は、先にインストールしてください。
+
 ```powershell
 scoop bucket add mdview https://github.com/HonotaKobo/scoop-mdview
 scoop install mdview

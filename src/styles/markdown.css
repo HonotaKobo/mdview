@@ -191,5 +191,6 @@
 
 .katex-display > .katex {
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 2px 0;
 }

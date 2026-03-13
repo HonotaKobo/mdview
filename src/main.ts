@@ -33,7 +33,7 @@ function updateDirtyIndicator(dirty: boolean) {
 
 async function renderMarkdownWithScrollKeep(content: string): Promise<void> {
   const container = document.getElementById('content')!;
-  const scrollKeeper = new ScrollKeeper(container);
+  const scrollKeeper = new ScrollKeeper(document.getElementById('scroll-area')!);
 
   const anchor = scrollKeeper.captureAnchor();
   await renderMarkdown(content, container);
