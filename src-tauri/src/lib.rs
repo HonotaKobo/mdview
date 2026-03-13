@@ -41,7 +41,7 @@ pub fn run() {
     if !args.query.is_empty() || args.grep.is_some() || args.lines.is_some()
         || args.delete.is_some() || args.insert.is_some() || args.replace.is_some()
     {
-        eprintln!("mdview: No instance found with id: {}", id);
+        eprintln!("mdcast: No instance found with id: {}", id);
         std::process::exit(2);
     }
     if args.list {
@@ -66,7 +66,7 @@ pub fn run() {
             .stdout(Stdio::null())
             .stderr(Stdio::inherit())
             .spawn()
-            .expect("failed to launch mdview");
+            .expect("failed to launch mdcast");
         return;
     }
 
@@ -90,7 +90,7 @@ pub fn run() {
                 (content, title, Some(abs_path_str))
             }
             Err(e) => {
-                eprintln!("mdview: Failed to read file: {}", e);
+                eprintln!("mdcast: Failed to read file: {}", e);
                 (String::new(), initial_title.clone(), None)
             }
         }

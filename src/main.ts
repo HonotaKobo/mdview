@@ -30,7 +30,7 @@ const fontSizeManager = new FontSizeManager();
 
 function updateWindowTitle(title: string) {
   document.getElementById('doc-title')!.textContent = title;
-  getCurrentWindow().setTitle(`${title} — mdview`);
+  getCurrentWindow().setTitle(`${title} — mdcast`);
 }
 
 function updateDirtyIndicator(dirty: boolean) {

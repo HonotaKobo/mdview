@@ -87,8 +87,8 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
     // macOS: add app menu with standard items
     #[cfg(target_os = "macos")]
     {
-        let app_menu = SubmenuBuilder::new(app, "mdview")
-            .item(&PredefinedMenuItem::about(app, Some("About mdview"), None)?)
+        let app_menu = SubmenuBuilder::new(app, "mdcast")
+            .item(&PredefinedMenuItem::about(app, Some("About mdcast"), None)?)
             .separator()
             .item(&PredefinedMenuItem::hide(app, None)?)
             .item(&PredefinedMenuItem::hide_others(app, None)?)

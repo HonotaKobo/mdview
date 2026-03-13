@@ -20,7 +20,7 @@ mod transport {
 
     pub fn instance_dir() -> PathBuf {
         let uid = unsafe { libc::getuid() };
-        let dir = std::env::temp_dir().join(format!("mdview-{}", uid));
+        let dir = std::env::temp_dir().join(format!("mdcast-{}", uid));
         if !dir.exists() {
             std::fs::create_dir_all(&dir).ok();
             use std::os::unix::fs::PermissionsExt;
@@ -59,7 +59,7 @@ mod transport {
 
     pub fn instance_dir() -> PathBuf {
         let username = std::env::var("USERNAME").unwrap_or_else(|_| "default".into());
-        let dir = std::env::temp_dir().join(format!("mdview-{}", username));
+        let dir = std::env::temp_dir().join(format!("mdcast-{}", username));
         if !dir.exists() {
             std::fs::create_dir_all(&dir).ok();
         }
@@ -149,11 +149,11 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
         let parsed = parse_ranges(ranges)?;
         serde_json::json!({ "type": "Delete", "ranges": parsed })
     } else if let Some(line) = args.insert {
-        let content = args.content.as_ref().ok_or("mdview: --content is required with --insert")?;
+        let content = args.content.as_ref().ok_or("mdcast: --content is required with --insert")?;
         serde_json::json!({ "type": "Insert", "line": line, "content": content })
     } else if let Some(ref range) = args.replace {
         let (start, end) = parse_single_range(range)?;
-        let content = args.content.as_ref().ok_or("mdview: --content is required with --replace")?;
+        let content = args.content.as_ref().ok_or("mdcast: --content is required with --replace")?;
         serde_json::json!({ "type": "Replace", "start": start, "end": end, "content": content })
     } else {
         serde_json::json!({ "type": "Update", "body": args.body, "title": args.title })
@@ -176,7 +176,7 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
             std::process::exit(0);
         } else {
             if let Some(value) = resp.value {
-                eprintln!("mdview: {}", value);
+                eprintln!("mdcast: {}", value);
             }
             std::process::exit(1);
         }
@@ -185,7 +185,7 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
     // Write operations: exit code only
     if !resp.ok {
         if let Some(value) = resp.value {
-            eprintln!("mdview: {}", value);
+            eprintln!("mdcast: {}", value);
         }
         std::process::exit(1);
     }
@@ -198,7 +198,7 @@ pub fn start_listener(id: String, app: AppHandle) {
         let listener = match transport::bind(&id) {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("mdview: Failed to start IPC listener: {}", e);
+                eprintln!("mdcast: Failed to start IPC listener: {}", e);
                 return;
             }
         };

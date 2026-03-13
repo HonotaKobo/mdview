@@ -19,8 +19,8 @@ docs/
 
 
 # Package manager repos
-homebrew-mdview/
-scoop-mdview/
+homebrew-mdcast/
+scoop-mdcast/
 
 # Environment
 .env
