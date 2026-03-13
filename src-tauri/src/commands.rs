@@ -54,3 +54,13 @@ pub fn rename_file(old_path: String, new_path: String, state: tauri::State<'_, A
 pub fn get_translations(i18n: tauri::State<'_, I18n>) -> HashMap<String, String> {
     i18n.flat_map()
 }
+
+#[command]
+pub fn get_platform() -> String {
+    std::env::consts::OS.to_string()
+}
+
+#[command]
+pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
+    crate::menu::execute_action(&app, &id);
+}

@@ -121,10 +121,20 @@ pub fn run() {
             commands::get_initial_content,
             commands::rename_file,
             commands::get_translations,
+            commands::get_platform,
+            commands::execute_menu_action,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
             app.set_menu(menu)?;
+
+            // On Windows, disable native decorations for custom title bar
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_decorations(false);
+                }
+            }
 
             app.manage(i18n);
 

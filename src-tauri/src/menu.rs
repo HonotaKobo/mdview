@@ -115,9 +115,8 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
     }
 }
 
-pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
-    let id = event.id().as_ref();
-
+/// Execute a menu action by ID. Shared by native menu events and the frontend command.
+pub fn execute_action(app: &AppHandle, id: &str) {
     match id {
         // Window operations — handle directly in Rust
         "file_quit" => {
@@ -142,7 +141,14 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
         "view_always_on_top" => {
             if let Some(window) = app.get_webview_window("main") {
                 let current = window.is_always_on_top().unwrap_or(false);
-                let _ = window.set_always_on_top(!current);
+                let new_state = !current;
+                let _ = window.set_always_on_top(new_state);
+                if let Some(item) = app.menu().and_then(|m| m.get("view_always_on_top")) {
+                    if let Some(check) = item.as_check_menuitem() {
+                        let _ = check.set_checked(new_state);
+                    }
+                }
+                let _ = app.emit("menu-action", serde_json::json!({ "action": "always_on_top_changed", "value": new_state }));
             }
         }
 
@@ -158,6 +164,10 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             let _ = app.emit("menu-action", serde_json::json!({ "action": id }));
         }
     }
+}
+
+pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
+    execute_action(app, event.id().as_ref());
 }
 
 fn update_theme_checks(app: &AppHandle, selected_id: &str) {

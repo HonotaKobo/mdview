@@ -1,0 +1,148 @@
+name: Update Package Managers
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-scoop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get release info
+        id: release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Download exe and compute hash
+        id: hash
+        run: |
+          URL="https://github.com/HonotaKobo/mdcast/releases/download/${{ steps.release.outputs.tag }}/mdcast_${{ steps.release.outputs.version }}_x64-setup.exe"
+          echo "Downloading $URL"
+          curl -fSL -o setup.exe "$URL"
+          HASH=$(sha256sum setup.exe | awk '{print $1}')
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "SHA256: $HASH"
+
+      - name: Checkout scoop bucket
+        uses: actions/checkout@v4
+        with:
+          repository: HonotaKobo/scoop-mdcast
+          token: ${{ secrets.PACKAGE_PAT }}
+
+      - name: Update manifest
+        uses: actions/github-script@v7
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          HASH: ${{ steps.hash.outputs.hash }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { VERSION, TAG, HASH } = process.env;
+            const manifest = {
+              version: VERSION,
+              description: "Markdown viewer for the AI age",
+              homepage: "https://github.com/HonotaKobo/mdcast",
+              license: "MIT",
+              architecture: {
+                "64bit": {
+                  url: `https://github.com/HonotaKobo/mdcast/releases/download/${TAG}/mdcast_${VERSION}_x64-setup.exe#/setup.exe`,
+                  hash: HASH
+                }
+              },
+              installer: {
+                script: [
+                  "Start-Process \"$dir\\setup.exe\" -ArgumentList '/S' -Wait",
+                  "Copy-Item \"$env:LOCALAPPDATA\\mdcast\\mdcast.exe\" \"$dir\\mdcast.exe\""
+                ]
+              },
+              uninstaller: {
+                script: "Start-Process \"$dir\\setup.exe\" -ArgumentList '/UNINSTALL','/S' -Wait"
+              },
+              bin: "mdcast.exe"
+            };
+            fs.writeFileSync('bucket/mdcast.json', JSON.stringify(manifest, null, 4) + '\n');
+
+      - name: Push scoop update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/mdcast.json
+          git commit -m "Update mdcast to ${{ steps.release.outputs.tag }}"
+          git push
+
+  update-homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get release info
+        id: release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Download dmgs and compute hashes
+        id: hash
+        run: |
+          BASE="https://github.com/HonotaKobo/mdcast/releases/download/${{ steps.release.outputs.tag }}"
+          VERSION="${{ steps.release.outputs.version }}"
+
+          curl -fSL -o arm.dmg "$BASE/mdcast_${VERSION}_aarch64.dmg"
+          ARM_HASH=$(sha256sum arm.dmg | awk '{print $1}')
+          echo "arm=$ARM_HASH" >> "$GITHUB_OUTPUT"
+
+          curl -fSL -o intel.dmg "$BASE/mdcast_${VERSION}_x64.dmg"
+          INTEL_HASH=$(sha256sum intel.dmg | awk '{print $1}')
+          echo "intel=$INTEL_HASH" >> "$GITHUB_OUTPUT"
+
+          echo "ARM SHA256: $ARM_HASH"
+          echo "Intel SHA256: $INTEL_HASH"
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: HonotaKobo/homebrew-mdcast
+          token: ${{ secrets.PACKAGE_PAT }}
+
+      - name: Update cask
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          ARM_HASH: ${{ steps.hash.outputs.arm }}
+          INTEL_HASH: ${{ steps.hash.outputs.intel }}
+        run: |
+          cat > Casks/mdcast.rb << 'TEMPLATE'
+          cask "mdcast" do
+            arch arm: "aarch64", intel: "x64"
+
+            version "VERSION_PLACEHOLDER"
+            sha256 arm: "ARM_HASH_PLACEHOLDER",
+                   intel: "INTEL_HASH_PLACEHOLDER"
+
+            url "https://github.com/HonotaKobo/mdcast/releases/download/v#{version}/mdcast_#{version}_#{arch}.dmg"
+            name "mdcast"
+            desc "Markdown viewer for the AI age"
+            homepage "https://github.com/HonotaKobo/mdcast"
+
+            app "mdcast.app"
+            binary "#{appdir}/mdcast.app/Contents/MacOS/mdcast"
+
+            postflight do
+              system_command "/usr/bin/xattr",
+                             args: ["-cr", "#{appdir}/mdcast.app"]
+            end
+          end
+          TEMPLATE
+
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Casks/mdcast.rb
+          sed -i "s/ARM_HASH_PLACEHOLDER/$ARM_HASH/g" Casks/mdcast.rb
+          sed -i "s/INTEL_HASH_PLACEHOLDER/$INTEL_HASH/g" Casks/mdcast.rb
+
+      - name: Push homebrew update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/mdcast.rb
+          git commit -m "Update mdcast to ${{ steps.release.outputs.tag }}"
+          git push

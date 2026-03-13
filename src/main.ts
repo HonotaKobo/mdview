@@ -9,6 +9,7 @@ import { ThemeManager } from './theme';
 import { handleSave, handleSaveAs, handleRename } from './save';
 import { FindBar } from './find';
 import { FontSizeManager } from './font-size';
+import { CustomTitleBar } from './titlebar';
 
 interface ContentUpdate {
   body?: string;
@@ -29,16 +30,18 @@ const findBar = new FindBar();
 const fontSizeManager = new FontSizeManager();
 
 function updateWindowTitle(title: string) {
-  document.getElementById('doc-title')!.textContent = title;
   getCurrentWindow().setTitle(`${title} — mdcast`);
 }
 
-function updateDirtyIndicator(dirty: boolean) {
-  const indicator = document.getElementById('dirty-indicator');
-  if (indicator) {
-    indicator.style.display = dirty ? 'inline' : 'none';
+// Initialize custom title bar on Windows
+async function initPlatformUI() {
+  const platform = await invoke<string>('get_platform');
+  if (platform === 'windows') {
+    const titleBar = new CustomTitleBar();
+    await titleBar.init();
   }
 }
+initPlatformUI();
 
 async function renderMarkdownWithScrollKeep(content: string): Promise<void> {
   const container = document.getElementById('content')!;
@@ -77,13 +80,11 @@ async function showOpenDialog() {
 async function doSave() {
   await handleSave(currentContent, currentTitle);
   isDirty = false;
-  updateDirtyIndicator(false);
 }
 
 async function doSaveAs() {
   await handleSaveAs(currentContent, currentTitle);
   isDirty = false;
-  updateDirtyIndicator(false);
 }
 
 async function doRename() {
@@ -135,7 +136,6 @@ listen('content-update', async (event) => {
   if (update.body !== undefined) {
     currentContent = update.body;
     isDirty = true;
-    updateDirtyIndicator(true);
     await renderMarkdownWithScrollKeep(update.body);
   }
   if (update.title !== undefined) {
