@@ -137,9 +137,15 @@ export class CustomTitleBar {
     const titlebar = document.createElement('div');
     titlebar.id = 'custom-titlebar';
 
-    // Row 1: Title + window controls
+    // Row 1: Icon + Title + window controls
     const titleRow = document.createElement('div');
     titleRow.className = 'titlebar-title-row';
+
+    const icon = document.createElement('img');
+    icon.className = 'titlebar-icon';
+    icon.src = '/app-icon.png';
+    icon.alt = 'mdcast';
+    titleRow.appendChild(icon);
 
     const titleDrag = document.createElement('div');
     titleDrag.className = 'titlebar-title';

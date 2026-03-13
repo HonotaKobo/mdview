@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import markdownItAnchor from 'markdown-it-anchor';
 import markdownItTaskLists from 'markdown-it-task-lists';
+import markdownItDeflist from 'markdown-it-deflist';
 import markdownItFootnote from 'markdown-it-footnote';
 import markdownItFrontMatter from 'markdown-it-front-matter';
 import texmath from 'markdown-it-texmath';
@@ -55,12 +56,52 @@ const md: MarkdownIt = new MarkdownIt({
       encodeURIComponent(s.trim().toLowerCase().replace(/\s+/g, '-')),
   })
   .use(markdownItTaskLists, { enabled: false })
+  .use(markdownItDeflist)
   .use(markdownItFootnote)
   .use(texmath, {
     engine: katex,
     delimiters: 'dollars',
     katexOptions: { throwOnError: false },
   });
+
+// Custom plugin: checkboxes in definition list <dd> elements
+function deflistTaskPlugin(md: MarkdownIt): void {
+  md.core.ruler.after('inline', 'deflist-task', (state) => {
+    const tokens = state.tokens;
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i].type !== 'dd_open') continue;
+      // Find the next inline token inside this dd
+      for (let j = i + 1; j < tokens.length && tokens[j].type !== 'dd_close'; j++) {
+        if (tokens[j].type !== 'inline') continue;
+        const content = tokens[j].content;
+        const match = content.match(/^\[([ xX])\]\s?/);
+        if (!match) break;
+        const checked = match[1] === 'x' || match[1] === 'X';
+        // Add class to dd_open
+        tokens[i].attrJoin('class', 'deflist-task-item');
+        // Replace inline content: prepend checkbox HTML
+        const checkbox = `<input type="checkbox" disabled${checked ? ' checked' : ''}> `;
+        tokens[j].content = content.slice(match[0].length);
+        const children = tokens[j].children ?? [];
+        tokens[j].children = children;
+        // Replace the text token that starts with [ ] or [x]
+        for (const child of children) {
+          if (child.type === 'text' && child.content.startsWith(match[0])) {
+            child.content = child.content.slice(match[0].length);
+            break;
+          }
+        }
+        // Insert html_inline token for the checkbox at the beginning
+        const checkboxToken = new state.Token('html_inline', '', 0);
+        checkboxToken.content = checkbox;
+        children.unshift(checkboxToken);
+        break;
+      }
+    }
+  });
+}
+
+md.use(deflistTaskPlugin);
 
 export async function renderMarkdown(
   content: string,

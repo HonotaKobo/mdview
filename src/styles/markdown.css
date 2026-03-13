@@ -137,6 +137,31 @@
   margin-right: 0.5em;
 }
 
+/* Definition lists */
+#content dl {
+  margin-bottom: 16px;
+}
+
+#content dt {
+  margin-top: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+#content dd {
+  margin-left: 2em;
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+#content dd.deflist-task-item {
+  list-style: none;
+}
+
+#content dd.deflist-task-item input[type='checkbox'] {
+  margin-right: 0.5em;
+}
+
 /* highlight.js overrides for theme integration */
 #content pre.hljs {
   background: var(--code-bg);

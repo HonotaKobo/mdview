@@ -16,6 +16,7 @@
     "katex": "^0.16.38",
     "markdown-it": "^14",
     "markdown-it-anchor": "^9",
+    "markdown-it-deflist": "^3.0.0",
     "markdown-it-footnote": "^4",
     "markdown-it-front-matter": "^0.2.4",
     "markdown-it-task-lists": "^2",
