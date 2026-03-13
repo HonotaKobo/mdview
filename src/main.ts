@@ -24,6 +24,7 @@ interface MenuAction {
 let currentContent = '';
 let currentTitle = 'Untitled';
 let isDirty = false;
+let customTitleBar: CustomTitleBar | null = null;
 
 const themeManager = new ThemeManager();
 const findBar = new FindBar();
@@ -31,14 +32,19 @@ const fontSizeManager = new FontSizeManager();
 
 function updateWindowTitle(title: string) {
   getCurrentWindow().setTitle(`${title} — mdcast`);
+  customTitleBar?.setTitle(title);
 }
 
 // Initialize custom title bar on Windows
 async function initPlatformUI() {
   const platform = await invoke<string>('get_platform');
   if (platform === 'windows') {
-    const titleBar = new CustomTitleBar();
-    await titleBar.init();
+    customTitleBar = new CustomTitleBar();
+    await customTitleBar.init();
+    // Set initial title if content was already loaded
+    if (currentTitle !== 'Untitled') {
+      customTitleBar.setTitle(currentTitle);
+    }
   }
 }
 initPlatformUI();

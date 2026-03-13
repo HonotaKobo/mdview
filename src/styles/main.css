@@ -50,13 +50,43 @@ body {
 /* Custom title bar (Windows only — injected by JS) */
 #custom-titlebar {
   display: flex;
-  align-items: center;
-  height: 32px;
+  flex-direction: column;
   background: var(--titlebar-bg);
   border-bottom: 1px solid var(--titlebar-border);
   user-select: none;
   flex-shrink: 0;
   font-size: 12px;
+}
+
+/* Row 1: Title + window controls */
+.titlebar-title-row {
+  display: flex;
+  align-items: center;
+  height: 32px;
+}
+
+.titlebar-title {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.titlebar-title-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Row 2: Menu bar */
+.titlebar-menu-row {
+  display: flex;
+  align-items: center;
+  height: 24px;
 }
 
 .titlebar-menu {
@@ -83,7 +113,7 @@ body {
 
 .menu-top-label:hover,
 .menu-top-item.open .menu-top-label {
-  background: var(--bg-secondary);
+  background: rgba(128, 128, 128, 0.15);
 }
 
 .menu-dropdown {
@@ -175,12 +205,6 @@ body {
   display: block;
 }
 
-/* Drag region */
-.titlebar-drag {
-  flex: 1;
-  height: 100%;
-}
-
 /* Window control buttons */
 .titlebar-controls {
   display: flex;
@@ -201,7 +225,7 @@ body {
 }
 
 .ctrl-btn:hover {
-  background: var(--bg-secondary);
+  background: rgba(128, 128, 128, 0.15);
 }
 
 .ctrl-close:hover {

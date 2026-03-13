@@ -39,6 +39,7 @@ interface MenuDef {
 
 export class CustomTitleBar {
   private el!: HTMLElement;
+  private titleEl!: HTMLElement;
   private openMenuId: string | null = null;
   private translations: Record<string, string> = {};
   private checkStates: Record<string, boolean> = {};
@@ -59,6 +60,13 @@ export class CustomTitleBar {
     document.body.insertBefore(this.el, document.body.firstChild);
     this.setupEvents();
     this.listenForStateChanges();
+  }
+
+  /** Update the displayed title (called from main.ts) */
+  setTitle(title: string): void {
+    if (this.titleEl) {
+      this.titleEl.textContent = title ? `${title} \u2014 mdcast` : 'mdcast';
+    }
   }
 
   private t(key: string): string {
@@ -129,7 +137,36 @@ export class CustomTitleBar {
     const titlebar = document.createElement('div');
     titlebar.id = 'custom-titlebar';
 
-    // Menu bar
+    // Row 1: Title + window controls
+    const titleRow = document.createElement('div');
+    titleRow.className = 'titlebar-title-row';
+
+    const titleDrag = document.createElement('div');
+    titleDrag.className = 'titlebar-title';
+    titleDrag.setAttribute('data-tauri-drag-region', '');
+
+    this.titleEl = document.createElement('span');
+    this.titleEl.className = 'titlebar-title-text';
+    this.titleEl.textContent = 'mdcast';
+    this.titleEl.setAttribute('data-tauri-drag-region', '');
+    titleDrag.appendChild(this.titleEl);
+
+    titleRow.appendChild(titleDrag);
+
+    // Window control buttons
+    const controls = document.createElement('div');
+    controls.className = 'titlebar-controls';
+    controls.appendChild(this.createCtrlBtn('tb-minimize', 'minimize'));
+    controls.appendChild(this.createCtrlBtn('tb-maximize', 'maximize'));
+    controls.appendChild(this.createCtrlBtn('tb-close', 'close'));
+    titleRow.appendChild(controls);
+
+    titlebar.appendChild(titleRow);
+
+    // Row 2: Menu bar
+    const menuRow = document.createElement('div');
+    menuRow.className = 'titlebar-menu-row';
+
     const menuBar = document.createElement('div');
     menuBar.className = 'titlebar-menu';
 
@@ -148,21 +185,8 @@ export class CustomTitleBar {
 
       menuBar.appendChild(topItem);
     }
-    titlebar.appendChild(menuBar);
-
-    // Drag region (for window move)
-    const drag = document.createElement('div');
-    drag.className = 'titlebar-drag';
-    drag.setAttribute('data-tauri-drag-region', '');
-    titlebar.appendChild(drag);
-
-    // Window control buttons
-    const controls = document.createElement('div');
-    controls.className = 'titlebar-controls';
-    controls.appendChild(this.createCtrlBtn('tb-minimize', 'minimize'));
-    controls.appendChild(this.createCtrlBtn('tb-maximize', 'maximize'));
-    controls.appendChild(this.createCtrlBtn('tb-close', 'close'));
-    titlebar.appendChild(controls);
+    menuRow.appendChild(menuBar);
+    titlebar.appendChild(menuRow);
 
     return titlebar;
   }
@@ -338,8 +362,8 @@ export class CustomTitleBar {
       getCurrentWindow().close();
     });
 
-    // Double-click on drag region to maximize/restore
-    this.el.querySelector('.titlebar-drag')!.addEventListener('dblclick', async () => {
+    // Double-click on title row to maximize/restore
+    this.el.querySelector('.titlebar-title')!.addEventListener('dblclick', async () => {
       const win = getCurrentWindow();
       if (await win.isMaximized()) {
         await win.unmaximize();
