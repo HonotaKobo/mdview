@@ -18,6 +18,10 @@ docs/
 *.swo
 
 
+# Package manager repos
+homebrew-mdview/
+scoop-mdview/
+
 # Environment
 .env
 .env.*
