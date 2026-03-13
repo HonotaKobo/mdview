@@ -23,9 +23,9 @@ pub struct CliArgs {
     #[arg(long, short)]
     pub title: Option<String>,
 
-    /// Query an existing instance property (requires --id)
+    /// Query existing instance properties (requires --id, repeatable)
     #[arg(long, value_name = "PROPERTY", conflicts_with_all = ["body", "file", "file_pos", "delete", "insert", "replace"])]
-    pub query: Option<QueryProperty>,
+    pub query: Vec<QueryProperty>,
 
     /// List all open windows
     #[arg(long, conflicts_with_all = ["body", "file", "file_pos", "id", "title", "query", "grep", "lines", "delete", "insert", "replace"])]
@@ -72,4 +72,6 @@ pub enum QueryProperty {
     Status,
     /// Total line count
     Linecount,
+    /// All properties as JSON
+    All,
 }

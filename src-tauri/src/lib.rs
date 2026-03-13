@@ -36,7 +36,7 @@ pub fn run() {
     }
 
     // If this is a read/write operation requiring an existing instance, error out
-    if args.query.is_some() || args.grep.is_some() || args.lines.is_some()
+    if !args.query.is_empty() || args.grep.is_some() || args.lines.is_some()
         || args.delete.is_some() || args.insert.is_some() || args.replace.is_some()
     {
         eprintln!("mdview: No instance found with id: {}", id);

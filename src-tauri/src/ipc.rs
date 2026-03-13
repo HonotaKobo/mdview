@@ -103,7 +103,7 @@ pub fn instance_file(id: &str) -> PathBuf {
 #[serde(tag = "type")]
 enum IpcRequest {
     Update { body: Option<String>, title: Option<String> },
-    Query { property: String },
+    Query { properties: Vec<String> },
     Grep { pattern: String },
     Lines { start: usize, end: usize },
     Delete { ranges: Vec<(usize, usize)> },
@@ -156,9 +156,9 @@ fn parse_ranges(s: &str) -> Result<Vec<(usize, usize)>, String> {
 pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = transport::connect(id)?;
 
-    let request = if let Some(ref query) = args.query {
-        let prop = format!("{:?}", query).to_lowercase();
-        serde_json::json!({ "type": "Query", "property": prop })
+    let request = if !args.query.is_empty() {
+        let props: Vec<String> = args.query.iter().map(|q| format!("{:?}", q).to_lowercase()).collect();
+        serde_json::json!({ "type": "Query", "properties": props })
     } else if let Some(ref pattern) = args.grep {
         serde_json::json!({ "type": "Grep", "pattern": pattern })
     } else if let Some(ref range) = args.lines {
@@ -189,7 +189,7 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
     let resp = serde_json::from_str::<IpcResponse>(&response_buf)?;
 
     // Read operations: output result to stdout
-    if args.query.is_some() || args.grep.is_some() || args.lines.is_some() {
+    if !args.query.is_empty() || args.grep.is_some() || args.lines.is_some() {
         if resp.ok {
             if let Some(value) = resp.value {
                 println!("{}", value);
@@ -238,7 +238,7 @@ fn handle_stream(app: &AppHandle, stream: &mut (impl Read + Write)) {
         if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
             let response = match req {
                 IpcRequest::Update { body, title } => handle_update(app, body, title),
-                IpcRequest::Query { property } => handle_query(app, &property),
+                IpcRequest::Query { properties } => handle_query(app, &properties),
                 IpcRequest::Grep { pattern } => handle_grep(app, &pattern),
                 IpcRequest::Lines { start, end } => handle_lines(app, start, end),
                 IpcRequest::Delete { ranges } => handle_delete(app, ranges),
@@ -271,7 +271,7 @@ pub fn list_instances() {
         if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
             if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
                 if let Ok(mut stream) = transport::connect(id) {
-                    let req = r#"{"type":"Query","property":"title"}"#;
+                    let req = r#"{"type":"Query","properties":["title"]}"#;
                     if stream.write_all(req.as_bytes()).is_ok()
                         && stream.shutdown(std::net::Shutdown::Write).is_ok()
                     {
@@ -319,40 +319,74 @@ fn handle_update(app: &AppHandle, body: Option<String>, title: Option<String>) -
     IpcResponse { ok: true, value: None }
 }
 
-fn handle_query(app: &AppHandle, property: &str) -> IpcResponse {
-    let state = app.state::<AppState>();
-    let state = state.lock().unwrap();
-
+fn query_single(state: &crate::state::AppStateInner, property: &str) -> Option<serde_json::Value> {
     match property {
         "path" => {
             if !state.path_disclosure {
-                return IpcResponse { ok: false, value: None };
+                return None;
             }
-            if let Some(ref path) = state.saved_path {
-                IpcResponse { ok: true, value: Some(path.clone()) }
-            } else {
-                IpcResponse { ok: false, value: None }
-            }
+            state.saved_path.as_ref().map(|p| serde_json::Value::String(p.clone()))
         }
-        "body" => IpcResponse { ok: true, value: Some(state.current_content.clone()) },
-        "title" => IpcResponse { ok: true, value: Some(state.title.clone()) },
+        "body" => Some(serde_json::Value::String(state.current_content.clone())),
+        "title" => Some(serde_json::Value::String(state.title.clone())),
         "status" => {
-            let status = serde_json::json!({
+            Some(serde_json::json!({
                 "path": if state.path_disclosure { state.saved_path.clone() } else { None::<String> },
                 "title": state.title,
                 "saved": state.saved_path.is_some(),
                 "dirty": state.dirty,
                 "path_disclosure": state.path_disclosure,
-            });
-            IpcResponse { ok: true, value: Some(status.to_string()) }
+            }))
         }
         "linecount" => {
             let count = state.current_content.split('\n').count();
             let count = if state.current_content.ends_with('\n') { count - 1 } else { count };
-            IpcResponse { ok: true, value: Some(count.to_string()) }
+            Some(serde_json::json!(count))
         }
-        _ => IpcResponse { ok: false, value: None },
+        _ => None,
     }
+}
+
+const ALL_PROPERTIES: &[&str] = &["path", "body", "title", "linecount"];
+
+fn handle_query(app: &AppHandle, properties: &[String]) -> IpcResponse {
+    let state = app.state::<AppState>();
+    let state = state.lock().unwrap();
+
+    // Expand "all" into all properties
+    let expanded: Vec<&str> = if properties.iter().any(|p| p == "all") {
+        ALL_PROPERTIES.to_vec()
+    } else {
+        properties.iter().map(|s| s.as_str()).collect()
+    };
+
+    // Single property: return plain value for backward compatibility
+    if expanded.len() == 1 {
+        let prop = expanded[0];
+        // "status" is already JSON, keep its original behavior
+        if prop == "status" {
+            if let Some(val) = query_single(&state, prop) {
+                return IpcResponse { ok: true, value: Some(val.to_string()) };
+            }
+            return IpcResponse { ok: false, value: None };
+        }
+        return match query_single(&state, prop) {
+            Some(serde_json::Value::String(s)) => IpcResponse { ok: true, value: Some(s) },
+            Some(val) => IpcResponse { ok: true, value: Some(val.to_string()) },
+            None => IpcResponse { ok: false, value: None },
+        };
+    }
+
+    // Multiple properties: return JSON object
+    let mut map = serde_json::Map::new();
+    for prop in &expanded {
+        if let Some(val) = query_single(&state, prop) {
+            map.insert(prop.to_string(), val);
+        } else {
+            map.insert(prop.to_string(), serde_json::Value::Null);
+        }
+    }
+    IpcResponse { ok: true, value: Some(serde_json::Value::Object(map).to_string()) }
 }
 
 fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
