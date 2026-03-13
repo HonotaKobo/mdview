@@ -11,6 +11,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-opener": "^2.5.3",
     "highlight.js": "^11",
     "katex": "^0.16.38",
     "markdown-it": "^14",

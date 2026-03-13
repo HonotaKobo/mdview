@@ -2,6 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { renderMarkdown } from './renderer';
 import { ScrollKeeper } from './scroll-keeper';
 import { ThemeManager } from './theme';
@@ -96,6 +97,26 @@ listen('content-update', async (event) => {
 });
 
 // File change detection (file mode) — handled by Rust watcher via content-update event
+
+// Intercept link clicks: open external URLs in default browser, handle anchors in-page
+document.getElementById('content')!.addEventListener('click', (e) => {
+  const anchor = (e.target as HTMLElement).closest('a');
+  if (!anchor) return;
+
+  const href = anchor.getAttribute('href');
+  if (!href) return;
+
+  e.preventDefault();
+
+  if (href.startsWith('#')) {
+    // In-page anchor navigation
+    const target = document.getElementById(decodeURIComponent(href.slice(1)));
+    if (target) target.scrollIntoView({ behavior: 'smooth' });
+  } else {
+    // External URL — open in system default browser
+    openUrl(href);
+  }
+});
 
 // Drag & drop support
 document.addEventListener('dragover', (e) => {

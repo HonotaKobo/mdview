@@ -45,6 +45,22 @@ mdview                    # GUIファイル選択ダイアログから開く
 
 ## インストール
 
+### macOS（Homebrew）
+
+```bash
+brew tap HonotaKobo/mdview
+brew install --cask mdview
+```
+
+### Windows（Scoop）
+
+```powershell
+scoop bucket add mdview https://github.com/HonotaKobo/scoop-mdview
+scoop install mdview
+```
+
+### その他
+
 [GitHub Releases](../../releases) から最新版をダウンロードしてください。
 
 | プラットフォーム | フォーマット |
