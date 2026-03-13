@@ -47,6 +47,27 @@ pub fn run() {
         return;
     }
 
+    // Daemonize: re-launch self in background so the terminal is freed immediately
+    if !args.foreground {
+        let exe = std::env::current_exe().expect("failed to get executable path");
+        let mut child_args: Vec<String> = std::env::args().skip(1).collect();
+        child_args.push("--_foreground".to_string());
+        // Pass auto-generated ID explicitly so the child doesn't regenerate it
+        if args.id.is_none() {
+            child_args.push("--id".to_string());
+            child_args.push(id.clone());
+        }
+        use std::process::{Command, Stdio};
+        Command::new(exe)
+            .args(&child_args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("failed to launch mdview");
+        return;
+    }
+
     let initial_content = args.body.clone().unwrap_or_default();
     let initial_title = args.title.clone().unwrap_or_else(|| "Untitled".to_string());
     let initial_file = args.file.clone().or_else(|| args.file_pos.clone());

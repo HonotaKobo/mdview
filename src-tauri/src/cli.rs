@@ -58,6 +58,10 @@ pub struct CliArgs {
     /// Content for --insert / --replace (use \n for newlines)
     #[arg(long)]
     pub content: Option<String>,
+
+    /// Internal: run GUI in foreground (used by daemonize logic)
+    #[arg(long = "_foreground", hide = true)]
+    pub foreground: bool,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
