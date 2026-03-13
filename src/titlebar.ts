@@ -50,6 +50,7 @@ export class CustomTitleBar {
     // Initialize check states from localStorage
     const savedTheme = localStorage.getItem('mdcast-theme') || 'auto';
     this.checkStates = {
+      edit_toggle: false,
       theme_dark: savedTheme === 'dark',
       theme_light: savedTheme === 'light',
       theme_auto: savedTheme === 'auto',
@@ -93,6 +94,8 @@ export class CustomTitleBar {
         id: 'edit',
         label: this.t('menu.edit'),
         items: [
+          { type: 'check', id: 'edit_toggle', label: this.t('menu.edit_toggle') },
+          { type: 'separator' },
           { type: 'normal', id: 'edit_copy_markdown', label: this.t('menu.edit_copy_markdown'), accelerator: 'Ctrl+Shift+C' },
           { type: 'normal', id: 'edit_copy_plaintext', label: this.t('menu.edit_copy_plaintext') },
           { type: 'separator' },
@@ -388,7 +391,9 @@ export class CustomTitleBar {
   private listenForStateChanges(): void {
     listen('menu-action', (event) => {
       const { action, value } = event.payload as { action: string; value?: unknown };
-      if (action === 'theme_change' && typeof value === 'string') {
+      if (action === 'edit_toggle' && typeof value === 'boolean') {
+        this.setCheck('edit_toggle', value);
+      } else if (action === 'theme_change' && typeof value === 'string') {
         this.setThemeCheck(value);
       } else if (action === 'always_on_top_changed') {
         this.setCheck('view_always_on_top', value === true);

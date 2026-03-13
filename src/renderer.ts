@@ -103,6 +103,11 @@ function deflistTaskPlugin(md: MarkdownIt): void {
 
 md.use(deflistTaskPlugin);
 
+/** Expose the markdown-it instance for block parsing in editor mode */
+export function getMarkdownIt(): MarkdownIt {
+  return md;
+}
+
 export async function renderMarkdown(
   content: string,
   container: HTMLElement

@@ -31,6 +31,10 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
 
     // --- Edit menu ---
     let edit_menu = SubmenuBuilder::new(app, i18n.t("menu.edit"))
+        .item(&CheckMenuItemBuilder::with_id("edit_toggle", i18n.t("menu.edit_toggle"))
+            .accelerator("CmdOrCtrl+E")
+            .build(app)?)
+        .separator()
         .item(&MenuItemBuilder::with_id("edit_copy_markdown", i18n.t("menu.edit_copy_markdown"))
             .accelerator("CmdOrCtrl+Shift+C")
             .build(app)?)
@@ -149,6 +153,16 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                     }
                 }
                 let _ = app.emit("menu-action", serde_json::json!({ "action": "always_on_top_changed", "value": new_state }));
+            }
+        }
+
+        // Edit mode toggle — flip check mark and emit to frontend
+        "edit_toggle" => {
+            if let Some(item) = app.menu().and_then(|m| m.get("edit_toggle")) {
+                if let Some(check) = item.as_check_menuitem() {
+                    let new_state = check.is_checked().unwrap_or(false);
+                    let _ = app.emit("menu-action", serde_json::json!({ "action": "edit_toggle", "value": new_state }));
+                }
             }
         }
 

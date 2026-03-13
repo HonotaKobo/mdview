@@ -10,6 +10,7 @@ import { handleSave, handleSaveAs, handleRename } from './save';
 import { FindBar } from './find';
 import { FontSizeManager } from './font-size';
 import { CustomTitleBar } from './titlebar';
+import { EditorController } from './editor/editor-controller';
 
 interface ContentUpdate {
   body?: string;
@@ -18,17 +19,24 @@ interface ContentUpdate {
 
 interface MenuAction {
   action: string;
-  value?: string;
+  value?: string | boolean;
 }
 
 let currentContent = '';
 let currentTitle = 'Untitled';
 let isDirty = false;
+let editMode = false;
 let customTitleBar: CustomTitleBar | null = null;
 
 const themeManager = new ThemeManager();
 const findBar = new FindBar();
 const fontSizeManager = new FontSizeManager();
+const editorController = new EditorController(document.getElementById('content')!);
+
+editorController.setOnContentChange((markdown) => {
+  currentContent = markdown;
+  isDirty = true;
+});
 
 function updateWindowTitle(title: string) {
   getCurrentWindow().setTitle(`${title} — mdcast`);
@@ -67,8 +75,14 @@ async function openFile(filePath: string) {
   const fileName = filePath.split(/[\\/]/).pop() || 'Untitled';
   currentContent = content;
   currentTitle = fileName;
-  const container = document.getElementById('content')!;
-  await renderMarkdown(content, container);
+
+  if (editMode) {
+    editorController.updateContent(content);
+  } else {
+    const container = document.getElementById('content')!;
+    await renderMarkdown(content, container);
+  }
+
   updateWindowTitle(currentTitle);
   await invoke('notify_saved', { path: filePath });
 }
@@ -84,11 +98,17 @@ async function showOpenDialog() {
 }
 
 async function doSave() {
+  if (editMode) {
+    currentContent = editorController.getCurrentContent();
+  }
   await handleSave(currentContent, currentTitle);
   isDirty = false;
 }
 
 async function doSaveAs() {
+  if (editMode) {
+    currentContent = editorController.getCurrentContent();
+  }
   await handleSaveAs(currentContent, currentTitle);
   isDirty = false;
 }
@@ -103,6 +123,9 @@ async function doRename() {
 }
 
 async function copyAsMarkdown() {
+  if (editMode) {
+    currentContent = editorController.getCurrentContent();
+  }
   await navigator.clipboard.writeText(currentContent);
 }
 
@@ -118,6 +141,25 @@ function selectAll() {
   range.selectNodeContents(content);
   selection?.removeAllRanges();
   selection?.addRange(range);
+}
+
+// --- Edit mode toggle ---
+
+function toggleEditMode(forceState?: boolean): void {
+  const newState = forceState !== undefined ? forceState : !editMode;
+
+  if (newState === editMode) return;
+
+  if (newState) {
+    // Enter edit mode
+    editMode = true;
+    editorController.enterEditMode(currentContent);
+  } else {
+    // Exit edit mode
+    currentContent = editorController.exitEditMode();
+    editMode = false;
+    renderMarkdownWithScrollKeep(currentContent);
+  }
 }
 
 // Pull initial content from Rust backend (reliable, no race condition)
@@ -142,7 +184,12 @@ listen('content-update', async (event) => {
   if (update.body !== undefined) {
     currentContent = update.body;
     isDirty = true;
-    await renderMarkdownWithScrollKeep(update.body);
+
+    if (editMode) {
+      editorController.updateContent(update.body);
+    } else {
+      await renderMarkdownWithScrollKeep(update.body);
+    }
   }
   if (update.title !== undefined) {
     currentTitle = update.title;
@@ -155,6 +202,9 @@ listen('menu-action', (event) => {
   const { action, value } = event.payload as MenuAction;
 
   switch (action) {
+    case 'edit_toggle':
+      toggleEditMode(value as boolean);
+      break;
     case 'file_open':
       showOpenDialog();
       break;
@@ -210,6 +260,9 @@ listen('menu-action', (event) => {
 
 // Intercept link clicks: open external URLs in default browser, handle anchors in-page
 document.getElementById('content')!.addEventListener('click', (e) => {
+  // In edit mode, don't intercept link clicks (let contenteditable handle them)
+  if (editMode) return;
+
   const anchor = (e.target as HTMLElement).closest('a');
   if (!anchor) return;
 
@@ -242,8 +295,14 @@ document.addEventListener('drop', async (e) => {
     const text = await file.text();
     currentContent = text;
     currentTitle = file.name;
-    const container = document.getElementById('content')!;
-    await renderMarkdown(text, container);
+
+    if (editMode) {
+      editorController.updateContent(text);
+    } else {
+      const container = document.getElementById('content')!;
+      await renderMarkdown(text, container);
+    }
+
     updateWindowTitle(currentTitle);
   }
 });
