@@ -117,25 +117,6 @@ struct IpcResponse {
     value: Option<String>,
 }
 
-/// \n → newline, \\ → backslash
-fn unescape_content(s: &str) -> String {
-    let mut result = String::new();
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            match chars.next() {
-                Some('n') => result.push('\n'),
-                Some('\\') => result.push('\\'),
-                Some(other) => { result.push('\\'); result.push(other); }
-                None => result.push('\\'),
-            }
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
-
 /// "199-200" → (199, 200), "42" → (42, 42)
 fn parse_single_range(s: &str) -> Result<(usize, usize), String> {
     if let Some((a, b)) = s.split_once('-') {
@@ -169,12 +150,10 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
         serde_json::json!({ "type": "Delete", "ranges": parsed })
     } else if let Some(line) = args.insert {
         let content = args.content.as_ref().ok_or("mdview: --content is required with --insert")?;
-        let content = unescape_content(content);
         serde_json::json!({ "type": "Insert", "line": line, "content": content })
     } else if let Some(ref range) = args.replace {
         let (start, end) = parse_single_range(range)?;
         let content = args.content.as_ref().ok_or("mdview: --content is required with --replace")?;
-        let content = unescape_content(content);
         serde_json::json!({ "type": "Replace", "start": start, "end": end, "content": content })
     } else {
         serde_json::json!({ "type": "Update", "body": args.body, "title": args.title })

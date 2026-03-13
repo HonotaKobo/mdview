@@ -1,5 +1,27 @@
 use clap::{Parser, ValueEnum};
 
+/// Unescape \n → newline, \\ → backslash
+fn unescape(s: &str) -> Result<String, String> {
+    let mut result = String::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => result.push('\n'),
+                Some('\\') => result.push('\\'),
+                Some(other) => {
+                    result.push('\\');
+                    result.push(other);
+                }
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    Ok(result)
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "mdview", about = "Markdown viewer for the AI age")]
 pub struct CliArgs {
@@ -11,8 +33,8 @@ pub struct CliArgs {
     #[arg(long, value_name = "PATH", conflicts_with = "file_pos")]
     pub file: Option<String>,
 
-    /// Markdown body content (full replacement)
-    #[arg(long, conflicts_with_all = ["file_pos", "file", "delete", "insert", "replace", "grep", "lines"])]
+    /// Markdown body content (full replacement, use \n for newlines)
+    #[arg(long, value_parser = unescape, conflicts_with_all = ["file_pos", "file", "delete", "insert", "replace", "grep", "lines"])]
     pub body: Option<String>,
 
     /// Window identifier (same ID updates existing window)
@@ -56,7 +78,7 @@ pub struct CliArgs {
     pub replace: Option<String>,
 
     /// Content for --insert / --replace (use \n for newlines)
-    #[arg(long)]
+    #[arg(long, value_parser = unescape)]
     pub content: Option<String>,
 
     /// Internal: run GUI in foreground (used by daemonize logic)
