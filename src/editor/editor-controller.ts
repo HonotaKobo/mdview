@@ -2,7 +2,7 @@ import type { Block } from './block-model';
 import { generateBlockKey } from './block-model';
 import { parseBlocks } from './block-parser';
 import { exportMarkdown } from './block-export';
-import { renderBlockElement } from './block-renderer';
+import { renderBlockElement, setFootnoteContext } from './block-renderer';
 
 /**
  * EditorController manages the edit mode lifecycle.
@@ -14,6 +14,13 @@ export class EditorController {
   private container: HTMLElement;
   private activeBlockKey: string | null = null;
   private onContentChange: ((markdown: string) => void) | null = null;
+
+  /** Original block state for Escape cancellation */
+  private originalBlockState: Map<string, { text: string; lang?: string }> = new Map();
+
+  /** Undo/Redo stacks (markdown snapshots) */
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -28,6 +35,8 @@ export class EditorController {
   enterEditMode(content: string): void {
     this.blocks = parseBlocks(content);
     document.body.classList.add('edit-mode');
+    this.undoStack = [content];
+    this.redoStack = [];
     this.renderAllBlocks();
   }
 
@@ -48,7 +57,36 @@ export class EditorController {
   updateContent(content: string): void {
     this.blocks = parseBlocks(content);
     this.activeBlockKey = null;
+    this.undoStack = [content];
+    this.redoStack = [];
     this.renderAllBlocks();
+  }
+
+  /** Undo last change (call when not inside a textarea) */
+  undo(): void {
+    if (this.undoStack.length <= 1) return;
+    const current = this.undoStack.pop()!;
+    this.redoStack.push(current);
+    const prev = this.undoStack[this.undoStack.length - 1];
+    this.blocks = parseBlocks(prev);
+    this.activeBlockKey = null;
+    this.renderAllBlocks();
+    if (this.onContentChange) {
+      this.onContentChange(prev);
+    }
+  }
+
+  /** Redo last undone change */
+  redo(): void {
+    if (this.redoStack.length === 0) return;
+    const next = this.redoStack.pop()!;
+    this.undoStack.push(next);
+    this.blocks = parseBlocks(next);
+    this.activeBlockKey = null;
+    this.renderAllBlocks();
+    if (this.onContentChange) {
+      this.onContentChange(next);
+    }
   }
 
   // --- Rendering ---
@@ -67,32 +105,149 @@ export class EditorController {
       this.blocks.push(emptyBlock);
     }
 
-    for (const block of this.blocks) {
+    this.updateFootnoteContext();
+
+    for (let i = 0; i < this.blocks.length; i++) {
+      this.container.appendChild(this.createGapElement());
+
+      const block = this.blocks[i];
       const el = renderBlockElement(block);
       this.attachBlockEvents(el, block);
       this.container.appendChild(el);
     }
+
+    // Gap after last block
+    this.container.appendChild(this.createGapElement());
   }
 
   private rerenderBlock(block: Block): void {
     const oldEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
     if (!oldEl) return;
 
+    this.updateFootnoteContext();
+
     const newEl = renderBlockElement(block);
     this.attachBlockEvents(newEl, block);
     oldEl.replaceWith(newEl);
   }
 
+  // --- Gap / Add block ---
+
+  private createGapElement(): HTMLElement {
+    const gap = document.createElement('div');
+    gap.className = 'block-gap';
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'block-add-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add block';
+    // Prevent textarea from losing focus on mousedown
+    addBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+    });
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.insertBlockAtGap(gap);
+    });
+
+    gap.appendChild(addBtn);
+
+    gap.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.insertBlockAtGap(gap);
+    });
+
+    return gap;
+  }
+
+  private insertBlockAtGap(gap: HTMLElement): void {
+    // Sync current active block
+    if (this.activeBlockKey) {
+      const activeBlock = this.blocks.find(b => b.key === this.activeBlockKey);
+      if (activeBlock) {
+        const textarea = this.getTextarea(activeBlock);
+        if (textarea) {
+          this.syncBlockText(activeBlock, textarea);
+          if (activeBlock.text.trim() === '' && this.blocks.length > 1) {
+            const idx = this.blocks.indexOf(activeBlock);
+            if (idx !== -1) this.blocks.splice(idx, 1);
+          } else {
+            this.detectTypeChange(activeBlock);
+          }
+        }
+      }
+      this.activeBlockKey = null;
+    }
+
+    // Determine insert position by counting blocks before this gap
+    const children = Array.from(this.container.children);
+    const gapIndex = children.indexOf(gap);
+    let blockIndex = 0;
+    for (let i = 0; i < gapIndex; i++) {
+      if (children[i].classList.contains('md-block')) blockIndex++;
+    }
+
+    const newBlock: Block = {
+      key: generateBlockKey(),
+      type: 'paragraph',
+      text: '',
+      sourceStart: 0,
+      sourceEnd: 0,
+    };
+
+    this.blocks.splice(blockIndex, 0, newBlock);
+    this.renderAllBlocks();
+
+    this.originalBlockState.set(newBlock.key, { text: '', lang: undefined });
+    this.activeBlockKey = newBlock.key;
+    this.focusBlock(newBlock, 'start');
+    // Don't call notifyChange — empty block is temporary
+  }
+
   // --- Event handling ---
 
   private attachBlockEvents(el: HTMLElement, block: Block): void {
-    // Focus tracking: when a textarea in this block gets focus,
-    // sync and re-render the previously active block.
+    // Focus tracking
     el.addEventListener('focusin', () => {
       if (this.activeBlockKey && this.activeBlockKey !== block.key) {
         this.syncAndRerenderBlock(this.activeBlockKey);
       }
+      if (!this.originalBlockState.has(block.key)) {
+        this.originalBlockState.set(block.key, { text: block.text, lang: block.lang });
+      }
       this.activeBlockKey = block.key;
+    });
+
+    // Focus lost: exit edit mode if focus leaves this block
+    el.addEventListener('focusout', (e) => {
+      const related = (e as FocusEvent).relatedTarget as HTMLElement | null;
+      if (related && el.contains(related)) return;
+
+      requestAnimationFrame(() => {
+        if (this.activeBlockKey !== block.key) return;
+        this.activeBlockKey = null;
+        this.originalBlockState.delete(block.key);
+
+        // Sync the block
+        const textarea = this.getTextarea(block);
+        if (textarea) this.syncBlockText(block, textarea);
+
+        // Remove empty blocks
+        if (block.text.trim() === '' && this.blocks.length > 1) {
+          const idx = this.blocks.indexOf(block);
+          if (idx !== -1) {
+            this.blocks.splice(idx, 1);
+            this.renderAllBlocks();
+            this.notifyChange();
+            return;
+          }
+        }
+
+        this.detectTypeChange(block);
+        this.rerenderBlock(block);
+        this.notifyChange();
+      });
     });
 
     // Keyboard events
@@ -113,6 +268,33 @@ export class EditorController {
   private handleKeyDown(e: KeyboardEvent, block: Block): void {
     const textarea = this.getTextarea(block);
     if (!textarea) return;
+
+    // Escape: cancel editing, restore original text
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const original = this.originalBlockState.get(block.key);
+      if (original) {
+        block.text = original.text;
+        block.lang = original.lang;
+      }
+      this.originalBlockState.delete(block.key);
+      this.activeBlockKey = null;
+
+      // Remove block if empty after restore
+      if (block.text.trim() === '' && this.blocks.length > 1) {
+        const idx = this.blocks.indexOf(block);
+        if (idx !== -1) {
+          this.blocks.splice(idx, 1);
+          this.renderAllBlocks();
+          return;
+        }
+      }
+
+      this.rerenderBlock(block);
+      return;
+    }
 
     if (e.key === 'Enter' && !e.shiftKey) {
       // Split paragraph/heading on Enter
@@ -171,17 +353,21 @@ export class EditorController {
     this.blocks.splice(idx + 1, 0, newBlock);
 
     // Re-render current block (exits editing, shows preview)
+    this.originalBlockState.delete(block.key);
     this.rerenderBlock(block);
 
-    // Render and insert new block
+    // Render and insert new block (with gap)
+    const newGap = this.createGapElement();
     const newEl = renderBlockElement(newBlock);
     this.attachBlockEvents(newEl, newBlock);
     const currentEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
     if (currentEl) {
-      currentEl.after(newEl);
+      currentEl.after(newGap);
+      newGap.after(newEl);
     }
 
     // Focus the new block
+    this.originalBlockState.set(newBlock.key, { text: after, lang: undefined });
     this.activeBlockKey = newBlock.key;
     this.focusBlock(newBlock, 'start');
     this.notifyChange();
@@ -200,9 +386,13 @@ export class EditorController {
 
     this.blocks.splice(idx, 1);
     const currentEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
+    // Remove the block and the gap before it
+    currentEl?.previousElementSibling?.remove();
     currentEl?.remove();
 
+    this.originalBlockState.delete(block.key);
     this.rerenderBlock(prevBlock);
+    this.originalBlockState.set(prevBlock.key, { text: prevBlock.text, lang: prevBlock.lang });
     this.activeBlockKey = prevBlock.key;
     this.focusBlock(prevBlock, prevTextLen);
     this.notifyChange();
@@ -226,8 +416,11 @@ export class EditorController {
 
     this.blocks.splice(idx + 1, 1);
     const nextEl = this.container.querySelector(`[data-block-key="${nextBlock.key}"]`);
+    // Remove the block and the gap before it
+    nextEl?.previousElementSibling?.remove();
     nextEl?.remove();
 
+    this.originalBlockState.delete(nextBlock.key);
     this.rerenderBlock(block);
     this.activeBlockKey = block.key;
     this.focusBlock(block, currentTextLen);
@@ -281,6 +474,37 @@ export class EditorController {
 
   // --- Sync ---
 
+  /** Sync textarea content to block model, handling fence/math delimiters */
+  private syncBlockText(block: Block, textarea: HTMLTextAreaElement): void {
+    if (block.type === 'fence') {
+      const lines = textarea.value.split('\n');
+      const first = lines[0] || '';
+      const fenceMatch = first.match(/^(`{3,})(.*)/);
+      if (fenceMatch) {
+        block.lang = fenceMatch[2].trim() || undefined;
+        const last = lines[lines.length - 1] || '';
+        if (/^`{3,}\s*$/.test(last) && lines.length > 1) {
+          block.text = lines.slice(1, -1).join('\n');
+        } else {
+          block.text = lines.slice(1).join('\n');
+        }
+      } else {
+        block.text = textarea.value;
+      }
+    } else if (block.type === 'math') {
+      const lines = textarea.value.split('\n');
+      const first = lines[0] || '';
+      const last = lines[lines.length - 1] || '';
+      if (/^\$\$/.test(first) && /^\$\$/.test(last) && lines.length > 1) {
+        block.text = lines.slice(1, -1).join('\n');
+      } else {
+        block.text = textarea.value;
+      }
+    } else {
+      block.text = textarea.value;
+    }
+  }
+
   private syncActiveBlock(): void {
     if (!this.activeBlockKey) return;
 
@@ -290,7 +514,7 @@ export class EditorController {
     const textarea = this.getTextarea(block);
     if (!textarea) return;
 
-    block.text = textarea.value;
+    this.syncBlockText(block, textarea);
   }
 
   private syncAndRerenderBlock(blockKey: string): void {
@@ -303,7 +527,8 @@ export class EditorController {
     const textarea = el.querySelector('.block-editor-textarea') as HTMLTextAreaElement;
     if (!textarea) return;
 
-    block.text = textarea.value;
+    this.syncBlockText(block, textarea);
+    this.originalBlockState.delete(blockKey);
 
     // Detect type changes (e.g., user typed # at start of paragraph)
     this.detectTypeChange(block);
@@ -345,9 +570,27 @@ export class EditorController {
     this.notifyChange();
   }
 
+  /** Collect footnote definitions from all blocks and set context for preview */
+  private updateFootnoteContext(): void {
+    const footnoteDefs = this.blocks
+      .filter(b => /^\[\^[^\]]+\]:/m.test(b.text))
+      .map(b => b.text)
+      .join('\n');
+    setFootnoteContext(footnoteDefs);
+  }
+
   private notifyChange(): void {
+    const content = exportMarkdown(this.blocks);
+    // Push to undo stack if different from last entry
+    if (this.undoStack.length === 0 || this.undoStack[this.undoStack.length - 1] !== content) {
+      this.undoStack.push(content);
+      this.redoStack = [];
+      if (this.undoStack.length > 100) {
+        this.undoStack.shift();
+      }
+    }
     if (this.onContentChange) {
-      this.onContentChange(exportMarkdown(this.blocks));
+      this.onContentChange(content);
     }
   }
 }

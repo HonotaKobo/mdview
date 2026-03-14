@@ -1,8 +1,15 @@
 import type { Block } from './block-model';
-import { getMarkdownIt } from '../renderer';
+import { getMarkdownIt, addCopyButtons } from '../renderer';
 import katex from 'katex';
 
 const EDIT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+/** Footnote definitions context for resolving references in previews */
+let _footnoteContext = '';
+
+export function setFootnoteContext(defs: string): void {
+  _footnoteContext = defs;
+}
 
 /**
  * Render a single block into an HTML element for edit mode.
@@ -45,6 +52,18 @@ export function renderBlockElement(block: Block): HTMLElement {
   renderPreview(block, preview);
   wrapper.appendChild(preview);
 
+  // Double-click preview to enter edit mode
+  preview.addEventListener('dblclick', () => {
+    if (!wrapper.classList.contains('editing')) {
+      wrapper.classList.add('editing');
+      const textarea = wrapper.querySelector('.block-editor-textarea') as HTMLTextAreaElement;
+      if (textarea) {
+        textarea.focus();
+        autoResize(textarea);
+      }
+    }
+  });
+
   // Source (textarea + toolbar, hidden by default)
   const source = document.createElement('div');
   source.className = 'block-source';
@@ -75,50 +94,56 @@ function renderPreview(block: Block, preview: HTMLElement): void {
     case 'code':
       preview.innerHTML = md.render(block.text.split('\n').map(l => '    ' + l).join('\n'));
       break;
-    default:
-      preview.innerHTML = md.render(block.text);
+    default: {
+      const isFootnoteDef = /^\[\^[^\]]+\]:/m.test(block.text);
+      let renderText = block.text;
+
+      // Inject footnote definitions so references resolve in preview
+      if (_footnoteContext && !isFootnoteDef) {
+        renderText += '\n\n' + _footnoteContext;
+      }
+
+      let html = md.render(renderText);
+
+      // Strip the footnote section for non-definition blocks
+      if (!isFootnoteDef && _footnoteContext) {
+        html = html.replace(/<hr class="footnotes-sep">[\s\S]*$/, '');
+      }
+
+      preview.innerHTML = html;
       break;
+    }
   }
+
+  // Add copy buttons to any <pre> elements in the preview
+  addCopyButtons(preview);
 }
 
 // --- Source (textarea + toolbar) ---
 
 function renderSource(block: Block, source: HTMLElement): void {
-  // Top delimiter label for fence/math
-  if (block.type === 'fence') {
-    addLabel(source, '```' + (block.lang || ''));
-  } else if (block.type === 'math') {
-    addLabel(source, '$$');
-  }
-
-  // Textarea
+  // Textarea — for fence/math, include delimiters in the editable area
   const textarea = document.createElement('textarea');
   textarea.className = 'block-editor-textarea';
-  textarea.value = block.text;
+
+  if (block.type === 'fence') {
+    textarea.value = '```' + (block.lang || '') + '\n' + block.text + '\n```';
+  } else if (block.type === 'math') {
+    textarea.value = '$$\n' + block.text + '\n$$';
+  } else {
+    textarea.value = block.text;
+  }
+
   textarea.rows = 1;
   textarea.spellcheck = false;
   textarea.addEventListener('input', () => autoResize(textarea));
   textarea.addEventListener('focus', () => autoResize(textarea));
   source.appendChild(textarea);
 
-  // Bottom delimiter label for fence/math
-  if (block.type === 'fence') {
-    addLabel(source, '```');
-  } else if (block.type === 'math') {
-    addLabel(source, '$$');
-  }
-
   // Formatting toolbar (text-oriented blocks only)
   if (!['fence', 'code', 'math'].includes(block.type)) {
     source.appendChild(createToolbar(textarea));
   }
-}
-
-function addLabel(parent: HTMLElement, text: string): void {
-  const el = document.createElement('div');
-  el.className = 'source-label';
-  el.textContent = text;
-  parent.appendChild(el);
 }
 
 function autoResize(textarea: HTMLTextAreaElement): void {
@@ -160,12 +185,42 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
 
 function wrapSelection(textarea: HTMLTextAreaElement, prefix: string, suffix: string): void {
   const { selectionStart: start, selectionEnd: end, value } = textarea;
-  const selected = value.slice(start, end) || 'text';
-  const inserted = prefix + selected + suffix;
 
+  // Check if surrounding text already has the prefix/suffix (toggle off)
+  const beforePrefix = value.slice(start - prefix.length, start);
+  const afterSuffix = value.slice(end, end + suffix.length);
+
+  if (beforePrefix === prefix && afterSuffix === suffix) {
+    // Unwrap: remove surrounding prefix and suffix
+    const inner = value.slice(start, end);
+    textarea.value = value.slice(0, start - prefix.length) + inner + value.slice(end + suffix.length);
+    textarea.selectionStart = start - prefix.length;
+    textarea.selectionEnd = end - prefix.length;
+    textarea.focus();
+    textarea.dispatchEvent(new Event('input'));
+    return;
+  }
+
+  // Check if selected text itself starts with prefix and ends with suffix
+  const selected = value.slice(start, end);
+  if (selected.length >= prefix.length + suffix.length &&
+      selected.startsWith(prefix) && selected.endsWith(suffix)) {
+    // Unwrap: remove prefix and suffix from selection
+    const inner = selected.slice(prefix.length, -suffix.length);
+    textarea.value = value.slice(0, start) + inner + value.slice(end);
+    textarea.selectionStart = start;
+    textarea.selectionEnd = start + inner.length;
+    textarea.focus();
+    textarea.dispatchEvent(new Event('input'));
+    return;
+  }
+
+  // Wrap: add prefix and suffix
+  const sel = selected || 'text';
+  const inserted = prefix + sel + suffix;
   textarea.value = value.slice(0, start) + inserted + value.slice(end);
   textarea.selectionStart = start + prefix.length;
-  textarea.selectionEnd = start + prefix.length + selected.length;
+  textarea.selectionEnd = start + prefix.length + sel.length;
   textarea.focus();
   textarea.dispatchEvent(new Event('input'));
 }

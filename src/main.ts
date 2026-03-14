@@ -227,10 +227,22 @@ document.addEventListener('drop', async (e) => {
   }
 });
 
-// Escape to close find bar
+// Global keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && findBar.isVisible()) {
     findBar.hide();
+  }
+
+  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z redo (only when not in a textarea)
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+    if (document.activeElement?.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        editorController.redo();
+      } else {
+        editorController.undo();
+      }
+    }
   }
 });
 

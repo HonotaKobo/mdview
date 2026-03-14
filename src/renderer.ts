@@ -161,7 +161,7 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
 const COPY_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M0 0 C3.3 0 6.6 0 10 0 C10 3.3 10 6.6 10 10 C9.34 10 8.68 10 8 10 C8 10.66 8 11.32 8 12 C4.7 12 1.4 12 -2 12 C-2 8.7 -2 5.4 -2 2 C-1.34 2 -0.68 2 0 2 C0 1.34 0 0.68 0 0 Z M1 1 C1 1.33 1 1.66 1 2 C3.31 2 5.62 2 8 2 C8 4.31 8 6.62 8 9 C8.33 9 8.66 9 9 9 C9 6.36 9 3.72 9 1 C6.36 1 3.72 1 1 1 Z M-1 3 C-1 5.64 -1 8.28 -1 11 C1.64 11 4.28 11 7 11 C7 8.36 7 5.72 7 3 C4.36 3 1.72 3 -1 3 Z" fill="currentColor" transform="translate(4,2)"/></svg>';
 const CHECK_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" fill="currentColor"/></svg>';
 
-function addCopyButtons(container: HTMLElement): void {
+export function addCopyButtons(container: HTMLElement): void {
   const preBlocks = container.querySelectorAll('pre');
   for (const pre of preBlocks) {
     pre.style.position = 'relative';
