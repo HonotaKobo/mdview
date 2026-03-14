@@ -2,9 +2,6 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
-import { openUrl } from '@tauri-apps/plugin-opener';
-import { renderMarkdown } from './renderer';
-import { ScrollKeeper } from './scroll-keeper';
 import { ThemeManager } from './theme';
 import { handleSave, handleSaveAs, handleRename } from './save';
 import { FindBar } from './find';
@@ -25,7 +22,6 @@ interface MenuAction {
 let currentContent = '';
 let currentTitle = 'Untitled';
 let isDirty = false;
-let editMode = false;
 let customTitleBar: CustomTitleBar | null = null;
 
 const themeManager = new ThemeManager();
@@ -57,18 +53,6 @@ async function initPlatformUI() {
 }
 initPlatformUI();
 
-async function renderMarkdownWithScrollKeep(content: string): Promise<void> {
-  const container = document.getElementById('content')!;
-  const scrollKeeper = new ScrollKeeper(document.getElementById('scroll-area')!);
-
-  const anchor = scrollKeeper.captureAnchor();
-  await renderMarkdown(content, container);
-
-  if (anchor) {
-    scrollKeeper.restoreAnchor(anchor);
-  }
-}
-
 // Open a file via dialog or path
 async function openFile(filePath: string) {
   const content = await invoke<string>('read_file', { path: filePath });
@@ -76,12 +60,7 @@ async function openFile(filePath: string) {
   currentContent = content;
   currentTitle = fileName;
 
-  if (editMode) {
-    editorController.updateContent(content);
-  } else {
-    const container = document.getElementById('content')!;
-    await renderMarkdown(content, container);
-  }
+  editorController.updateContent(content);
 
   updateWindowTitle(currentTitle);
   await invoke('notify_saved', { path: filePath });
@@ -98,17 +77,13 @@ async function showOpenDialog() {
 }
 
 async function doSave() {
-  if (editMode) {
-    currentContent = editorController.getCurrentContent();
-  }
+  currentContent = editorController.getCurrentContent();
   await handleSave(currentContent, currentTitle);
   isDirty = false;
 }
 
 async function doSaveAs() {
-  if (editMode) {
-    currentContent = editorController.getCurrentContent();
-  }
+  currentContent = editorController.getCurrentContent();
   await handleSaveAs(currentContent, currentTitle);
   isDirty = false;
 }
@@ -123,9 +98,7 @@ async function doRename() {
 }
 
 async function copyAsMarkdown() {
-  if (editMode) {
-    currentContent = editorController.getCurrentContent();
-  }
+  currentContent = editorController.getCurrentContent();
   await navigator.clipboard.writeText(currentContent);
 }
 
@@ -143,33 +116,13 @@ function selectAll() {
   selection?.addRange(range);
 }
 
-// --- Edit mode toggle ---
-
-function toggleEditMode(forceState?: boolean): void {
-  const newState = forceState !== undefined ? forceState : !editMode;
-
-  if (newState === editMode) return;
-
-  if (newState) {
-    // Enter edit mode
-    editMode = true;
-    editorController.enterEditMode(currentContent);
-  } else {
-    // Exit edit mode
-    currentContent = editorController.exitEditMode();
-    editMode = false;
-    renderMarkdownWithScrollKeep(currentContent);
-  }
-}
-
 // Pull initial content from Rust backend (reliable, no race condition)
 async function loadInitialContent() {
   const [body, title] = await invoke<[string, string]>('get_initial_content');
   if (body) {
     currentContent = body;
     currentTitle = title || 'Untitled';
-    const container = document.getElementById('content')!;
-    await renderMarkdown(body, container);
+    editorController.enterEditMode(body);
     updateWindowTitle(currentTitle);
   } else {
     // No content provided — show file open dialog
@@ -185,11 +138,7 @@ listen('content-update', async (event) => {
     currentContent = update.body;
     isDirty = true;
 
-    if (editMode) {
-      editorController.updateContent(update.body);
-    } else {
-      await renderMarkdownWithScrollKeep(update.body);
-    }
+    editorController.updateContent(update.body);
   }
   if (update.title !== undefined) {
     currentTitle = update.title;
@@ -202,9 +151,6 @@ listen('menu-action', (event) => {
   const { action, value } = event.payload as MenuAction;
 
   switch (action) {
-    case 'edit_toggle':
-      toggleEditMode(value as boolean);
-      break;
     case 'file_open':
       showOpenDialog();
       break;
@@ -258,28 +204,7 @@ listen('menu-action', (event) => {
   }
 });
 
-// Intercept link clicks: open external URLs in default browser, handle anchors in-page
-document.getElementById('content')!.addEventListener('click', (e) => {
-  // In edit mode, don't intercept link clicks (let contenteditable handle them)
-  if (editMode) return;
-
-  const anchor = (e.target as HTMLElement).closest('a');
-  if (!anchor) return;
-
-  const href = anchor.getAttribute('href');
-  if (!href) return;
-
-  e.preventDefault();
-
-  if (href.startsWith('#')) {
-    // In-page anchor navigation
-    const target = document.getElementById(decodeURIComponent(href.slice(1)));
-    if (target) target.scrollIntoView({ behavior: 'smooth' });
-  } else {
-    // External URL — open in system default browser
-    openUrl(href);
-  }
-});
+// In edit mode, link clicks are handled by contenteditable
 
 // Drag & drop support
 document.addEventListener('dragover', (e) => {
@@ -296,12 +221,7 @@ document.addEventListener('drop', async (e) => {
     currentContent = text;
     currentTitle = file.name;
 
-    if (editMode) {
-      editorController.updateContent(text);
-    } else {
-      const container = document.getElementById('content')!;
-      await renderMarkdown(text, container);
-    }
+    editorController.updateContent(text);
 
     updateWindowTitle(currentTitle);
   }
