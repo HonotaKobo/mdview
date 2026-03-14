@@ -28,11 +28,13 @@
 /* Show markers when block has focus */
 .md-block:focus-within .ag-remove {
   display: inline;
+  position: relative;
+  z-index: 1;
 }
 
-/* Code fence lines: hidden by default, shown on focus */
+/* Code fence lines: always in layout, hidden by default, shown on focus */
 .ag-fence {
-  display: none;
+  visibility: hidden;
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
@@ -43,7 +45,7 @@
 }
 
 .md-block:focus-within .ag-fence {
-  display: block;
+  visibility: visible;
 }
 
 /* Contenteditable elements */
@@ -92,9 +94,11 @@ body.edit-mode .code-copy-btn {
 
 /* Print: hide edit mode indicators */
 @media print {
-  .ag-remove,
-  .ag-fence {
+  .ag-remove {
     display: none !important;
+  }
+  .ag-fence {
+    visibility: hidden !important;
   }
   body.edit-mode #scroll-area::after {
     display: none;

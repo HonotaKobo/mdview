@@ -25,6 +25,9 @@ export function renderBlockElement(block: Block): HTMLElement {
     case 'code':
       renderCodeBlock(block, wrapper);
       break;
+    case 'math':
+      renderMath(block, wrapper);
+      break;
     case 'hr':
       renderHr(block, wrapper);
       break;
@@ -112,6 +115,31 @@ function renderCodeBlock(block: Block, wrapper: HTMLElement): void {
   code.textContent = block.text;
   pre.appendChild(code);
   wrapper.appendChild(pre);
+}
+
+function renderMath(block: Block, wrapper: HTMLElement): void {
+  wrapper.classList.add('md-block-code');
+
+  // Top $$ marker
+  const topMarker = document.createElement('div');
+  topMarker.className = 'ag-fence';
+  topMarker.textContent = '$$';
+  wrapper.appendChild(topMarker);
+
+  // Math content (editable as raw text)
+  const pre = document.createElement('pre');
+  pre.className = 'hljs';
+  const code = document.createElement('code');
+  code.setAttribute('contenteditable', 'true');
+  code.textContent = block.text;
+  pre.appendChild(code);
+  wrapper.appendChild(pre);
+
+  // Bottom $$ marker
+  const bottomMarker = document.createElement('div');
+  bottomMarker.className = 'ag-fence';
+  bottomMarker.textContent = '$$';
+  wrapper.appendChild(bottomMarker);
 }
 
 function renderHr(_block: Block, wrapper: HTMLElement): void {
@@ -281,6 +309,24 @@ function appendInlineContent(text: string, parent: HTMLElement): void {
         break;
       }
 
+      case 'math_inline': {
+        const marker = token.markup || '$';
+        const openSpan = document.createElement('span');
+        openSpan.className = 'ag-remove';
+        openSpan.textContent = marker;
+        parent.appendChild(openSpan);
+
+        const span = document.createElement('span');
+        span.textContent = token.content;
+        parent.appendChild(span);
+
+        const closeSpan = document.createElement('span');
+        closeSpan.className = 'ag-remove';
+        closeSpan.textContent = marker;
+        parent.appendChild(closeSpan);
+        break;
+      }
+
       case 'image': {
         const src = token.attrGet('src') || '';
         const alt = token.content || '';
@@ -305,13 +351,16 @@ function appendInlineContent(text: string, parent: HTMLElement): void {
   }
 }
 
-function appendTokenToElement(token: { type: string; content: string }, parent: HTMLElement): void {
+function appendTokenToElement(token: { type: string; content: string; markup?: string }, parent: HTMLElement): void {
   if (token.type === 'text') {
     parent.appendChild(document.createTextNode(token.content));
   } else if (token.type === 'code_inline') {
     const code = document.createElement('code');
     code.textContent = token.content;
     parent.appendChild(code);
+  } else if (token.type === 'math_inline') {
+    const marker = token.markup || '$';
+    parent.appendChild(document.createTextNode(marker + token.content + marker));
   } else if (token.type === 'softbreak' || token.type === 'hardbreak') {
     parent.appendChild(document.createElement('br'));
   } else if (token.content) {

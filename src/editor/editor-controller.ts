@@ -96,10 +96,21 @@ export class EditorController {
 
     // Keyboard events for block operations
     el.addEventListener('keydown', (e) => this.handleKeyDown(e, block));
+
+    // Checkbox toggle
+    const checkboxes = el.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach((cb, index) => {
+      (cb as HTMLInputElement).removeAttribute('disabled');
+      cb.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleCheckbox(block, index);
+      });
+    });
   }
 
   private handleKeyDown(e: KeyboardEvent, block: Block): void {
-    if (e.key === 'Enter' && !e.shiftKey && block.type !== 'fence' && block.type !== 'code') {
+    if (e.key === 'Enter' && !e.shiftKey && block.type !== 'fence' && block.type !== 'code' && block.type !== 'math') {
       // Don't split in generic blocks (lists, tables, etc.) — let default behavior work
       if (block.type !== 'paragraph' && block.type !== 'heading') return;
 
@@ -356,6 +367,11 @@ export class EditorController {
 
   // --- Sync ---
 
+  /** Block types where we can safely sync text from a single contenteditable element */
+  private static readonly SYNCABLE_TYPES: ReadonlySet<string> = new Set([
+    'paragraph', 'heading', 'fence', 'code', 'math',
+  ]);
+
   /** Sync the currently active block's DOM content back to block.text */
   private syncActiveBlock(): void {
     if (!this.activeBlockKey) return;
@@ -363,29 +379,16 @@ export class EditorController {
     const block = this.blocks.find(b => b.key === this.activeBlockKey);
     if (!block) return;
 
+    // Skip sync for complex blocks with multiple contenteditable elements
+    if (!EditorController.SYNCABLE_TYPES.has(block.type)) return;
+
     const el = this.container.querySelector(`[data-block-key="${this.activeBlockKey}"]`);
     if (!el) return;
 
     const editable = el.querySelector('[contenteditable="true"]') as HTMLElement;
     if (!editable) return;
 
-    const text = this.getTextContent(editable);
-
-    switch (block.type) {
-      case 'heading': {
-        // textContent includes the # marker since ag-remove spans contain text
-        block.text = text;
-        break;
-      }
-      case 'fence': {
-        // Code content only (fences are separate elements)
-        block.text = text;
-        break;
-      }
-      default:
-        block.text = text;
-        break;
-    }
+    block.text = this.getTextContent(editable);
   }
 
   /** Sync and re-render a specific block (called when focus leaves a block) */
@@ -393,20 +396,17 @@ export class EditorController {
     const block = this.blocks.find(b => b.key === blockKey);
     if (!block) return;
 
+    // Skip sync+rerender for complex blocks with multiple contenteditable elements
+    // (lists, tables, definition lists, html, etc.) to avoid content destruction
+    if (!EditorController.SYNCABLE_TYPES.has(block.type)) return;
+
     const el = this.container.querySelector(`[data-block-key="${blockKey}"]`);
     if (!el) return;
 
     const editable = el.querySelector('[contenteditable="true"]') as HTMLElement;
     if (!editable) return;
 
-    const text = this.getTextContent(editable);
-
-    // Update block text
-    if (block.type === 'heading' || block.type === 'fence') {
-      block.text = text;
-    } else {
-      block.text = text;
-    }
+    block.text = this.getTextContent(editable);
 
     // Detect type changes (e.g., user typed # at start of paragraph)
     this.detectTypeChange(block);
@@ -435,6 +435,20 @@ export class EditorController {
         block.level = match[1].length;
       }
     }
+  }
+
+  private toggleCheckbox(block: Block, index: number): void {
+    let count = 0;
+    block.text = block.text.replace(/\[([ xX])\]/g, (match, state) => {
+      if (count === index) {
+        count++;
+        return state === ' ' ? '[x]' : '[ ]';
+      }
+      count++;
+      return match;
+    });
+    this.rerenderBlock(block);
+    this.notifyChange();
   }
 
   private notifyChange(): void {

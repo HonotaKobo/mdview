@@ -11,7 +11,7 @@ export function parseBlocks(content: string): Block[] {
   const md = getMarkdownIt();
   const tokens = md.parse(content, {});
   const lines = content.split('\n');
-  const blocks: Block[] = [];
+  let blocks: Block[] = [];
   let i = 0;
 
   while (i < tokens.length) {
@@ -33,6 +33,12 @@ export function parseBlocks(content: string): Block[] {
     // Skip past the closing token for open/close pairs
     i = skipToClose(tokens, i, token) + 1;
   }
+
+  // Post-process: merge HTML structures (details, div, etc.)
+  blocks = mergeHtmlStructures(blocks, lines);
+
+  // Post-process: fill gaps for uncovered lines (footnotes, etc.)
+  blocks = fillUncoveredLines(blocks, lines);
 
   return blocks;
 }
@@ -161,6 +167,15 @@ function tokenToBlock(
         sourceEnd: end,
       };
 
+    case 'math_block':
+      return {
+        key: generateBlockKey(),
+        type: 'math',
+        text: token.content.replace(/\n$/, ''),
+        sourceStart: start,
+        sourceEnd: end,
+      };
+
     default:
       // Unknown block-level token with map — treat as paragraph
       if (token.map) {
@@ -197,4 +212,94 @@ function skipToClose(tokens: Token[], index: number, token: Token): number {
     }
   }
   return index;
+}
+
+/**
+ * Merge HTML blocks that form a single structure (e.g., <details>...</details>).
+ * When markdown-it splits multi-line HTML into separate tokens with interleaved
+ * markdown content, merge them back into a single block.
+ */
+function mergeHtmlStructures(blocks: Block[], lines: string[]): Block[] {
+  const mergeableTags = ['details', 'div', 'section', 'article', 'aside', 'nav', 'figure'];
+  const result: Block[] = [];
+  let i = 0;
+
+  while (i < blocks.length) {
+    const block = blocks[i];
+    if (block.type === 'html') {
+      const match = block.text.match(/^<(\w+)[\s>]/);
+      if (match) {
+        const tag = match[1].toLowerCase();
+        if (mergeableTags.includes(tag) && !block.text.includes(`</${tag}`)) {
+          // Opening tag without matching close — find the closing block
+          let j = i + 1;
+          let found = false;
+          while (j < blocks.length) {
+            if (blocks[j].type === 'html' && blocks[j].text.includes(`</${tag}`)) {
+              // Merge blocks i through j using original source lines
+              const mergedText = lines.slice(block.sourceStart, blocks[j].sourceEnd).join('\n');
+              result.push({
+                key: block.key,
+                type: 'html',
+                text: mergedText,
+                sourceStart: block.sourceStart,
+                sourceEnd: blocks[j].sourceEnd,
+              });
+              i = j + 1;
+              found = true;
+              break;
+            }
+            j++;
+          }
+          if (found) continue;
+        }
+      }
+    }
+    result.push(block);
+    i++;
+  }
+  return result;
+}
+
+/**
+ * Find source lines not covered by any block and create blocks for them.
+ * This handles footnote definitions and other content that markdown-it
+ * processes without assigning source maps.
+ */
+function fillUncoveredLines(blocks: Block[], lines: string[]): Block[] {
+  blocks.sort((a, b) => a.sourceStart - b.sourceStart);
+
+  const totalLines = lines.length;
+  const covered = new Set<number>();
+  for (const block of blocks) {
+    for (let line = block.sourceStart; line < block.sourceEnd; line++) {
+      covered.add(line);
+    }
+  }
+
+  let uncoveredStart = -1;
+  for (let line = 0; line <= totalLines; line++) {
+    const isUncovered = line < totalLines && !covered.has(line);
+    if (isUncovered) {
+      if (uncoveredStart === -1) uncoveredStart = line;
+    } else {
+      if (uncoveredStart !== -1) {
+        const text = lines.slice(uncoveredStart, line).join('\n');
+        // Only create block if there's non-blank content
+        if (text.trim()) {
+          blocks.push({
+            key: generateBlockKey(),
+            type: 'paragraph',
+            text,
+            sourceStart: uncoveredStart,
+            sourceEnd: line,
+          });
+        }
+        uncoveredStart = -1;
+      }
+    }
+  }
+
+  blocks.sort((a, b) => a.sourceStart - b.sourceStart);
+  return blocks;
 }

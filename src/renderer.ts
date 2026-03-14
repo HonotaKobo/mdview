@@ -56,7 +56,7 @@ const md: MarkdownIt = new MarkdownIt({
     slugify: (s: string) =>
       encodeURIComponent(s.trim().toLowerCase().replace(/\s+/g, '-')),
   })
-  .use(markdownItTaskLists, { enabled: false })
+  .use(markdownItTaskLists, { enabled: true })
   .use(markdownItDeflist)
   .use(markdownItFootnote)
   .use(texmath, {
@@ -81,7 +81,7 @@ function deflistTaskPlugin(md: MarkdownIt): void {
         // Add class to dd_open
         tokens[i].attrJoin('class', 'deflist-task-item');
         // Replace inline content: prepend checkbox HTML
-        const checkbox = `<input type="checkbox" disabled${checked ? ' checked' : ''}> `;
+        const checkbox = `<input type="checkbox"${checked ? ' checked' : ''}> `;
         tokens[j].content = content.slice(match[0].length);
         const children = tokens[j].children ?? [];
         tokens[j].children = children;

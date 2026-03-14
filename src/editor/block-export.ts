@@ -15,6 +15,9 @@ export function exportMarkdown(blocks: Block[]): string {
         parts.push('```' + lang + '\n' + block.text + '\n```');
         break;
       }
+      case 'math':
+        parts.push('$$\n' + block.text + '\n$$');
+        break;
       default:
         parts.push(block.text);
         break;
