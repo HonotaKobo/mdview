@@ -9,12 +9,13 @@ import katex from 'katex';
 import hljs from 'highlight.js';
 import mermaid from 'mermaid';
 
+import DOMPurify from 'dompurify';
 import 'katex/dist/katex.min.css';
 
 mermaid.initialize({
   startOnLoad: false,
   theme: 'default',
-  securityLevel: 'loose',
+  securityLevel: 'strict',
 });
 
 function escapeHtml(str: string): string {
@@ -119,7 +120,17 @@ export async function renderMarkdown(
     const highlighted = hljs.highlight(capturedFrontMatter, { language: 'yaml' }).value;
     fmHtml = `<pre class="hljs"><code>${highlighted}</code></pre>`;
   }
-  container.innerHTML = fmHtml + html;
+  container.innerHTML = DOMPurify.sanitize(fmHtml + html, {
+    ADD_TAGS: ['semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn', 'ms', 'mtext',
+               'mfrac', 'msqrt', 'mroot', 'msup', 'msub', 'msubsup', 'munder',
+               'mover', 'munderover', 'mtable', 'mtr', 'mtd', 'mspace', 'mpadded',
+               'menclose', 'mglyph', 'mmultiscripts', 'mprescripts', 'none',
+               'math', 'mjx-container'],
+    ADD_ATTR: ['encoding', 'mathvariant', 'stretchy', 'fence', 'separator',
+               'lspace', 'rspace', 'accent', 'accentunder', 'columnalign',
+               'rowalign', 'columnspan', 'rowspan', 'depth', 'height', 'width',
+               'displaystyle', 'scriptlevel', 'xmlns', 'class', 'style', 'aria-hidden'],
+  });
   await renderMermaidDiagrams(container);
   addCopyButtons(container);
 }

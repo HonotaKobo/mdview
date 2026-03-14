@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+mod http_api;
 mod i18n;
 mod ipc;
 mod menu;
@@ -139,6 +140,8 @@ pub fn run() {
             app.manage(i18n);
 
             ipc::start_listener(id_for_setup.clone(), app.handle().clone());
+            let http_port = http_api::start_http_server(id_for_setup.clone(), app.handle().clone());
+            eprintln!("mdcast: HTTP API listening on http://127.0.0.1:{}", http_port);
 
             // Start file watcher for file mode
             if let Some(ref fp) = resolved_file_path {
@@ -159,6 +162,8 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 let path = ipc::instance_file(&id_for_exit);
                 std::fs::remove_file(&path).ok();
+                // Clean up HTTP port file
+                std::fs::remove_file(path.with_extension("http")).ok();
             }
         });
 }

@@ -101,7 +101,7 @@ pub fn instance_file(id: &str) -> PathBuf {
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
-enum IpcRequest {
+pub(crate) enum IpcRequest {
     Update { body: Option<String>, title: Option<String> },
     Query { properties: Vec<String> },
     Grep { pattern: String },
@@ -112,9 +112,9 @@ enum IpcRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-struct IpcResponse {
-    ok: bool,
-    value: Option<String>,
+pub(crate) struct IpcResponse {
+    pub(crate) ok: bool,
+    pub(crate) value: Option<String>,
 }
 
 /// "199-200" → (199, 200), "42" → (42, 42)
@@ -280,9 +280,48 @@ pub fn list_instances() {
     }
 }
 
+/// Returns list of instances as Vec<(id, title)> for API use
+pub(crate) fn get_instances() -> Vec<(String, String)> {
+    let dir = transport::instance_dir();
+    if !dir.exists() {
+        return Vec::new();
+    }
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+    let mut result = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
+            if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
+                if let Ok(mut stream) = transport::connect(id) {
+                    let req = r#"{"type":"Query","properties":["title"]}"#;
+                    if stream.write_all(req.as_bytes()).is_ok()
+                        && stream.shutdown(std::net::Shutdown::Write).is_ok()
+                    {
+                        let mut buf = String::new();
+                        if stream.read_to_string(&mut buf).is_ok() {
+                            if let Ok(resp) = serde_json::from_str::<serde_json::Value>(&buf) {
+                                let title = resp
+                                    .get("value")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Untitled")
+                                    .to_string();
+                                result.push((id.to_string(), title));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
 // --- Handler functions ---
 
-fn handle_update(app: &AppHandle, body: Option<String>, title: Option<String>) -> IpcResponse {
+pub(crate) fn handle_update(app: &AppHandle, body: Option<String>, title: Option<String>) -> IpcResponse {
     let _ = app.emit("content-update", serde_json::json!({ "body": body, "title": title }));
     {
         let state = app.state::<AppState>();
@@ -328,7 +367,7 @@ fn query_single(state: &crate::state::AppStateInner, property: &str) -> Option<s
 
 const ALL_PROPERTIES: &[&str] = &["path", "body", "title", "linecount"];
 
-fn handle_query(app: &AppHandle, properties: &[String]) -> IpcResponse {
+pub(crate) fn handle_query(app: &AppHandle, properties: &[String]) -> IpcResponse {
     let state = app.state::<AppState>();
     let state = state.lock().unwrap();
 
@@ -368,7 +407,7 @@ fn handle_query(app: &AppHandle, properties: &[String]) -> IpcResponse {
     IpcResponse { ok: true, value: Some(serde_json::Value::Object(map).to_string()) }
 }
 
-fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
+pub(crate) fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
     let state = app.state::<AppState>();
     let state = state.lock().unwrap();
 
@@ -391,7 +430,7 @@ fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
     }
 }
 
-fn handle_lines(app: &AppHandle, start: usize, end: usize) -> IpcResponse {
+pub(crate) fn handle_lines(app: &AppHandle, start: usize, end: usize) -> IpcResponse {
     let state = app.state::<AppState>();
     let state = state.lock().unwrap();
 
@@ -433,7 +472,7 @@ fn apply_edit(app: &AppHandle, editor: impl FnOnce(&mut Vec<String>) -> Result<(
     IpcResponse { ok: true, value: None }
 }
 
-fn handle_delete(app: &AppHandle, mut ranges: Vec<(usize, usize)>) -> IpcResponse {
+pub(crate) fn handle_delete(app: &AppHandle, mut ranges: Vec<(usize, usize)>) -> IpcResponse {
     ranges.sort_by(|a, b| b.0.cmp(&a.0));
 
     apply_edit(app, |lines| {
@@ -447,7 +486,7 @@ fn handle_delete(app: &AppHandle, mut ranges: Vec<(usize, usize)>) -> IpcRespons
     })
 }
 
-fn handle_insert(app: &AppHandle, line: usize, content: &str) -> IpcResponse {
+pub(crate) fn handle_insert(app: &AppHandle, line: usize, content: &str) -> IpcResponse {
     let new_lines: Vec<String> = content.split('\n').map(String::from).collect();
 
     apply_edit(app, |lines| {
@@ -462,7 +501,7 @@ fn handle_insert(app: &AppHandle, line: usize, content: &str) -> IpcResponse {
     })
 }
 
-fn handle_replace(app: &AppHandle, start: usize, end: usize, content: &str) -> IpcResponse {
+pub(crate) fn handle_replace(app: &AppHandle, start: usize, end: usize, content: &str) -> IpcResponse {
     let new_lines: Vec<String> = if content.is_empty() {
         Vec::new()
     } else {
