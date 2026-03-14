@@ -67,16 +67,6 @@ async function openFileInCurrentWindow(filePath: string) {
   await invoke('notify_saved', { path: filePath });
 }
 
-// Open file dialog for initial load (opens in current window)
-async function showOpenDialogInitial() {
-  const selected = await open({
-    multiple: false,
-    filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }],
-  });
-  if (selected) {
-    await openFileInCurrentWindow(selected as string);
-  }
-}
 
 // Open file dialog that opens in a new window
 async function openFileInNewWindow() {
@@ -142,7 +132,7 @@ function debounced(action: string, fn: () => void) {
 
 // Pull initial content from Rust backend (reliable, no race condition)
 async function loadInitialContent() {
-  const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
+  const [body, title, _contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
   currentContent = body;
   currentTitle = title || 'Untitled';
   editorController.enterEditMode(body);
