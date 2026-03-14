@@ -125,7 +125,7 @@ export async function renderMarkdown(
                'mfrac', 'msqrt', 'mroot', 'msup', 'msub', 'msubsup', 'munder',
                'mover', 'munderover', 'mtable', 'mtr', 'mtd', 'mspace', 'mpadded',
                'menclose', 'mglyph', 'mmultiscripts', 'mprescripts', 'none',
-               'math', 'mjx-container'],
+               'math', 'mjx-container', 'eq', 'eqn'],
     ADD_ATTR: ['encoding', 'mathvariant', 'stretchy', 'fence', 'separator',
                'lspace', 'rspace', 'accent', 'accentunder', 'columnalign',
                'rowalign', 'columnspan', 'rowspan', 'depth', 'height', 'width',

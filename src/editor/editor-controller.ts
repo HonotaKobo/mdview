@@ -6,7 +6,8 @@ import { renderBlockElement } from './block-renderer';
 
 /**
  * EditorController manages the edit mode lifecycle.
- * Handles block rendering, contenteditable, and block operations.
+ * Blocks show rendered previews by default. Clicking the edit icon
+ * opens a textarea for raw markdown editing.
  */
 export class EditorController {
   private blocks: Block[] = [];
@@ -56,7 +57,6 @@ export class EditorController {
     this.container.innerHTML = '';
 
     if (this.blocks.length === 0) {
-      // Empty document: create a single empty paragraph
       const emptyBlock: Block = {
         key: generateBlockKey(),
         type: 'paragraph',
@@ -86,7 +86,8 @@ export class EditorController {
   // --- Event handling ---
 
   private attachBlockEvents(el: HTMLElement, block: Block): void {
-    // Focus tracking
+    // Focus tracking: when a textarea in this block gets focus,
+    // sync and re-render the previously active block.
     el.addEventListener('focusin', () => {
       if (this.activeBlockKey && this.activeBlockKey !== block.key) {
         this.syncAndRerenderBlock(this.activeBlockKey);
@@ -94,10 +95,10 @@ export class EditorController {
       this.activeBlockKey = block.key;
     });
 
-    // Keyboard events for block operations
+    // Keyboard events
     el.addEventListener('keydown', (e) => this.handleKeyDown(e, block));
 
-    // Checkbox toggle
+    // Checkbox toggle in preview
     const checkboxes = el.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach((cb, index) => {
       (cb as HTMLInputElement).removeAttribute('disabled');
@@ -110,55 +111,35 @@ export class EditorController {
   }
 
   private handleKeyDown(e: KeyboardEvent, block: Block): void {
-    if (e.key === 'Enter' && !e.shiftKey && block.type !== 'fence' && block.type !== 'code' && block.type !== 'math') {
-      // Don't split in generic blocks (lists, tables, etc.) — let default behavior work
-      if (block.type !== 'paragraph' && block.type !== 'heading') return;
+    const textarea = this.getTextarea(block);
+    if (!textarea) return;
 
-      e.preventDefault();
-      this.splitBlock(block);
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Split paragraph/heading on Enter
+      if (block.type === 'paragraph' || block.type === 'heading') {
+        e.preventDefault();
+        this.splitBlock(block);
+      }
     } else if (e.key === 'Backspace') {
-      const sel = window.getSelection();
-      if (sel && sel.isCollapsed) {
-        const offset = this.getCursorOffsetInBlock(block);
-        if (offset === 0) {
-          e.preventDefault();
-          this.mergeWithPrevious(block);
-        }
+      if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
+        e.preventDefault();
+        this.mergeWithPrevious(block);
       }
     } else if (e.key === 'Delete') {
-      const sel = window.getSelection();
-      if (sel && sel.isCollapsed) {
-        const el = this.container.querySelector(`[data-block-key="${block.key}"]`);
-        if (el) {
-          const editable = el.querySelector('[contenteditable="true"]') as HTMLElement;
-          if (editable) {
-            const textLen = this.getTextContent(editable).length;
-            const offset = this.getCursorOffsetInBlock(block);
-            if (offset >= textLen) {
-              e.preventDefault();
-              this.mergeWithNext(block);
-            }
-          }
-        }
+      if (textarea.selectionStart === textarea.value.length &&
+          textarea.selectionEnd === textarea.value.length) {
+        e.preventDefault();
+        this.mergeWithNext(block);
       }
     } else if (e.key === 'ArrowUp') {
-      const offset = this.getCursorOffsetInBlock(block);
-      if (offset === 0) {
+      if (textarea.selectionStart === 0) {
         e.preventDefault();
         this.focusPreviousBlock(block, 'end');
       }
     } else if (e.key === 'ArrowDown') {
-      const el = this.container.querySelector(`[data-block-key="${block.key}"]`);
-      if (el) {
-        const editable = el.querySelector('[contenteditable="true"]') as HTMLElement;
-        if (editable) {
-          const textLen = this.getTextContent(editable).length;
-          const offset = this.getCursorOffsetInBlock(block);
-          if (offset >= textLen) {
-            e.preventDefault();
-            this.focusNextBlock(block, 'start');
-          }
-        }
+      if (textarea.selectionStart === textarea.value.length) {
+        e.preventDefault();
+        this.focusNextBlock(block, 'start');
       }
     }
   }
@@ -170,25 +151,15 @@ export class EditorController {
     const idx = this.blocks.indexOf(block);
     if (idx === -1) return;
 
-    const offset = this.getCursorOffsetInBlock(block);
-    const fullText = block.text;
+    const textarea = this.getTextarea(block);
+    if (!textarea) return;
 
-    // For headings, we need to account for the marker in the offset
-    let textOffset = offset;
-    if (block.type === 'heading') {
-      const match = block.text.match(/^(#{1,6}\s+)/);
-      if (match) {
-        textOffset = offset; // offset includes marker since ag-remove is in DOM
-      }
-    }
+    const offset = textarea.selectionStart;
+    const before = block.text.slice(0, offset);
+    const after = block.text.slice(offset);
 
-    const before = fullText.slice(0, textOffset);
-    const after = fullText.slice(textOffset);
-
-    // Update current block
     block.text = before;
 
-    // Create new paragraph block
     const newBlock: Block = {
       key: generateBlockKey(),
       type: 'paragraph',
@@ -199,8 +170,10 @@ export class EditorController {
 
     this.blocks.splice(idx + 1, 0, newBlock);
 
-    // Re-render both blocks
+    // Re-render current block (exits editing, shows preview)
     this.rerenderBlock(block);
+
+    // Render and insert new block
     const newEl = renderBlockElement(newBlock);
     this.attachBlockEvents(newEl, newBlock);
     const currentEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
@@ -208,7 +181,7 @@ export class EditorController {
       currentEl.after(newEl);
     }
 
-    // Focus the new block at the start
+    // Focus the new block
     this.activeBlockKey = newBlock.key;
     this.focusBlock(newBlock, 'start');
     this.notifyChange();
@@ -220,30 +193,18 @@ export class EditorController {
 
     this.syncActiveBlock();
     const prevBlock = this.blocks[idx - 1];
-
-    // Only merge simple blocks
     if (prevBlock.type !== 'paragraph' && prevBlock.type !== 'heading') return;
 
     const prevTextLen = prevBlock.text.length;
     prevBlock.text = prevBlock.text + block.text;
 
-    // Remove current block
     this.blocks.splice(idx, 1);
     const currentEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
     currentEl?.remove();
 
-    // Re-render previous block and set cursor at merge point
     this.rerenderBlock(prevBlock);
     this.activeBlockKey = prevBlock.key;
-
-    // Calculate cursor position accounting for heading marker
-    let cursorPos = prevTextLen;
-    if (prevBlock.type === 'heading') {
-      // The marker is shown in ag-remove, cursor offset includes it
-      cursorPos = prevTextLen;
-    }
-
-    this.focusBlock(prevBlock, cursorPos);
+    this.focusBlock(prevBlock, prevTextLen);
     this.notifyChange();
   }
 
@@ -253,12 +214,9 @@ export class EditorController {
 
     this.syncActiveBlock();
     const nextBlock = this.blocks[idx + 1];
-
-    // Only merge simple blocks
     if (nextBlock.type !== 'paragraph' && nextBlock.type !== 'heading') return;
 
     const currentTextLen = block.text.length;
-    // If next is heading, strip the # prefix
     let nextText = nextBlock.text;
     if (nextBlock.type === 'heading') {
       const match = nextText.match(/^#{1,6}\s+(.*)/s);
@@ -266,57 +224,46 @@ export class EditorController {
     }
     block.text = block.text + nextText;
 
-    // Remove next block
     this.blocks.splice(idx + 1, 1);
     const nextEl = this.container.querySelector(`[data-block-key="${nextBlock.key}"]`);
     nextEl?.remove();
 
-    // Re-render current block and set cursor at merge point
     this.rerenderBlock(block);
     this.activeBlockKey = block.key;
     this.focusBlock(block, currentTextLen);
     this.notifyChange();
   }
 
-  // --- Cursor utilities ---
+  // --- Textarea utilities ---
 
-  private getCursorOffsetInBlock(block: Block): number {
-    const sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return 0;
-
+  private getTextarea(block: Block): HTMLTextAreaElement | null {
     const blockEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
-    if (!blockEl) return 0;
-
-    const editable = blockEl.querySelector('[contenteditable="true"]') as HTMLElement;
-    if (!editable) return 0;
-
-    const range = sel.getRangeAt(0);
-    const preRange = document.createRange();
-    preRange.selectNodeContents(editable);
-    preRange.setEnd(range.startContainer, range.startOffset);
-
-    return preRange.toString().length;
+    if (!blockEl) return null;
+    return blockEl.querySelector('.block-editor-textarea') as HTMLTextAreaElement | null;
   }
 
   private focusBlock(block: Block, position: 'start' | 'end' | number): void {
     const blockEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
     if (!blockEl) return;
 
-    const editable = blockEl.querySelector('[contenteditable="true"]') as HTMLElement;
-    if (!editable) return;
+    // Enter editing mode
+    blockEl.classList.add('editing');
 
-    editable.focus();
+    const textarea = blockEl.querySelector('.block-editor-textarea') as HTMLTextAreaElement;
+    if (!textarea) return;
 
-    const sel = window.getSelection();
-    if (!sel) return;
+    textarea.focus();
+
+    // Auto-resize after becoming visible
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
 
     if (position === 'start') {
-      this.setCursorOffset(editable, 0);
+      textarea.selectionStart = textarea.selectionEnd = 0;
     } else if (position === 'end') {
-      const textLen = this.getTextContent(editable).length;
-      this.setCursorOffset(editable, textLen);
+      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
     } else {
-      this.setCursorOffset(editable, position);
+      textarea.selectionStart = textarea.selectionEnd = Math.min(position, textarea.value.length);
     }
   }
 
@@ -332,101 +279,48 @@ export class EditorController {
     this.focusBlock(this.blocks[idx + 1], position);
   }
 
-  private setCursorOffset(element: HTMLElement, offset: number): void {
-    const sel = window.getSelection();
-    if (!sel) return;
-
-    const range = document.createRange();
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-
-    let currentOffset = 0;
-    let node: Text | null = null;
-
-    while ((node = walker.nextNode() as Text | null)) {
-      const nodeLen = node.textContent?.length || 0;
-      if (currentOffset + nodeLen >= offset) {
-        range.setStart(node, offset - currentOffset);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        return;
-      }
-      currentOffset += nodeLen;
-    }
-
-    // If offset is beyond all text, place at end
-    range.selectNodeContents(element);
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-
-  private getTextContent(element: HTMLElement): string {
-    return element.textContent || '';
-  }
-
   // --- Sync ---
 
-  /** Block types where we can safely sync text from a single contenteditable element */
-  private static readonly SYNCABLE_TYPES: ReadonlySet<string> = new Set([
-    'paragraph', 'heading', 'fence', 'code', 'math',
-  ]);
-
-  /** Sync the currently active block's DOM content back to block.text */
   private syncActiveBlock(): void {
     if (!this.activeBlockKey) return;
 
     const block = this.blocks.find(b => b.key === this.activeBlockKey);
     if (!block) return;
 
-    // Skip sync for complex blocks with multiple contenteditable elements
-    if (!EditorController.SYNCABLE_TYPES.has(block.type)) return;
+    const textarea = this.getTextarea(block);
+    if (!textarea) return;
 
-    const el = this.container.querySelector(`[data-block-key="${this.activeBlockKey}"]`);
-    if (!el) return;
-
-    const editable = el.querySelector('[contenteditable="true"]') as HTMLElement;
-    if (!editable) return;
-
-    block.text = this.getTextContent(editable);
+    block.text = textarea.value;
   }
 
-  /** Sync and re-render a specific block (called when focus leaves a block) */
   private syncAndRerenderBlock(blockKey: string): void {
     const block = this.blocks.find(b => b.key === blockKey);
     if (!block) return;
 
-    // Skip sync+rerender for complex blocks with multiple contenteditable elements
-    // (lists, tables, definition lists, html, etc.) to avoid content destruction
-    if (!EditorController.SYNCABLE_TYPES.has(block.type)) return;
-
     const el = this.container.querySelector(`[data-block-key="${blockKey}"]`);
-    if (!el) return;
+    if (!el || !el.classList.contains('editing')) return;
 
-    const editable = el.querySelector('[contenteditable="true"]') as HTMLElement;
-    if (!editable) return;
+    const textarea = el.querySelector('.block-editor-textarea') as HTMLTextAreaElement;
+    if (!textarea) return;
 
-    block.text = this.getTextContent(editable);
+    block.text = textarea.value;
 
     // Detect type changes (e.g., user typed # at start of paragraph)
     this.detectTypeChange(block);
 
-    // Re-render the block
+    // Re-render the block (exits editing, shows updated preview)
     this.rerenderBlock(block);
     this.notifyChange();
   }
 
-  /** Detect if block type should change based on content */
   private detectTypeChange(block: Block): void {
     if (block.type === 'paragraph') {
-      // Check if it became a heading
       const match = block.text.match(/^(#{1,6})\s+/);
       if (match) {
         block.type = 'heading';
         block.level = match[1].length;
       }
     } else if (block.type === 'heading') {
-      // Check if heading prefix was removed
       const match = block.text.match(/^(#{1,6})\s+/);
       if (!match) {
         block.type = 'paragraph';

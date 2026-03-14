@@ -10,58 +10,117 @@
   border-radius: 2px;
 }
 
-.md-block:focus-within {
+.md-block.editing {
   border-left-color: var(--link-color);
 }
 
-/* Inline markers: always in DOM, hidden by default */
-.ag-remove {
+/* --- Preview / Source toggle --- */
+.block-source {
   display: none;
+}
+
+.md-block.editing .block-preview {
+  display: none;
+}
+
+.md-block.editing .block-source {
+  display: block;
+}
+
+/* --- Edit button (visible on hover) --- */
+.block-edit-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
   color: var(--text-secondary);
-  font-weight: normal;
-  font-style: normal;
-  text-decoration: none;
-  font-size: inherit;
-  opacity: 0.6;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
 }
 
-/* Show markers when block has focus */
-.md-block:focus-within .ag-remove {
-  display: inline;
-  position: relative;
-  z-index: 1;
+.md-block:hover .block-edit-btn {
+  opacity: 1;
 }
 
-/* Code fence lines: always in layout, hidden by default, shown on focus */
-.ag-fence {
-  visibility: hidden;
+.md-block.editing .block-edit-btn {
+  display: none;
+}
+
+.block-edit-btn:hover {
+  color: var(--text-color);
+  background: var(--bg-hover, var(--bg-secondary));
+}
+
+/* --- Textarea --- */
+.block-editor-textarea {
+  display: block;
+  width: 100%;
+  min-height: 1.6em;
+  padding: 8px;
+  margin: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-color);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.block-editor-textarea:focus {
+  outline: none;
+  border-color: var(--link-color);
+}
+
+/* Delimiter labels (```, $$) */
+.source-label {
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
-  font-size: 85%;
+  font-size: 12px;
   padding: 2px 0;
   opacity: 0.6;
   user-select: none;
 }
 
-.md-block:focus-within .ag-fence {
-  visibility: visible;
+/* --- Formatting toolbar --- */
+.block-editor-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 0 0;
 }
 
-/* Contenteditable elements */
-.md-block [contenteditable='true'] {
-  outline: none;
-  cursor: text;
+.toolbar-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
 }
 
-.md-block [contenteditable='true']:empty::before {
-  content: '';
-  display: inline-block;
+.toolbar-btn:hover {
+  color: var(--text-color);
+  background: var(--bg-hover, var(--bg-secondary));
+  border-color: var(--text-secondary);
 }
 
 /* Edit mode body */
 body.edit-mode #content {
-  cursor: text;
+  cursor: default;
 }
 
 /* Edit mode indicator */
@@ -82,11 +141,6 @@ body.edit-mode #scroll-area::after {
   z-index: 100;
 }
 
-/* Code block in edit mode */
-.md-block-code pre {
-  position: relative;
-}
-
 /* Disable copy buttons in edit mode */
 body.edit-mode .code-copy-btn {
   display: none;
@@ -94,11 +148,8 @@ body.edit-mode .code-copy-btn {
 
 /* Print: hide edit mode indicators */
 @media print {
-  .ag-remove {
+  .block-edit-btn {
     display: none !important;
-  }
-  .ag-fence {
-    visibility: hidden !important;
   }
   body.edit-mode #scroll-area::after {
     display: none;

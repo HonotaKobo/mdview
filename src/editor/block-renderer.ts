@@ -1,10 +1,13 @@
 import type { Block } from './block-model';
 import { getMarkdownIt } from '../renderer';
-import hljs from 'highlight.js';
+import katex from 'katex';
+
+const EDIT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
 /**
  * Render a single block into an HTML element for edit mode.
- * Inline markers (**,*,`,~~) are wrapped in .ag-remove spans.
+ * Each block has a rendered preview (default) and a textarea editor
+ * with formatting toolbar (shown when the edit icon is clicked).
  */
 export function renderBlockElement(block: Block): HTMLElement {
   const wrapper = document.createElement('div');
@@ -12,358 +15,157 @@ export function renderBlockElement(block: Block): HTMLElement {
   wrapper.dataset.blockKey = block.key;
   wrapper.dataset.blockType = block.type;
 
-  switch (block.type) {
-    case 'heading':
-      renderHeading(block, wrapper);
-      break;
-    case 'paragraph':
-      renderParagraph(block, wrapper);
-      break;
-    case 'fence':
-      renderFence(block, wrapper);
-      break;
-    case 'code':
-      renderCodeBlock(block, wrapper);
-      break;
-    case 'math':
-      renderMath(block, wrapper);
-      break;
-    case 'hr':
-      renderHr(block, wrapper);
-      break;
-    default:
-      // Lists, blockquotes, tables, etc. — render via markdown-it, make contenteditable
-      renderGeneric(block, wrapper);
-      break;
+  // HR: no editing needed
+  if (block.type === 'hr') {
+    wrapper.appendChild(document.createElement('hr'));
+    return wrapper;
   }
+
+  // Edit button (visible on hover)
+  const editBtn = document.createElement('button');
+  editBtn.className = 'block-edit-btn';
+  editBtn.innerHTML = EDIT_ICON;
+  editBtn.title = 'Edit';
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!wrapper.classList.contains('editing')) {
+      wrapper.classList.add('editing');
+      const textarea = wrapper.querySelector('.block-editor-textarea') as HTMLTextAreaElement;
+      if (textarea) {
+        textarea.focus();
+        autoResize(textarea);
+      }
+    }
+  });
+  wrapper.appendChild(editBtn);
+
+  // Preview (rendered markdown)
+  const preview = document.createElement('div');
+  preview.className = 'block-preview';
+  renderPreview(block, preview);
+  wrapper.appendChild(preview);
+
+  // Source (textarea + toolbar, hidden by default)
+  const source = document.createElement('div');
+  source.className = 'block-source';
+  renderSource(block, source);
+  wrapper.appendChild(source);
 
   return wrapper;
 }
 
-function renderHeading(block: Block, wrapper: HTMLElement): void {
-  const level = block.level || 1;
-  const el = document.createElement(`h${level}`);
-  el.setAttribute('contenteditable', 'true');
+// --- Preview ---
 
-  // Extract the heading text (remove # prefix)
-  const match = block.text.match(/^(#{1,6})\s+(.*)/s);
-  if (match) {
-    const marker = match[1] + ' ';
-    const content = match[2];
-
-    const markerSpan = document.createElement('span');
-    markerSpan.className = 'ag-remove';
-    markerSpan.textContent = marker;
-
-    el.appendChild(markerSpan);
-    appendInlineContent(content, el);
-  } else {
-    el.textContent = block.text;
-  }
-
-  wrapper.appendChild(el);
-}
-
-function renderParagraph(block: Block, wrapper: HTMLElement): void {
-  const el = document.createElement('p');
-  el.setAttribute('contenteditable', 'true');
-  appendInlineContent(block.text, el);
-  wrapper.appendChild(el);
-}
-
-function renderFence(block: Block, wrapper: HTMLElement): void {
-  wrapper.classList.add('md-block-code');
-
-  // Top fence line
-  const topFence = document.createElement('div');
-  topFence.className = 'ag-fence';
-  topFence.textContent = '```' + (block.lang || '');
-  wrapper.appendChild(topFence);
-
-  // Code content
-  const pre = document.createElement('pre');
-  pre.className = 'hljs';
-  const code = document.createElement('code');
-  code.setAttribute('contenteditable', 'true');
-
-  // Syntax highlight if language is known
-  if (block.lang && hljs.getLanguage(block.lang)) {
-    try {
-      code.innerHTML = hljs.highlight(block.text, { language: block.lang }).value;
-    } catch {
-      code.textContent = block.text;
-    }
-  } else {
-    code.textContent = block.text;
-  }
-
-  pre.appendChild(code);
-  wrapper.appendChild(pre);
-
-  // Bottom fence line
-  const bottomFence = document.createElement('div');
-  bottomFence.className = 'ag-fence';
-  bottomFence.textContent = '```';
-  wrapper.appendChild(bottomFence);
-}
-
-function renderCodeBlock(block: Block, wrapper: HTMLElement): void {
-  const pre = document.createElement('pre');
-  pre.className = 'hljs';
-  const code = document.createElement('code');
-  code.setAttribute('contenteditable', 'true');
-  code.textContent = block.text;
-  pre.appendChild(code);
-  wrapper.appendChild(pre);
-}
-
-function renderMath(block: Block, wrapper: HTMLElement): void {
-  wrapper.classList.add('md-block-code');
-
-  // Top $$ marker
-  const topMarker = document.createElement('div');
-  topMarker.className = 'ag-fence';
-  topMarker.textContent = '$$';
-  wrapper.appendChild(topMarker);
-
-  // Math content (editable as raw text)
-  const pre = document.createElement('pre');
-  pre.className = 'hljs';
-  const code = document.createElement('code');
-  code.setAttribute('contenteditable', 'true');
-  code.textContent = block.text;
-  pre.appendChild(code);
-  wrapper.appendChild(pre);
-
-  // Bottom $$ marker
-  const bottomMarker = document.createElement('div');
-  bottomMarker.className = 'ag-fence';
-  bottomMarker.textContent = '$$';
-  wrapper.appendChild(bottomMarker);
-}
-
-function renderHr(_block: Block, wrapper: HTMLElement): void {
-  const hr = document.createElement('hr');
-  wrapper.appendChild(hr);
-}
-
-function renderGeneric(block: Block, wrapper: HTMLElement): void {
+function renderPreview(block: Block, preview: HTMLElement): void {
   const md = getMarkdownIt();
-  const html = md.render(block.text);
-  const container = document.createElement('div');
-  container.innerHTML = html;
-
-  // Make leaf text elements contenteditable
-  const editableElements = container.querySelectorAll('li, td, th, dd, dt, p');
-  for (const el of editableElements) {
-    // Only set contenteditable on leaf-level elements
-    if (!el.querySelector('li, td, th, dd, dt, p')) {
-      el.setAttribute('contenteditable', 'true');
-    }
-  }
-
-  // Move children to wrapper
-  while (container.firstChild) {
-    wrapper.appendChild(container.firstChild);
-  }
-}
-
-/**
- * Parse inline markdown and append elements with ag-remove markers.
- * Uses markdown-it's inline parser to identify markers.
- */
-function appendInlineContent(text: string, parent: HTMLElement): void {
-  const md = getMarkdownIt();
-  const tokens = md.parseInline(text, {})[0]?.children || [];
-
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-
-    switch (token.type) {
-      case 'text':
-        parent.appendChild(document.createTextNode(token.content));
-        break;
-
-      case 'softbreak':
-        parent.appendChild(document.createElement('br'));
-        break;
-
-      case 'hardbreak':
-        parent.appendChild(document.createElement('br'));
-        break;
-
-      case 'strong_open': {
-        const marker = token.markup; // ** or __
-        const markerSpan = document.createElement('span');
-        markerSpan.className = 'ag-remove';
-        markerSpan.textContent = marker;
-        parent.appendChild(markerSpan);
-
-        const strong = document.createElement('strong');
-        // Collect until strong_close
-        i++;
-        while (i < tokens.length && tokens[i].type !== 'strong_close') {
-          appendTokenToElement(tokens[i], strong);
-          i++;
-        }
-        parent.appendChild(strong);
-
-        // Close marker
-        if (i < tokens.length) {
-          const closeSpan = document.createElement('span');
-          closeSpan.className = 'ag-remove';
-          closeSpan.textContent = tokens[i].markup;
-          parent.appendChild(closeSpan);
-        }
-        break;
+  switch (block.type) {
+    case 'math':
+      try {
+        preview.innerHTML = katex.renderToString(block.text, {
+          throwOnError: false,
+          displayMode: true,
+        });
+      } catch {
+        preview.textContent = block.text;
       }
-
-      case 'em_open': {
-        const marker = token.markup;
-        const markerSpan = document.createElement('span');
-        markerSpan.className = 'ag-remove';
-        markerSpan.textContent = marker;
-        parent.appendChild(markerSpan);
-
-        const em = document.createElement('em');
-        i++;
-        while (i < tokens.length && tokens[i].type !== 'em_close') {
-          appendTokenToElement(tokens[i], em);
-          i++;
-        }
-        parent.appendChild(em);
-
-        if (i < tokens.length) {
-          const closeSpan = document.createElement('span');
-          closeSpan.className = 'ag-remove';
-          closeSpan.textContent = tokens[i].markup;
-          parent.appendChild(closeSpan);
-        }
-        break;
-      }
-
-      case 's_open': {
-        const marker = token.markup;
-        const markerSpan = document.createElement('span');
-        markerSpan.className = 'ag-remove';
-        markerSpan.textContent = marker;
-        parent.appendChild(markerSpan);
-
-        const s = document.createElement('s');
-        i++;
-        while (i < tokens.length && tokens[i].type !== 's_close') {
-          appendTokenToElement(tokens[i], s);
-          i++;
-        }
-        parent.appendChild(s);
-
-        if (i < tokens.length) {
-          const closeSpan = document.createElement('span');
-          closeSpan.className = 'ag-remove';
-          closeSpan.textContent = tokens[i].markup;
-          parent.appendChild(closeSpan);
-        }
-        break;
-      }
-
-      case 'code_inline': {
-        const marker = token.markup; // ` or ``
-        const openSpan = document.createElement('span');
-        openSpan.className = 'ag-remove';
-        openSpan.textContent = marker;
-        parent.appendChild(openSpan);
-
-        const code = document.createElement('code');
-        code.textContent = token.content;
-        parent.appendChild(code);
-
-        const closeSpan = document.createElement('span');
-        closeSpan.className = 'ag-remove';
-        closeSpan.textContent = marker;
-        parent.appendChild(closeSpan);
-        break;
-      }
-
-      case 'link_open': {
-        const href = token.attrGet('href') || '';
-        // [marker
-        const openSpan = document.createElement('span');
-        openSpan.className = 'ag-remove';
-        openSpan.textContent = '[';
-        parent.appendChild(openSpan);
-
-        const a = document.createElement('a');
-        a.href = href;
-        i++;
-        while (i < tokens.length && tokens[i].type !== 'link_close') {
-          appendTokenToElement(tokens[i], a);
-          i++;
-        }
-        parent.appendChild(a);
-
-        // ](url) marker
-        const closeSpan = document.createElement('span');
-        closeSpan.className = 'ag-remove';
-        closeSpan.textContent = `](${href})`;
-        parent.appendChild(closeSpan);
-        break;
-      }
-
-      case 'math_inline': {
-        const marker = token.markup || '$';
-        const openSpan = document.createElement('span');
-        openSpan.className = 'ag-remove';
-        openSpan.textContent = marker;
-        parent.appendChild(openSpan);
-
-        const span = document.createElement('span');
-        span.textContent = token.content;
-        parent.appendChild(span);
-
-        const closeSpan = document.createElement('span');
-        closeSpan.className = 'ag-remove';
-        closeSpan.textContent = marker;
-        parent.appendChild(closeSpan);
-        break;
-      }
-
-      case 'image': {
-        const src = token.attrGet('src') || '';
-        const alt = token.content || '';
-        const img = document.createElement('img');
-        img.src = src;
-        img.alt = alt;
-        parent.appendChild(img);
-        break;
-      }
-
-      case 'html_inline':
-        parent.insertAdjacentHTML('beforeend', token.content);
-        break;
-
-      default:
-        // Fallback: just append text content
-        if (token.content) {
-          parent.appendChild(document.createTextNode(token.content));
-        }
-        break;
-    }
+      break;
+    case 'fence':
+      preview.innerHTML = md.render('```' + (block.lang || '') + '\n' + block.text + '\n```');
+      break;
+    case 'code':
+      preview.innerHTML = md.render(block.text.split('\n').map(l => '    ' + l).join('\n'));
+      break;
+    default:
+      preview.innerHTML = md.render(block.text);
+      break;
   }
 }
 
-function appendTokenToElement(token: { type: string; content: string; markup?: string }, parent: HTMLElement): void {
-  if (token.type === 'text') {
-    parent.appendChild(document.createTextNode(token.content));
-  } else if (token.type === 'code_inline') {
-    const code = document.createElement('code');
-    code.textContent = token.content;
-    parent.appendChild(code);
-  } else if (token.type === 'math_inline') {
-    const marker = token.markup || '$';
-    parent.appendChild(document.createTextNode(marker + token.content + marker));
-  } else if (token.type === 'softbreak' || token.type === 'hardbreak') {
-    parent.appendChild(document.createElement('br'));
-  } else if (token.content) {
-    parent.appendChild(document.createTextNode(token.content));
+// --- Source (textarea + toolbar) ---
+
+function renderSource(block: Block, source: HTMLElement): void {
+  // Top delimiter label for fence/math
+  if (block.type === 'fence') {
+    addLabel(source, '```' + (block.lang || ''));
+  } else if (block.type === 'math') {
+    addLabel(source, '$$');
   }
+
+  // Textarea
+  const textarea = document.createElement('textarea');
+  textarea.className = 'block-editor-textarea';
+  textarea.value = block.text;
+  textarea.rows = 1;
+  textarea.spellcheck = false;
+  textarea.addEventListener('input', () => autoResize(textarea));
+  textarea.addEventListener('focus', () => autoResize(textarea));
+  source.appendChild(textarea);
+
+  // Bottom delimiter label for fence/math
+  if (block.type === 'fence') {
+    addLabel(source, '```');
+  } else if (block.type === 'math') {
+    addLabel(source, '$$');
+  }
+
+  // Formatting toolbar (text-oriented blocks only)
+  if (!['fence', 'code', 'math'].includes(block.type)) {
+    source.appendChild(createToolbar(textarea));
+  }
+}
+
+function addLabel(parent: HTMLElement, text: string): void {
+  const el = document.createElement('div');
+  el.className = 'source-label';
+  el.textContent = text;
+  parent.appendChild(el);
+}
+
+function autoResize(textarea: HTMLTextAreaElement): void {
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+// --- Formatting toolbar ---
+
+function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
+  const toolbar = document.createElement('div');
+  toolbar.className = 'block-editor-toolbar';
+
+  const buttons: { html: string; title: string; prefix: string; suffix: string }[] = [
+    { html: '<strong>B</strong>', title: 'Bold', prefix: '**', suffix: '**' },
+    { html: '<em>I</em>', title: 'Italic', prefix: '*', suffix: '*' },
+    { html: '<s>S</s>', title: 'Strikethrough', prefix: '~~', suffix: '~~' },
+    { html: 'Code', title: 'Inline Code', prefix: '`', suffix: '`' },
+    { html: 'Link', title: 'Link', prefix: '[', suffix: '](url)' },
+    { html: '$', title: 'Math', prefix: '$', suffix: '$' },
+  ];
+
+  for (const btn of buttons) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toolbar-btn';
+    button.innerHTML = btn.html;
+    button.title = btn.title;
+    // mousedown to prevent textarea losing focus
+    button.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      wrapSelection(textarea, btn.prefix, btn.suffix);
+    });
+    toolbar.appendChild(button);
+  }
+
+  return toolbar;
+}
+
+function wrapSelection(textarea: HTMLTextAreaElement, prefix: string, suffix: string): void {
+  const { selectionStart: start, selectionEnd: end, value } = textarea;
+  const selected = value.slice(start, end) || 'text';
+  const inserted = prefix + selected + suffix;
+
+  textarea.value = value.slice(0, start) + inserted + value.slice(end);
+  textarea.selectionStart = start + prefix.length;
+  textarea.selectionEnd = start + prefix.length + selected.length;
+  textarea.focus();
+  textarea.dispatchEvent(new Event('input'));
 }
