@@ -118,6 +118,19 @@ async function copyAsPlaintext() {
   await navigator.clipboard.writeText(text);
 }
 
+async function reloadCurrentFile() {
+  const savedPath = await invoke<string | null>('get_saved_path');
+  if (!savedPath) return;
+  try {
+    const content = await invoke<string>('read_file', { path: savedPath });
+    currentContent = content;
+    editorController.updateContent(content);
+    isDirty = false;
+  } catch (e) {
+    console.error('Reload failed:', e);
+  }
+}
+
 // Debounce guard to prevent double-firing from native menu + JS handler
 const actionDebounce = new Set<string>();
 function debounced(action: string, fn: () => void) {
@@ -173,6 +186,9 @@ listen('menu-action', (event) => {
       break;
     case 'file_save_as':
       debounced('file_save_as', () => doSaveAs());
+      break;
+    case 'file_reload':
+      debounced('file_reload', () => reloadCurrentFile());
       break;
     case 'file_print':
       debounced('file_print', () => window.print());
@@ -279,6 +295,10 @@ document.addEventListener('keydown', (e) => {
       } else {
         debounced('file_save', () => doSave());
       }
+      break;
+    case 'r':
+      e.preventDefault();
+      debounced('file_reload', () => reloadCurrentFile());
       break;
     case 'p':
       e.preventDefault();

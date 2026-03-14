@@ -5,6 +5,7 @@
     "file_open": "ファイルを開く",
     "file_save": "保存",
     "file_save_as": "名前を付けて保存",
+    "file_reload": "再読み込み",
     "file_print": "印刷",
     "file_quit": "終了",
     "edit": "編集",

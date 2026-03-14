@@ -130,23 +130,6 @@ body.edit-mode #content {
   cursor: default;
 }
 
-/* Edit mode indicator */
-body.edit-mode #scroll-area::after {
-  content: 'EDIT';
-  position: fixed;
-  bottom: 8px;
-  right: 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 2px 8px;
-  pointer-events: none;
-  opacity: 0.7;
-  z-index: 100;
-}
 
 /* Copy buttons are already hidden when .block-preview is hidden via .editing */
 
@@ -193,8 +176,5 @@ body.edit-mode #scroll-area::after {
   .block-edit-btn,
   .block-gap {
     display: none !important;
-  }
-  body.edit-mode #scroll-area::after {
-    display: none;
   }
 }
