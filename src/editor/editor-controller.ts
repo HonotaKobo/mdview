@@ -343,105 +343,6 @@ export class EditorController {
 
   // --- Block operations ---
 
-  private splitBlock(block: Block): void {
-    this.syncActiveBlock();
-    const idx = this.blocks.indexOf(block);
-    if (idx === -1) return;
-
-    const textarea = this.getTextarea(block);
-    if (!textarea) return;
-
-    const offset = textarea.selectionStart;
-    const before = block.text.slice(0, offset);
-    const after = block.text.slice(offset);
-
-    block.text = before;
-
-    const newBlock: Block = {
-      key: generateBlockKey(),
-      type: 'paragraph',
-      text: after,
-      sourceStart: block.sourceEnd,
-      sourceEnd: block.sourceEnd,
-    };
-
-    this.blocks.splice(idx + 1, 0, newBlock);
-
-    // Re-render current block (exits editing, shows preview)
-    this.originalBlockState.delete(block.key);
-    this.rerenderBlock(block);
-
-    // Render and insert new block (with gap)
-    const newGap = this.createGapElement();
-    const newEl = renderBlockElement(newBlock);
-    this.attachBlockEvents(newEl, newBlock);
-    const currentEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
-    if (currentEl) {
-      currentEl.after(newGap);
-      newGap.after(newEl);
-    }
-
-    // Focus the new block
-    this.originalBlockState.set(newBlock.key, { text: after, lang: undefined });
-    this.activeBlockKey = newBlock.key;
-    this.focusBlock(newBlock, 'start');
-    this.notifyChange();
-  }
-
-  private mergeWithPrevious(block: Block): void {
-    const idx = this.blocks.indexOf(block);
-    if (idx <= 0) return;
-
-    this.syncActiveBlock();
-    const prevBlock = this.blocks[idx - 1];
-    if (prevBlock.type !== 'paragraph' && prevBlock.type !== 'heading') return;
-
-    const prevTextLen = prevBlock.text.length;
-    prevBlock.text = prevBlock.text + block.text;
-
-    this.blocks.splice(idx, 1);
-    const currentEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
-    // Remove the block and the gap before it
-    currentEl?.previousElementSibling?.remove();
-    currentEl?.remove();
-
-    this.originalBlockState.delete(block.key);
-    this.rerenderBlock(prevBlock);
-    this.originalBlockState.set(prevBlock.key, { text: prevBlock.text, lang: prevBlock.lang });
-    this.activeBlockKey = prevBlock.key;
-    this.focusBlock(prevBlock, prevTextLen);
-    this.notifyChange();
-  }
-
-  private mergeWithNext(block: Block): void {
-    const idx = this.blocks.indexOf(block);
-    if (idx >= this.blocks.length - 1) return;
-
-    this.syncActiveBlock();
-    const nextBlock = this.blocks[idx + 1];
-    if (nextBlock.type !== 'paragraph' && nextBlock.type !== 'heading') return;
-
-    const currentTextLen = block.text.length;
-    let nextText = nextBlock.text;
-    if (nextBlock.type === 'heading') {
-      const match = nextText.match(/^#{1,6}\s+(.*)/s);
-      if (match) nextText = match[1];
-    }
-    block.text = block.text + nextText;
-
-    this.blocks.splice(idx + 1, 1);
-    const nextEl = this.container.querySelector(`[data-block-key="${nextBlock.key}"]`);
-    // Remove the block and the gap before it
-    nextEl?.previousElementSibling?.remove();
-    nextEl?.remove();
-
-    this.originalBlockState.delete(nextBlock.key);
-    this.rerenderBlock(block);
-    this.activeBlockKey = block.key;
-    this.focusBlock(block, currentTextLen);
-    this.notifyChange();
-  }
-
   // --- Textarea utilities ---
 
   private getTextarea(block: Block): HTMLTextAreaElement | null {
@@ -475,17 +376,6 @@ export class EditorController {
     }
   }
 
-  private focusPreviousBlock(block: Block, position: 'start' | 'end'): void {
-    const idx = this.blocks.indexOf(block);
-    if (idx <= 0) return;
-    this.focusBlock(this.blocks[idx - 1], position);
-  }
-
-  private focusNextBlock(block: Block, position: 'start' | 'end'): void {
-    const idx = this.blocks.indexOf(block);
-    if (idx >= this.blocks.length - 1) return;
-    this.focusBlock(this.blocks[idx + 1], position);
-  }
 
   // --- Sync ---
 

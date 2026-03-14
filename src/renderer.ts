@@ -130,7 +130,13 @@ function deflistTaskPlugin(md: MarkdownIt): void {
           }
           const radioToken = new state.Token('html_inline', '', 0);
           radioToken.content = radioHtml;
+          const rdLabelOpen = new state.Token('html_inline', '', 0);
+          rdLabelOpen.content = '<label>';
+          const rdLabelClose = new state.Token('html_inline', '', 0);
+          rdLabelClose.content = '</label>';
           children.unshift(radioToken);
+          children.unshift(rdLabelOpen);
+          children.push(rdLabelClose);
           break;
         }
 
@@ -167,7 +173,13 @@ function deflistTaskPlugin(md: MarkdownIt): void {
           }
           const checkboxToken = new state.Token('html_inline', '', 0);
           checkboxToken.content = checkbox;
+          const cbLabelOpen = new state.Token('html_inline', '', 0);
+          cbLabelOpen.content = '<label>';
+          const cbLabelClose = new state.Token('html_inline', '', 0);
+          cbLabelClose.content = '</label>';
           children.unshift(checkboxToken);
+          children.unshift(cbLabelOpen);
+          children.push(cbLabelClose);
           break;
         }
 
