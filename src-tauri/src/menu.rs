@@ -1,7 +1,9 @@
 use tauri::{
-    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder},
     AppHandle, Emitter, Manager, Wry,
 };
+#[cfg(target_os = "macos")]
+use tauri::menu::PredefinedMenuItem;
 
 use crate::i18n::I18n;
 
