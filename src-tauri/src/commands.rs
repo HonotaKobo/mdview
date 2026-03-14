@@ -28,9 +28,9 @@ pub fn get_saved_path(state: tauri::State<'_, AppState>) -> Option<String> {
 }
 
 #[command]
-pub fn get_initial_content(state: tauri::State<'_, AppState>) -> (String, String) {
+pub fn get_initial_content(state: tauri::State<'_, AppState>) -> (String, String, bool) {
     let state = state.lock().unwrap();
-    (state.current_content.clone(), state.title.clone())
+    (state.current_content.clone(), state.title.clone(), state.content_explicitly_set)
 }
 
 #[command]
@@ -63,4 +63,25 @@ pub fn get_platform() -> String {
 #[command]
 pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
     crate::menu::execute_action(&app, &id);
+}
+
+#[command]
+pub fn open_new_window(file: Option<String>) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let mut args: Vec<String> = vec![];
+    if let Some(ref f) = file {
+        args.push(f.clone());
+    } else {
+        // Pass empty body so the new window shows an empty editable view
+        args.push("--body".to_string());
+        args.push(String::new());
+    }
+    std::process::Command::new(exe)
+        .args(&args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

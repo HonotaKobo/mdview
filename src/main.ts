@@ -3,11 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { ThemeManager } from './theme';
-import { handleSave, handleSaveAs, handleRename } from './save';
+import { handleSave, handleSaveAs } from './save';
 import { FindBar } from './find';
 import { FontSizeManager } from './font-size';
 import { CustomTitleBar } from './titlebar';
 import { EditorController } from './editor/editor-controller';
+import { getMarkdownIt } from './renderer';
 
 interface ContentUpdate {
   body?: string;
@@ -53,8 +54,8 @@ async function initPlatformUI() {
 }
 initPlatformUI();
 
-// Open a file via dialog or path
-async function openFile(filePath: string) {
+// Open a file in the current window (used for initial load)
+async function openFileInCurrentWindow(filePath: string) {
   const content = await invoke<string>('read_file', { path: filePath });
   const fileName = filePath.split(/[\\/]/).pop() || 'Untitled';
   currentContent = content;
@@ -66,13 +67,25 @@ async function openFile(filePath: string) {
   await invoke('notify_saved', { path: filePath });
 }
 
-async function showOpenDialog() {
+// Open file dialog for initial load (opens in current window)
+async function showOpenDialogInitial() {
   const selected = await open({
     multiple: false,
     filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }],
   });
   if (selected) {
-    await openFile(selected as string);
+    await openFileInCurrentWindow(selected as string);
+  }
+}
+
+// Open file dialog that opens in a new window
+async function openFileInNewWindow() {
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }],
+  });
+  if (selected) {
+    await invoke('open_new_window', { file: selected as string });
   }
 }
 
@@ -88,18 +101,16 @@ async function doSaveAs() {
   isDirty = false;
 }
 
-async function doRename() {
-  const newPath = await handleRename();
-  if (newPath) {
-    const fileName = newPath.split(/[\\/]/).pop() || 'Untitled';
-    currentTitle = fileName;
-    updateWindowTitle(currentTitle);
-  }
-}
-
 async function copyAsMarkdown() {
   currentContent = editorController.getCurrentContent();
   await navigator.clipboard.writeText(currentContent);
+}
+
+async function copyAsHtml() {
+  currentContent = editorController.getCurrentContent();
+  const md = getMarkdownIt();
+  const html = md.render(currentContent);
+  await navigator.clipboard.writeText(html);
 }
 
 async function copyAsPlaintext() {
@@ -107,26 +118,26 @@ async function copyAsPlaintext() {
   await navigator.clipboard.writeText(text);
 }
 
-function selectAll() {
-  const selection = window.getSelection();
-  const content = document.getElementById('content')!;
-  const range = document.createRange();
-  range.selectNodeContents(content);
-  selection?.removeAllRanges();
-  selection?.addRange(range);
+// Debounce guard to prevent double-firing from native menu + JS handler
+const actionDebounce = new Set<string>();
+function debounced(action: string, fn: () => void) {
+  if (actionDebounce.has(action)) return;
+  actionDebounce.add(action);
+  setTimeout(() => actionDebounce.delete(action), 300);
+  fn();
 }
 
 // Pull initial content from Rust backend (reliable, no race condition)
 async function loadInitialContent() {
-  const [body, title] = await invoke<[string, string]>('get_initial_content');
-  if (body) {
+  const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
+  if (contentSet || body) {
     currentContent = body;
     currentTitle = title || 'Untitled';
     editorController.enterEditMode(body);
     updateWindowTitle(currentTitle);
   } else {
     // No content provided — show file open dialog
-    await showOpenDialog();
+    await showOpenDialogInitial();
   }
 }
 loadInitialContent();
@@ -151,36 +162,38 @@ listen('menu-action', (event) => {
   const { action, value } = event.payload as MenuAction;
 
   switch (action) {
+    case 'file_new_window':
+      debounced('file_new_window', () => invoke('open_new_window', { file: null }));
+      break;
     case 'file_open':
-      showOpenDialog();
+      debounced('file_open', () => openFileInNewWindow());
       break;
     case 'file_save':
-      doSave();
+      debounced('file_save', () => doSave());
       break;
     case 'file_save_as':
-      doSaveAs();
-      break;
-    case 'file_rename':
-      doRename();
+      debounced('file_save_as', () => doSaveAs());
       break;
     case 'file_print':
-      window.print();
+      debounced('file_print', () => window.print());
       break;
     case 'edit_copy_markdown':
-      copyAsMarkdown();
+      debounced('edit_copy_markdown', () => copyAsMarkdown());
+      break;
+    case 'edit_copy_html':
+      debounced('edit_copy_html', () => copyAsHtml());
       break;
     case 'edit_copy_plaintext':
-      copyAsPlaintext();
-      break;
-    case 'edit_select_all':
-      selectAll();
+      debounced('edit_copy_plaintext', () => copyAsPlaintext());
       break;
     case 'edit_find':
-      if (findBar.isVisible()) {
-        findBar.hide();
-      } else {
-        findBar.show();
-      }
+      debounced('edit_find', () => {
+        if (findBar.isVisible()) {
+          findBar.hide();
+        } else {
+          findBar.show();
+        }
+      });
       break;
     case 'edit_find_next':
       findBar.show();
@@ -196,15 +209,13 @@ listen('menu-action', (event) => {
       }
       break;
     case 'font_increase':
-      fontSizeManager.increase();
+      debounced('font_increase', () => fontSizeManager.increase());
       break;
     case 'font_decrease':
-      fontSizeManager.decrease();
+      debounced('font_decrease', () => fontSizeManager.decrease());
       break;
   }
 });
-
-// In edit mode, link clicks are handled by contenteditable
 
 // Drag & drop support
 document.addEventListener('dragover', (e) => {
@@ -229,20 +240,87 @@ document.addEventListener('drop', async (e) => {
 
 // Global keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && findBar.isVisible()) {
-    findBar.hide();
+  if (e.key === 'Escape') {
+    if (findBar.isVisible()) {
+      findBar.hide();
+    }
+    return;
   }
 
-  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z redo (only when not in a textarea)
-  if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-    if (document.activeElement?.tagName !== 'TEXTAREA') {
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+
+  // Skip if typing in a textarea (let standard editing work)
+  const inTextarea = document.activeElement?.tagName === 'TEXTAREA';
+
+  switch (e.key) {
+    case 'z':
+      if (!inTextarea) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          editorController.redo();
+        } else {
+          editorController.undo();
+        }
+      }
+      break;
+    case 'n':
+      e.preventDefault();
+      debounced('file_new_window', () => invoke('open_new_window', { file: null }));
+      break;
+    case 'o':
+      e.preventDefault();
+      debounced('file_open', () => openFileInNewWindow());
+      break;
+    case 's':
       e.preventDefault();
       if (e.shiftKey) {
-        editorController.redo();
+        debounced('file_save_as', () => doSaveAs());
       } else {
-        editorController.undo();
+        debounced('file_save', () => doSave());
       }
-    }
+      break;
+    case 'p':
+      e.preventDefault();
+      debounced('file_print', () => window.print());
+      break;
+    case 'f':
+      if (!inTextarea) {
+        e.preventDefault();
+        debounced('edit_find', () => {
+          if (findBar.isVisible()) {
+            findBar.hide();
+          } else {
+            findBar.show();
+          }
+        });
+      }
+      break;
+    case 'g':
+      e.preventDefault();
+      if (e.shiftKey) {
+        findBar.show();
+        findBar.prev();
+      } else {
+        findBar.show();
+        findBar.next();
+      }
+      break;
+    case 'C':
+    case 'c':
+      if (e.shiftKey && !inTextarea) {
+        e.preventDefault();
+        debounced('edit_copy_markdown', () => copyAsMarkdown());
+      }
+      break;
+    case '=':
+      e.preventDefault();
+      debounced('font_increase', () => fontSizeManager.increase());
+      break;
+    case '-':
+      e.preventDefault();
+      debounced('font_decrease', () => fontSizeManager.decrease());
+      break;
   }
 });
 

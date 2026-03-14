@@ -94,6 +94,7 @@ export class EditorController {
   private renderAllBlocks(): void {
     this.container.innerHTML = '';
 
+    let autoFocusEmpty = false;
     if (this.blocks.length === 0) {
       const emptyBlock: Block = {
         key: generateBlockKey(),
@@ -103,6 +104,7 @@ export class EditorController {
         sourceEnd: 0,
       };
       this.blocks.push(emptyBlock);
+      autoFocusEmpty = true;
     }
 
     this.updateFootnoteContext();
@@ -118,6 +120,16 @@ export class EditorController {
 
     // Gap after last block
     this.container.appendChild(this.createGapElement());
+
+    // Auto-focus empty block on new/blank view
+    if (autoFocusEmpty && this.blocks.length === 1) {
+      const block = this.blocks[0];
+      this.originalBlockState.set(block.key, { text: '', lang: undefined });
+      this.activeBlockKey = block.key;
+      requestAnimationFrame(() => {
+        this.focusBlock(block, 'start');
+      });
+    }
   }
 
   private rerenderBlock(block: Block): void {

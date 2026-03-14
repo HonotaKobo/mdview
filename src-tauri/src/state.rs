@@ -13,6 +13,8 @@ pub struct AppStateInner {
     pub dirty: bool,
     /// Whether to disclose file path to AI tools (default: false)
     pub path_disclosure: bool,
+    /// Whether content was explicitly provided (--body or --file)
+    pub content_explicitly_set: bool,
 }
 
 impl AppStateInner {
@@ -23,6 +25,7 @@ impl AppStateInner {
             saved_path: None,
             dirty: false,
             path_disclosure: false,
+            content_explicitly_set: false,
         }
     }
 }

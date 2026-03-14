@@ -99,7 +99,9 @@ pub fn run() {
         (String::new(), initial_title.clone(), None)
     };
 
+    let content_explicitly_set = args.body.is_some() || initial_file.is_some();
     let mut app_state = AppStateInner::new(resolved_title, resolved_content);
+    app_state.content_explicitly_set = content_explicitly_set;
     if let Some(ref fp) = resolved_file_path {
         app_state.saved_path = Some(fp.clone());
     }
@@ -124,6 +126,7 @@ pub fn run() {
             commands::get_translations,
             commands::get_platform,
             commands::execute_menu_action,
+            commands::open_new_window,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;

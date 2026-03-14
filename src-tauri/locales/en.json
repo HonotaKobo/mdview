@@ -1,19 +1,19 @@
 {
   "menu": {
     "file": "File",
+    "file_new_window": "New Window",
     "file_open": "Open File",
     "file_save": "Save",
     "file_save_as": "Save As...",
-    "file_rename": "Rename",
     "file_print": "Print",
     "file_quit": "Quit",
     "edit": "Edit",
     "edit_copy_markdown": "Copy as Markdown",
+    "edit_copy_html": "Copy as HTML",
     "edit_copy_plaintext": "Copy as Plain Text",
     "edit_select_all": "Select All",
     "edit_find": "Find",
     "edit_find_next": "Find Next",
-    "edit_toggle": "Edit Mode",
     "edit_find_prev": "Find Previous",
     "view": "View",
     "view_theme": "Theme",
@@ -23,8 +23,6 @@
     "view_font_size": "Font Size",
     "view_font_size_increase": "Zoom In",
     "view_font_size_decrease": "Zoom Out",
-    "view_minimize": "Minimize",
-    "view_maximize": "Maximize",
     "view_always_on_top": "Always on Top"
   },
   "ui": {

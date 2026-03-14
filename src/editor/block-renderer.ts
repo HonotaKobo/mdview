@@ -1,6 +1,7 @@
 import type { Block } from './block-model';
 import { getMarkdownIt, addCopyButtons } from '../renderer';
 import katex from 'katex';
+import hljs from 'highlight.js';
 
 const EDIT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
@@ -78,6 +79,13 @@ export function renderBlockElement(block: Block): HTMLElement {
 function renderPreview(block: Block, preview: HTMLElement): void {
   const md = getMarkdownIt();
   switch (block.type) {
+    case 'front_matter': {
+      // Strip --- delimiters and render as YAML-highlighted code
+      const yamlContent = block.text.replace(/^---\n?/, '').replace(/\n?---$/, '');
+      const highlighted = hljs.highlight(yamlContent, { language: 'yaml' }).value;
+      preview.innerHTML = `<pre class="hljs"><code>${highlighted}</code></pre>`;
+      break;
+    }
     case 'math':
       try {
         preview.innerHTML = katex.renderToString(block.text, {

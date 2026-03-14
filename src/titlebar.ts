@@ -50,7 +50,6 @@ export class CustomTitleBar {
     // Initialize check states from localStorage
     const savedTheme = localStorage.getItem('mdcast-theme') || 'auto';
     this.checkStates = {
-      edit_toggle: false,
       theme_dark: savedTheme === 'dark',
       theme_light: savedTheme === 'light',
       theme_auto: savedTheme === 'auto',
@@ -80,10 +79,11 @@ export class CustomTitleBar {
         id: 'file',
         label: this.t('menu.file'),
         items: [
+          { type: 'normal', id: 'file_new_window', label: this.t('menu.file_new_window'), accelerator: 'Ctrl+N' },
           { type: 'normal', id: 'file_open', label: this.t('menu.file_open'), accelerator: 'Ctrl+O' },
+          { type: 'separator' },
           { type: 'normal', id: 'file_save', label: this.t('menu.file_save'), accelerator: 'Ctrl+S' },
           { type: 'normal', id: 'file_save_as', label: this.t('menu.file_save_as'), accelerator: 'Ctrl+Shift+S' },
-          { type: 'normal', id: 'file_rename', label: this.t('menu.file_rename') },
           { type: 'separator' },
           { type: 'normal', id: 'file_print', label: this.t('menu.file_print'), accelerator: 'Ctrl+P' },
           { type: 'separator' },
@@ -94,12 +94,9 @@ export class CustomTitleBar {
         id: 'edit',
         label: this.t('menu.edit'),
         items: [
-          { type: 'check', id: 'edit_toggle', label: this.t('menu.edit_toggle') },
-          { type: 'separator' },
           { type: 'normal', id: 'edit_copy_markdown', label: this.t('menu.edit_copy_markdown'), accelerator: 'Ctrl+Shift+C' },
+          { type: 'normal', id: 'edit_copy_html', label: this.t('menu.edit_copy_html') },
           { type: 'normal', id: 'edit_copy_plaintext', label: this.t('menu.edit_copy_plaintext') },
-          { type: 'separator' },
-          { type: 'normal', id: 'edit_select_all', label: this.t('menu.edit_select_all'), accelerator: 'Ctrl+A' },
           { type: 'separator' },
           { type: 'normal', id: 'edit_find', label: this.t('menu.edit_find'), accelerator: 'Ctrl+F' },
           { type: 'normal', id: 'edit_find_next', label: this.t('menu.edit_find_next'), accelerator: 'Ctrl+G' },
@@ -222,6 +219,12 @@ export class CustomTitleBar {
     const entry = document.createElement('div');
     entry.className = 'menu-entry has-submenu';
 
+    // Add empty check span for consistent left alignment
+    const check = document.createElement('span');
+    check.className = 'entry-check';
+    check.textContent = '';
+    entry.appendChild(check);
+
     const label = document.createElement('span');
     label.className = 'entry-label';
     label.textContent = item.label;
@@ -253,12 +256,15 @@ export class CustomTitleBar {
     entry.className = 'menu-entry';
     entry.dataset.action = item.id;
 
+    // Always add check span for consistent left alignment
+    const check = document.createElement('span');
+    check.className = 'entry-check';
     if (item.type === 'check') {
-      const check = document.createElement('span');
-      check.className = 'entry-check';
       check.textContent = this.checkStates[item.id] ? '\u2713' : '';
-      entry.appendChild(check);
+    } else {
+      check.textContent = '';
     }
+    entry.appendChild(check);
 
     const label = document.createElement('span');
     label.className = 'entry-label';
@@ -391,9 +397,7 @@ export class CustomTitleBar {
   private listenForStateChanges(): void {
     listen('menu-action', (event) => {
       const { action, value } = event.payload as { action: string; value?: unknown };
-      if (action === 'edit_toggle' && typeof value === 'boolean') {
-        this.setCheck('edit_toggle', value);
-      } else if (action === 'theme_change' && typeof value === 'string') {
+      if (action === 'theme_change' && typeof value === 'string') {
         this.setThemeCheck(value);
       } else if (action === 'always_on_top_changed') {
         this.setCheck('view_always_on_top', value === true);

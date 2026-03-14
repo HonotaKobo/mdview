@@ -1,19 +1,19 @@
 {
   "menu": {
     "file": "ファイル",
+    "file_new_window": "新しいウィンドウ",
     "file_open": "ファイルを開く",
     "file_save": "保存",
     "file_save_as": "名前を付けて保存",
-    "file_rename": "名前変更",
     "file_print": "印刷",
     "file_quit": "終了",
     "edit": "編集",
     "edit_copy_markdown": "Markdownとしてコピー",
+    "edit_copy_html": "HTMLとしてコピー",
     "edit_copy_plaintext": "プレーンテキストとしてコピー",
     "edit_select_all": "すべて選択",
     "edit_find": "検索",
     "edit_find_next": "次を検索",
-    "edit_toggle": "編集モード",
     "edit_find_prev": "前を検索",
     "view": "表示",
     "view_theme": "テーマ",
@@ -23,8 +23,6 @@
     "view_font_size": "フォントサイズ",
     "view_font_size_increase": "拡大",
     "view_font_size_decrease": "縮小",
-    "view_minimize": "最小化",
-    "view_maximize": "最大化",
     "view_always_on_top": "常に最前面"
   },
   "ui": {

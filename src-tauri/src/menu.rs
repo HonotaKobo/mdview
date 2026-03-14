@@ -10,16 +10,18 @@ use crate::i18n::I18n;
 pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Menu<Wry>> {
     // --- File menu ---
     let file_menu = SubmenuBuilder::new(app, i18n.t("menu.file"))
+        .item(&MenuItemBuilder::with_id("file_new_window", i18n.t("menu.file_new_window"))
+            .accelerator("CmdOrCtrl+N")
+            .build(app)?)
         .item(&MenuItemBuilder::with_id("file_open", i18n.t("menu.file_open"))
             .accelerator("CmdOrCtrl+O")
             .build(app)?)
+        .separator()
         .item(&MenuItemBuilder::with_id("file_save", i18n.t("menu.file_save"))
             .accelerator("CmdOrCtrl+S")
             .build(app)?)
         .item(&MenuItemBuilder::with_id("file_save_as", i18n.t("menu.file_save_as"))
             .accelerator("CmdOrCtrl+Shift+S")
-            .build(app)?)
-        .item(&MenuItemBuilder::with_id("file_rename", i18n.t("menu.file_rename"))
             .build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("file_print", i18n.t("menu.file_print"))
@@ -32,19 +34,29 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .build()?;
 
     // --- Edit menu ---
-    let edit_menu = SubmenuBuilder::new(app, i18n.t("menu.edit"))
-        .item(&CheckMenuItemBuilder::with_id("edit_toggle", i18n.t("menu.edit_toggle"))
-            .accelerator("CmdOrCtrl+E")
-            .build(app)?)
-        .separator()
+    let mut edit_builder = SubmenuBuilder::new(app, i18n.t("menu.edit"));
+
+    // macOS: add standard editing items so webview text operations work
+    #[cfg(target_os = "macos")]
+    {
+        edit_builder = edit_builder
+            .item(&PredefinedMenuItem::undo(app, None)?)
+            .item(&PredefinedMenuItem::redo(app, None)?)
+            .separator()
+            .item(&PredefinedMenuItem::cut(app, None)?)
+            .item(&PredefinedMenuItem::copy(app, None)?)
+            .item(&PredefinedMenuItem::paste(app, None)?)
+            .item(&PredefinedMenuItem::select_all(app, None)?)
+            .separator();
+    }
+
+    let edit_menu = edit_builder
         .item(&MenuItemBuilder::with_id("edit_copy_markdown", i18n.t("menu.edit_copy_markdown"))
             .accelerator("CmdOrCtrl+Shift+C")
             .build(app)?)
-        .item(&MenuItemBuilder::with_id("edit_copy_plaintext", i18n.t("menu.edit_copy_plaintext"))
+        .item(&MenuItemBuilder::with_id("edit_copy_html", i18n.t("menu.edit_copy_html"))
             .build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::with_id("edit_select_all", i18n.t("menu.edit_select_all"))
-            .accelerator("CmdOrCtrl+A")
+        .item(&MenuItemBuilder::with_id("edit_copy_plaintext", i18n.t("menu.edit_copy_plaintext"))
             .build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("edit_find", i18n.t("menu.edit_find"))
@@ -82,10 +94,6 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .item(&theme_submenu)
         .item(&font_submenu)
         .separator()
-        .item(&MenuItemBuilder::with_id("view_minimize", i18n.t("menu.view_minimize"))
-            .build(app)?)
-        .item(&MenuItemBuilder::with_id("view_maximize", i18n.t("menu.view_maximize"))
-            .build(app)?)
         .item(&CheckMenuItemBuilder::with_id("view_always_on_top", i18n.t("menu.view_always_on_top"))
             .build(app)?)
         .build()?;
@@ -130,20 +138,6 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                 let _ = window.close();
             }
         }
-        "view_minimize" => {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.minimize();
-            }
-        }
-        "view_maximize" => {
-            if let Some(window) = app.get_webview_window("main") {
-                if window.is_maximized().unwrap_or(false) {
-                    let _ = window.unmaximize();
-                } else {
-                    let _ = window.maximize();
-                }
-            }
-        }
         "view_always_on_top" => {
             if let Some(window) = app.get_webview_window("main") {
                 let current = window.is_always_on_top().unwrap_or(false);
@@ -155,16 +149,6 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                     }
                 }
                 let _ = app.emit("menu-action", serde_json::json!({ "action": "always_on_top_changed", "value": new_state }));
-            }
-        }
-
-        // Edit mode toggle — flip check mark and emit to frontend
-        "edit_toggle" => {
-            if let Some(item) = app.menu().and_then(|m| m.get("edit_toggle")) {
-                if let Some(check) = item.as_check_menuitem() {
-                    let new_state = check.is_checked().unwrap_or(false);
-                    let _ = app.emit("menu-action", serde_json::json!({ "action": "edit_toggle", "value": new_state }));
-                }
             }
         }
 
