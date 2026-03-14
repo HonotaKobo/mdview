@@ -146,6 +146,49 @@ fn url_decode(s: &str) -> String {
     String::from_utf8(bytes).unwrap_or_else(|_| s.to_string())
 }
 
+/// Fix invalid JSON escape sequences (e.g. \d, \s, \w from regex in code blocks).
+/// Scans character by character so that valid escapes (\n, \\, \", etc.) are preserved.
+fn fix_json_escapes(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.peek() {
+                Some(&next) => match next {
+                    '"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't' | 'u' => {
+                        result.push('\\');
+                        result.push(next);
+                        chars.next();
+                    }
+                    _ => {
+                        // Invalid JSON escape: add extra backslash
+                        result.push('\\');
+                        result.push('\\');
+                        result.push(next);
+                        chars.next();
+                    }
+                },
+                None => result.push('\\'),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Try parsing JSON, and on failure retry after fixing invalid escape sequences.
+fn parse_json_lenient<T: serde::de::DeserializeOwned>(body: &str) -> Result<T, String> {
+    match serde_json::from_str::<T>(body) {
+        Ok(v) => Ok(v),
+        Err(_) => {
+            let fixed = fix_json_escapes(body);
+            serde_json::from_str::<T>(&fixed)
+                .map_err(|e| format!("Invalid JSON: {}", e))
+        }
+    }
+}
+
 fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::IpcResponse {
     let url = request.url().to_string();
     let method = request.method().clone();
@@ -157,9 +200,9 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         // Pass-through: accept IpcRequest JSON directly
         (Method::Post, "/") => {
             let body = read_body(request);
-            match serde_json::from_str::<ipc::IpcRequest>(&body) {
+            match parse_json_lenient::<ipc::IpcRequest>(&body) {
                 Ok(req) => dispatch_ipc_request(app, req),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                Err(e) => error_response(&e),
             }
         }
 
@@ -174,17 +217,17 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
                 ipc::handle_update(app, Some(body), title)
             } else {
                 // JSON mode (default, backward compatible)
-                match serde_json::from_str::<UpdateRequest>(&body) {
+                match parse_json_lenient::<UpdateRequest>(&body) {
                     Ok(r) => ipc::handle_update(app, r.body, r.title),
-                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                    Err(e) => error_response(&e),
                 }
             }
         }
         (Method::Post, "/query") => {
             let body = read_body(request);
-            match serde_json::from_str::<QueryRequest>(&body) {
+            match parse_json_lenient::<QueryRequest>(&body) {
                 Ok(r) => ipc::handle_query(app, &r.properties),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                Err(e) => error_response(&e),
             }
         }
         (Method::Post, "/grep") => {
@@ -195,24 +238,24 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
                 // Raw body mode: body is the regex pattern
                 ipc::handle_grep(app, &body)
             } else {
-                match serde_json::from_str::<GrepRequest>(&body) {
+                match parse_json_lenient::<GrepRequest>(&body) {
                     Ok(r) => ipc::handle_grep(app, &r.pattern),
-                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                    Err(e) => error_response(&e),
                 }
             }
         }
         (Method::Post, "/lines") => {
             let body = read_body(request);
-            match serde_json::from_str::<LinesRequest>(&body) {
+            match parse_json_lenient::<LinesRequest>(&body) {
                 Ok(r) => ipc::handle_lines(app, r.start, r.end),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                Err(e) => error_response(&e),
             }
         }
         (Method::Post, "/edit/delete") => {
             let body = read_body(request);
-            match serde_json::from_str::<DeleteRequest>(&body) {
+            match parse_json_lenient::<DeleteRequest>(&body) {
                 Ok(r) => ipc::handle_delete(app, r.ranges),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                Err(e) => error_response(&e),
             }
         }
         (Method::Post, "/edit/insert") => {
@@ -226,9 +269,9 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
                     None => error_response("Missing or invalid query parameter: line"),
                 }
             } else {
-                match serde_json::from_str::<InsertRequest>(&body) {
+                match parse_json_lenient::<InsertRequest>(&body) {
                     Ok(r) => ipc::handle_insert(app, r.line, &r.content),
-                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                    Err(e) => error_response(&e),
                 }
             }
         }
@@ -245,9 +288,9 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
                     _ => error_response("Missing or invalid query parameters: start, end"),
                 }
             } else {
-                match serde_json::from_str::<ReplaceRequest>(&body) {
+                match parse_json_lenient::<ReplaceRequest>(&body) {
                     Ok(r) => ipc::handle_replace(app, r.start, r.end, &r.content),
-                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                    Err(e) => error_response(&e),
                 }
             }
         }
