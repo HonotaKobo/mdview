@@ -26,13 +26,13 @@ jobs:
           echo "SHA256: $HASH"
 
       - name: Checkout scoop bucket
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: HonotaKobo/scoop-mdcast
           token: ${{ secrets.PACKAGE_PAT }}
 
       - name: Update manifest
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           VERSION: ${{ steps.release.outputs.version }}
           TAG: ${{ steps.release.outputs.tag }}
@@ -101,7 +101,7 @@ jobs:
           echo "Intel SHA256: $INTEL_HASH"
 
       - name: Checkout homebrew tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: HonotaKobo/homebrew-mdcast
           token: ${{ secrets.PACKAGE_PAT }}
