@@ -339,34 +339,6 @@ export class EditorController {
       return;
     }
 
-    if (e.key === 'Enter' && !e.shiftKey) {
-      // Split paragraph/heading on Enter
-      if (block.type === 'paragraph' || block.type === 'heading') {
-        e.preventDefault();
-        this.splitBlock(block);
-      }
-    } else if (e.key === 'Backspace') {
-      if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
-        e.preventDefault();
-        this.mergeWithPrevious(block);
-      }
-    } else if (e.key === 'Delete') {
-      if (textarea.selectionStart === textarea.value.length &&
-          textarea.selectionEnd === textarea.value.length) {
-        e.preventDefault();
-        this.mergeWithNext(block);
-      }
-    } else if (e.key === 'ArrowUp') {
-      if (textarea.selectionStart === 0) {
-        e.preventDefault();
-        this.focusPreviousBlock(block, 'end');
-      }
-    } else if (e.key === 'ArrowDown') {
-      if (textarea.selectionStart === textarea.value.length) {
-        e.preventDefault();
-        this.focusNextBlock(block, 'start');
-      }
-    }
   }
 
   // --- Block operations ---
