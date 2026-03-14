@@ -8,7 +8,7 @@ mod state;
 mod watcher;
 
 use clap::Parser;
-use tauri::Manager as _;
+use tauri::{Emitter, Manager as _};
 use state::{AppState, AppStateInner};
 use watcher::FileWatcher;
 
@@ -158,12 +158,42 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(move |_app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                let path = ipc::instance_file(&id_for_exit);
-                std::fs::remove_file(&path).ok();
-                // Clean up HTTP port file
-                std::fs::remove_file(path.with_extension("http")).ok();
+        .run(move |app_handle, event| {
+            match event {
+                tauri::RunEvent::Opened { urls } => {
+                    for url in &urls {
+                        if let Ok(path) = url.to_file_path() {
+                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                let title = path
+                                    .file_name()
+                                    .map(|f| f.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| "Untitled".to_string());
+                                let abs_path = path.to_string_lossy().to_string();
+
+                                {
+                                    let state = app_handle.state::<AppState>();
+                                    let mut state = state.lock().unwrap();
+                                    state.current_content = content.clone();
+                                    state.title = title.clone();
+                                    state.saved_path = Some(abs_path);
+                                    state.dirty = false;
+                                }
+
+                                let _ = app_handle.emit("content-update", serde_json::json!({
+                                    "body": content,
+                                    "title": title,
+                                }));
+                            }
+                        }
+                    }
+                }
+                tauri::RunEvent::Exit => {
+                    let path = ipc::instance_file(&id_for_exit);
+                    std::fs::remove_file(&path).ok();
+                    // Clean up HTTP port file
+                    std::fs::remove_file(path.with_extension("http")).ok();
+                }
+                _ => {}
             }
         });
 }
