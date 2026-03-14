@@ -266,8 +266,8 @@ document.addEventListener('keydown', (e) => {
   const mod = e.metaKey || e.ctrlKey;
   if (!mod) return;
 
-  // Skip if typing in a textarea (let standard editing work)
-  const inTextarea = document.activeElement?.tagName === 'TEXTAREA';
+  // Skip if typing in a textarea or input (let standard editing work)
+  const inTextarea = document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT';
 
   switch (e.key) {
     case 'z':

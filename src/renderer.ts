@@ -65,37 +65,112 @@ const md: MarkdownIt = new MarkdownIt({
     katexOptions: { throwOnError: false },
   });
 
-// Custom plugin: checkboxes in definition list <dd> elements
+let deflistRenderCount = 0;
+
+// Custom plugin: checkboxes, radio buttons, and text inputs in definition list <dd> elements
 function deflistTaskPlugin(md: MarkdownIt): void {
   md.core.ruler.after('inline', 'deflist-task', (state) => {
     const tokens = state.tokens;
+    deflistRenderCount++;
+    const renderId = deflistRenderCount;
+    let radioGroupId = 0;
+
     for (let i = 0; i < tokens.length; i++) {
+      // Track dt_open for radio group boundaries
+      if (tokens[i].type === 'dt_open') {
+        radioGroupId++;
+        continue;
+      }
+
       if (tokens[i].type !== 'dd_open') continue;
+
       // Find the next inline token inside this dd
       for (let j = i + 1; j < tokens.length && tokens[j].type !== 'dd_close'; j++) {
         if (tokens[j].type !== 'inline') continue;
         const content = tokens[j].content;
-        const match = content.match(/^\[([ xX])\]\s?/);
-        if (!match) break;
-        const checked = match[1] === 'x' || match[1] === 'X';
-        // Add class to dd_open
-        tokens[i].attrJoin('class', 'deflist-task-item');
-        // Replace inline content: prepend checkbox HTML
-        const checkbox = `<input type="checkbox"${checked ? ' checked' : ''}> `;
-        tokens[j].content = content.slice(match[0].length);
         const children = tokens[j].children ?? [];
         tokens[j].children = children;
-        // Replace the text token that starts with [ ] or [x]
-        for (const child of children) {
-          if (child.type === 'text' && child.content.startsWith(match[0])) {
-            child.content = child.content.slice(match[0].length);
-            break;
-          }
+
+        // 1) Combined: [R:"x?"][T:"value"] optional-label
+        let match = content.match(/^\[R:"(x?)"\]\[T:"([^"]*)"\]\s?(.*)/);
+        if (match) {
+          const radioChecked = match[1] === 'x';
+          const textValue = match[2];
+          const label = match[3] || '';
+          tokens[i].attrJoin('class', 'deflist-task-item deflist-form-item');
+
+          const radioHtml = `<input type="radio" name="deflist-radio-${renderId}-${radioGroupId}"${radioChecked ? ' checked' : ''}> `;
+          const textHtml = `<input type="text" value="${escapeHtml(textValue)}" class="deflist-text-input"${label ? ` placeholder="${escapeHtml(label)}"` : ''}> `;
+
+          tokens[j].content = '';
+          const combinedChildren: typeof children = [];
+          tokens[j].children = combinedChildren;
+          const radioToken = new state.Token('html_inline', '', 0);
+          radioToken.content = radioHtml;
+          const textToken = new state.Token('html_inline', '', 0);
+          textToken.content = textHtml;
+          combinedChildren.push(radioToken, textToken);
+          break;
         }
-        // Insert html_inline token for the checkbox at the beginning
-        const checkboxToken = new state.Token('html_inline', '', 0);
-        checkboxToken.content = checkbox;
-        children.unshift(checkboxToken);
+
+        // 2) Radio: [R:"x?"] label
+        match = content.match(/^\[R:"(x?)"\]\s?/);
+        if (match) {
+          const checked = match[1] === 'x';
+          tokens[i].attrJoin('class', 'deflist-task-item deflist-form-item');
+
+          const radioHtml = `<input type="radio" name="deflist-radio-${renderId}-${radioGroupId}"${checked ? ' checked' : ''}> `;
+
+          tokens[j].content = content.slice(match[0].length);
+          for (const child of children) {
+            if (child.type === 'text' && child.content.startsWith(match[0])) {
+              child.content = child.content.slice(match[0].length);
+              break;
+            }
+          }
+          const radioToken = new state.Token('html_inline', '', 0);
+          radioToken.content = radioHtml;
+          children.unshift(radioToken);
+          break;
+        }
+
+        // 3) Text: [T:"value"] label
+        match = content.match(/^\[T:"([^"]*)"\]\s?(.*)/);
+        if (match) {
+          const textValue = match[1];
+          const label = match[2] || '';
+          tokens[i].attrJoin('class', 'deflist-task-item deflist-form-item');
+
+          const textHtml = `<input type="text" value="${escapeHtml(textValue)}" class="deflist-text-input"${label ? ` placeholder="${escapeHtml(label)}"` : ''}> `;
+
+          tokens[j].content = '';
+          const textChildren: typeof children = [];
+          tokens[j].children = textChildren;
+          const textToken = new state.Token('html_inline', '', 0);
+          textToken.content = textHtml;
+          textChildren.push(textToken);
+          break;
+        }
+
+        // 4) Checkbox: [ ] or [x] (existing)
+        match = content.match(/^\[([ xX])\]\s?/);
+        if (match) {
+          const checked = match[1] === 'x' || match[1] === 'X';
+          tokens[i].attrJoin('class', 'deflist-task-item');
+          const checkbox = `<input type="checkbox"${checked ? ' checked' : ''}> `;
+          tokens[j].content = content.slice(match[0].length);
+          for (const child of children) {
+            if (child.type === 'text' && child.content.startsWith(match[0])) {
+              child.content = child.content.slice(match[0].length);
+              break;
+            }
+          }
+          const checkboxToken = new state.Token('html_inline', '', 0);
+          checkboxToken.content = checkbox;
+          children.unshift(checkboxToken);
+          break;
+        }
+
         break;
       }
     }

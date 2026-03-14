@@ -275,6 +275,37 @@ export class EditorController {
         this.toggleCheckbox(block, index);
       });
     });
+
+    // Radio button toggle in preview
+    const radios = el.querySelectorAll('input[type="radio"]');
+    radios.forEach((radio, index) => {
+      const groupName = (radio as HTMLInputElement).name;
+      const groupIndices: number[] = [];
+      radios.forEach((r, idx) => {
+        if ((r as HTMLInputElement).name === groupName) {
+          groupIndices.push(idx);
+        }
+      });
+      (radio as HTMLInputElement).removeAttribute('disabled');
+      radio.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleRadio(block, index, groupIndices);
+      });
+    });
+
+    // Text input handling in preview
+    const formTextInputs = el.querySelectorAll('input[type="text"].deflist-text-input');
+    formTextInputs.forEach((input, index) => {
+      input.addEventListener('keydown', (e) => e.stopPropagation());
+      input.addEventListener('dblclick', (e) => e.stopPropagation());
+      input.addEventListener('change', () => {
+        const value = (input as HTMLInputElement).value.replace(/"/g, '');
+        this.updateTextInput(block, index, value);
+        const textarea = this.getTextarea(block);
+        if (textarea) textarea.value = block.text;
+      });
+    });
   }
 
   private handleKeyDown(e: KeyboardEvent, block: Block): void {
@@ -580,6 +611,52 @@ export class EditorController {
     });
     this.rerenderBlock(block);
     this.notifyChange();
+  }
+
+  private toggleRadio(block: Block, clickedIndex: number, groupIndices: number[]): void {
+    // Sync text input values before re-rendering
+    const blockEl = this.container.querySelector(`[data-block-key="${block.key}"]`);
+    if (blockEl) this.syncFormTextInputs(block, blockEl as HTMLElement);
+
+    let count = 0;
+    block.text = block.text.replace(/\[R:"(x?)"\]/g, (match) => {
+      const idx = count++;
+      if (groupIndices.includes(idx)) {
+        return idx === clickedIndex ? '[R:"x"]' : '[R:""]';
+      }
+      return match;
+    });
+    this.rerenderBlock(block);
+    this.notifyChange();
+  }
+
+  private updateTextInput(block: Block, textIndex: number, value: string): void {
+    let count = 0;
+    block.text = block.text.replace(/\[T:"([^"]*)"\]/g, (match) => {
+      if (count === textIndex) {
+        count++;
+        return `[T:"${value}"]`;
+      }
+      count++;
+      return match;
+    });
+    this.notifyChange();
+  }
+
+  private syncFormTextInputs(block: Block, blockEl: HTMLElement): void {
+    const textInputs = blockEl.querySelectorAll('input[type="text"].deflist-text-input');
+    if (textInputs.length === 0) return;
+
+    let count = 0;
+    block.text = block.text.replace(/\[T:"([^"]*)"\]/g, (match) => {
+      const input = textInputs[count] as HTMLInputElement | undefined;
+      count++;
+      if (input) {
+        const safeValue = input.value.replace(/"/g, '');
+        return `[T:"${safeValue}"]`;
+      }
+      return match;
+    });
   }
 
   /** Collect footnote definitions from all blocks and set context for preview */

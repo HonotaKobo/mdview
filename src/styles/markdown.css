@@ -162,6 +162,30 @@
   margin-right: 0.5em;
 }
 
+#content dd.deflist-form-item input[type='radio'] {
+  margin-right: 0.5em;
+  cursor: pointer;
+}
+
+#content dd.deflist-form-item .deflist-text-input {
+  font-size: 0.9em;
+  font-family: inherit;
+  padding: 2px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  min-width: 200px;
+  max-width: 100%;
+  line-height: 1.4;
+}
+
+#content dd.deflist-form-item .deflist-text-input:focus {
+  outline: none;
+  border-color: var(--link-color);
+  box-shadow: 0 0 0 1px var(--link-color);
+}
+
 /* highlight.js overrides for theme integration */
 #content pre.hljs {
   background: var(--code-bg);
