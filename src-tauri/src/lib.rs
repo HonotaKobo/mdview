@@ -13,7 +13,20 @@ use state::{AppState, AppStateInner};
 use watcher::FileWatcher;
 
 pub fn run() {
-    let args = cli::CliArgs::parse();
+    let mut args = cli::CliArgs::parse();
+
+    // --body - : read from stdin (must happen before daemonize)
+    let stdin_read = if args.body.as_deref() == Some("-") {
+        use std::io::Read as _;
+        let mut input = String::new();
+        std::io::stdin()
+            .read_to_string(&mut input)
+            .expect("mdcast: failed to read stdin");
+        args.body = Some(input);
+        true
+    } else {
+        false
+    };
 
     // Determine the instance ID
     let id = args.id.clone().unwrap_or_else(|| {
@@ -61,13 +74,25 @@ pub fn run() {
             child_args.push(id.clone());
         }
         use std::process::{Command, Stdio};
-        Command::new(exe)
-            .args(&child_args)
-            .stdin(Stdio::null())
+        let mut cmd = Command::new(exe);
+        cmd.args(&child_args)
             .stdout(Stdio::null())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .expect("failed to launch mdcast");
+            .stderr(Stdio::inherit());
+
+        if stdin_read {
+            // Pipe the stdin content to the child process (which will read it via --body -)
+            cmd.stdin(Stdio::piped());
+            let mut child = cmd.spawn().expect("failed to launch mdcast");
+            if let Some(mut child_stdin) = child.stdin.take() {
+                use std::io::Write as _;
+                child_stdin
+                    .write_all(args.body.as_deref().unwrap_or("").as_bytes())
+                    .ok();
+            }
+        } else {
+            cmd.stdin(Stdio::null());
+            cmd.spawn().expect("failed to launch mdcast");
+        }
         return;
     }
 
@@ -144,7 +169,9 @@ pub fn run() {
 
             ipc::start_listener(id_for_setup.clone(), app.handle().clone());
             let http_port = http_api::start_http_server(id_for_setup.clone(), app.handle().clone());
+            let port_path = ipc::instance_file(&id_for_setup).with_extension("http");
             eprintln!("mdcast: HTTP API listening on http://127.0.0.1:{}", http_port);
+            eprintln!("mdcast: port file: {}", port_path.display());
 
             // Start file watcher for file mode
             if let Some(ref fp) = resolved_file_path {

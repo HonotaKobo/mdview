@@ -143,15 +143,10 @@ function debounced(action: string, fn: () => void) {
 // Pull initial content from Rust backend (reliable, no race condition)
 async function loadInitialContent() {
   const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
-  if (contentSet || body) {
-    currentContent = body;
-    currentTitle = title || 'Untitled';
-    editorController.enterEditMode(body);
-    updateWindowTitle(currentTitle);
-  } else {
-    // No content provided — show file open dialog
-    await showOpenDialogInitial();
-  }
+  currentContent = body;
+  currentTitle = title || 'Untitled';
+  editorController.enterEditMode(body);
+  updateWindowTitle(currentTitle);
 }
 loadInitialContent();
 

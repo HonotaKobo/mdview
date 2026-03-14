@@ -90,6 +90,62 @@ fn error_response(msg: &str) -> ipc::IpcResponse {
     }
 }
 
+/// Extract Content-Type (without parameters like charset) from request headers.
+fn get_content_type(request: &tiny_http::Request) -> String {
+    for header in request.headers() {
+        if header.field.as_str().to_ascii_lowercase() == "content-type" {
+            let value = header.value.as_str();
+            return value.split(';').next().unwrap_or(value).trim().to_lowercase();
+        }
+    }
+    String::new()
+}
+
+/// Extract a query parameter value from a URL string.
+fn parse_query_param(url: &str, key: &str) -> Option<String> {
+    let query = url.split('?').nth(1)?;
+    for pair in query.split('&') {
+        if let Some((k, v)) = pair.split_once('=') {
+            if k == key {
+                return Some(url_decode(v));
+            }
+        }
+    }
+    None
+}
+
+/// Percent-decode a URL-encoded string (handles + as space, %XX sequences).
+fn url_decode(s: &str) -> String {
+    let mut bytes = Vec::new();
+    let mut iter = s.bytes();
+    while let Some(b) = iter.next() {
+        match b {
+            b'+' => bytes.push(b' '),
+            b'%' => {
+                let h1 = iter.next();
+                let h2 = iter.next();
+                if let (Some(h1), Some(h2)) = (h1, h2) {
+                    if let Ok(byte) = u8::from_str_radix(
+                        std::str::from_utf8(&[h1, h2]).unwrap_or(""),
+                        16,
+                    ) {
+                        bytes.push(byte);
+                    } else {
+                        bytes.extend_from_slice(&[b'%', h1, h2]);
+                    }
+                } else {
+                    bytes.push(b'%');
+                    if let Some(h1) = h1 {
+                        bytes.push(h1);
+                    }
+                }
+            }
+            _ => bytes.push(b),
+        }
+    }
+    String::from_utf8(bytes).unwrap_or_else(|_| s.to_string())
+}
+
 fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::IpcResponse {
     let url = request.url().to_string();
     let method = request.method().clone();
@@ -109,10 +165,19 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
 
         // REST-style endpoints
         (Method::Post, "/update") => {
+            let content_type = get_content_type(request);
             let body = read_body(request);
-            match serde_json::from_str::<UpdateRequest>(&body) {
-                Ok(r) => ipc::handle_update(app, r.body, r.title),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+
+            if content_type == "text/markdown" || content_type == "text/plain" {
+                // Raw body mode: body is markdown text, title from query param
+                let title = parse_query_param(&url, "title");
+                ipc::handle_update(app, Some(body), title)
+            } else {
+                // JSON mode (default, backward compatible)
+                match serde_json::from_str::<UpdateRequest>(&body) {
+                    Ok(r) => ipc::handle_update(app, r.body, r.title),
+                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                }
             }
         }
         (Method::Post, "/query") => {
@@ -123,10 +188,17 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             }
         }
         (Method::Post, "/grep") => {
+            let content_type = get_content_type(request);
             let body = read_body(request);
-            match serde_json::from_str::<GrepRequest>(&body) {
-                Ok(r) => ipc::handle_grep(app, &r.pattern),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+
+            if content_type == "text/plain" {
+                // Raw body mode: body is the regex pattern
+                ipc::handle_grep(app, &body)
+            } else {
+                match serde_json::from_str::<GrepRequest>(&body) {
+                    Ok(r) => ipc::handle_grep(app, &r.pattern),
+                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                }
             }
         }
         (Method::Post, "/lines") => {
@@ -144,17 +216,39 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             }
         }
         (Method::Post, "/edit/insert") => {
+            let content_type = get_content_type(request);
             let body = read_body(request);
-            match serde_json::from_str::<InsertRequest>(&body) {
-                Ok(r) => ipc::handle_insert(app, r.line, &r.content),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+
+            if content_type == "text/markdown" || content_type == "text/plain" {
+                // Raw body mode: body is the content, line from query param
+                match parse_query_param(&url, "line").and_then(|v| v.parse::<usize>().ok()) {
+                    Some(line) => ipc::handle_insert(app, line, &body),
+                    None => error_response("Missing or invalid query parameter: line"),
+                }
+            } else {
+                match serde_json::from_str::<InsertRequest>(&body) {
+                    Ok(r) => ipc::handle_insert(app, r.line, &r.content),
+                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                }
             }
         }
         (Method::Post, "/edit/replace") => {
+            let content_type = get_content_type(request);
             let body = read_body(request);
-            match serde_json::from_str::<ReplaceRequest>(&body) {
-                Ok(r) => ipc::handle_replace(app, r.start, r.end, &r.content),
-                Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+
+            if content_type == "text/markdown" || content_type == "text/plain" {
+                // Raw body mode: body is the content, start/end from query params
+                let start = parse_query_param(&url, "start").and_then(|v| v.parse::<usize>().ok());
+                let end = parse_query_param(&url, "end").and_then(|v| v.parse::<usize>().ok());
+                match (start, end) {
+                    (Some(s), Some(e)) => ipc::handle_replace(app, s, e, &body),
+                    _ => error_response("Missing or invalid query parameters: start, end"),
+                }
+            } else {
+                match serde_json::from_str::<ReplaceRequest>(&body) {
+                    Ok(r) => ipc::handle_replace(app, r.start, r.end, &r.content),
+                    Err(e) => error_response(&format!("Invalid JSON: {}", e)),
+                }
             }
         }
         (Method::Get, "/list") => {
