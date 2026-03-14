@@ -54,18 +54,6 @@ async function initPlatformUI() {
 }
 initPlatformUI();
 
-// Open a file in the current window (used for initial load)
-async function openFileInCurrentWindow(filePath: string) {
-  const content = await invoke<string>('read_file', { path: filePath });
-  const fileName = filePath.split(/[\\/]/).pop() || 'Untitled';
-  currentContent = content;
-  currentTitle = fileName;
-
-  editorController.updateContent(content);
-
-  updateWindowTitle(currentTitle);
-  await invoke('notify_saved', { path: filePath });
-}
 
 
 // Open file dialog that opens in a new window
