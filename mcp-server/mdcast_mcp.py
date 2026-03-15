@@ -115,11 +115,13 @@ def launch(body: str = "", title: str | None = None) -> str:
     if title:
         cmd += ["--title", title]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    result = subprocess.run(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=10
+    )
     auto_id = result.stdout.strip()
     if not auto_id:
         raise RuntimeError(
-            f"Failed to launch mdcast: {result.stderr.strip() or 'no output'}"
+            f"Failed to launch mdcast (exit code {result.returncode})"
         )
 
     # ポートファイルが生成されるまで待機
