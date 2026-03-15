@@ -99,6 +99,7 @@ export class CustomTitleBar {
           { type: 'normal', id: 'edit_copy_plaintext', label: this.t('menu.edit_copy_plaintext') },
           { type: 'separator' },
           { type: 'normal', id: 'edit_find', label: this.t('menu.edit_find'), accelerator: 'Ctrl+F' },
+          { type: 'normal', id: 'edit_find_replace', label: this.t('menu.edit_find_replace'), accelerator: 'Ctrl+H' },
           { type: 'normal', id: 'edit_find_next', label: this.t('menu.edit_find_next'), accelerator: 'Ctrl+G' },
           { type: 'normal', id: 'edit_find_prev', label: this.t('menu.edit_find_prev'), accelerator: 'Ctrl+Shift+G' },
         ],
@@ -126,6 +127,13 @@ export class CustomTitleBar {
           },
           { type: 'separator' },
           { type: 'check', id: 'view_always_on_top', label: this.t('menu.view_always_on_top') },
+        ],
+      },
+      {
+        id: 'help',
+        label: this.t('menu.help'),
+        items: [
+          { type: 'normal', id: 'help_about', label: this.t('menu.help_about') },
         ],
       },
     ];

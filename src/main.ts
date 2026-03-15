@@ -8,7 +8,10 @@ import { FindBar } from './find';
 import { FontSizeManager } from './font-size';
 import { CustomTitleBar } from './titlebar';
 import { EditorController } from './editor/editor-controller';
+import { StatusBar } from './status-bar';
 import { getMarkdownIt } from './renderer';
+import { exportAsPdf } from './pdf-export';
+import { exportAsHtml } from './html-export';
 
 interface ContentUpdate {
   body?: string;
@@ -29,11 +32,30 @@ const themeManager = new ThemeManager();
 const findBar = new FindBar();
 const fontSizeManager = new FontSizeManager();
 const editorController = new EditorController(document.getElementById('content')!);
+const statusBar = new StatusBar();
+
+findBar.setOnReplace((search, replace, all) => {
+  let content = editorController.getCurrentContent();
+  if (all) {
+    const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    content = content.replace(regex, replace);
+  } else {
+    const idx = content.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return;
+    content = content.slice(0, idx) + replace + content.slice(idx + search.length);
+  }
+  editorController.updateContent(content);
+  currentContent = content;
+  isDirty = true;
+  invoke('sync_content', { content });
+  findBar.search();
+});
 
 editorController.setOnContentChange((markdown) => {
   currentContent = markdown;
   isDirty = true;
   invoke('sync_content', { content: markdown });
+  statusBar.update(markdown);
 });
 
 function updateWindowTitle(title: string) {
@@ -126,6 +148,7 @@ async function loadInitialContent() {
   currentTitle = title || 'Untitled';
   editorController.enterEditMode(body);
   updateWindowTitle(currentTitle);
+  statusBar.update(body);
 }
 loadInitialContent();
 
@@ -137,6 +160,7 @@ listen('content-update', async (event) => {
     isDirty = true;
 
     editorController.updateContent(update.body);
+    statusBar.update(update.body);
   }
   if (update.title !== undefined) {
     currentTitle = update.title;
@@ -164,6 +188,15 @@ listen('menu-action', (event) => {
     case 'file_reload':
       debounced('file_reload', () => reloadCurrentFile());
       break;
+    case 'file_export_pdf':
+      debounced('file_export_pdf', () => exportAsPdf(currentTitle));
+      break;
+    case 'file_export_html':
+      debounced('file_export_html', () => {
+        currentContent = editorController.getCurrentContent();
+        exportAsHtml(currentTitle, currentContent);
+      });
+      break;
     case 'file_print':
       debounced('file_print', () => window.print());
       break;
@@ -185,6 +218,15 @@ listen('menu-action', (event) => {
         }
       });
       break;
+    case 'edit_find_replace':
+      debounced('edit_find_replace', () => {
+        if (findBar.isReplaceVisible()) {
+          findBar.hide();
+        } else {
+          findBar.showReplace();
+        }
+      });
+      break;
     case 'edit_find_next':
       findBar.show();
       findBar.next();
@@ -197,6 +239,9 @@ listen('menu-action', (event) => {
       if (value === 'dark' || value === 'light' || value === 'auto') {
         themeManager.setTheme(value);
       }
+      break;
+    case 'view_status_bar':
+      debounced('view_status_bar', () => statusBar.toggle());
       break;
     case 'font_increase':
       debounced('font_increase', () => fontSizeManager.increase());
@@ -238,6 +283,7 @@ document.addEventListener('drop', async (e) => {
     currentTitle = file.name;
 
     editorController.updateContent(text);
+    statusBar.update(text);
 
     updateWindowTitle(currentTitle);
   }
@@ -289,6 +335,13 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       debounced('file_reload', () => reloadCurrentFile());
       break;
+    case 'e':
+    case 'E':
+      if (e.shiftKey) {
+        e.preventDefault();
+        debounced('file_export_pdf', () => exportAsPdf(currentTitle));
+      }
+      break;
     case 'p':
       e.preventDefault();
       debounced('file_print', () => window.print());
@@ -301,6 +354,18 @@ document.addEventListener('keydown', (e) => {
             findBar.hide();
           } else {
             findBar.show();
+          }
+        });
+      }
+      break;
+    case 'h':
+      if (!inTextarea) {
+        e.preventDefault();
+        debounced('edit_find_replace', () => {
+          if (findBar.isReplaceVisible()) {
+            findBar.hide();
+          } else {
+            findBar.showReplace();
           }
         });
       }

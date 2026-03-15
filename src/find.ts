@@ -1,14 +1,20 @@
 export class FindBar {
   private bar: HTMLElement;
   private input: HTMLInputElement;
+  private replaceInput: HTMLInputElement;
+  private replaceRow: HTMLElement;
   private countEl: HTMLElement;
   private container: HTMLElement;
   private highlights: HTMLElement[] = [];
   private currentIndex = -1;
+  private replaceMode = false;
+  private onReplace: ((search: string, replace: string, all: boolean) => void) | null = null;
 
   constructor() {
     this.bar = document.getElementById('find-bar')!;
     this.input = document.getElementById('find-input') as HTMLInputElement;
+    this.replaceInput = document.getElementById('replace-input') as HTMLInputElement;
+    this.replaceRow = document.getElementById('replace-row')!;
     this.countEl = document.getElementById('find-count')!;
     this.container = document.getElementById('content')!;
 
@@ -17,6 +23,8 @@ export class FindBar {
     document.getElementById('find-next')!.addEventListener('click', () => this.next());
     document.getElementById('find-prev')!.addEventListener('click', () => this.prev());
     document.getElementById('find-close')!.addEventListener('click', () => this.hide());
+    document.getElementById('replace-one')!.addEventListener('click', () => this.replaceOne());
+    document.getElementById('replace-all')!.addEventListener('click', () => this.replaceAll());
 
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -31,23 +39,53 @@ export class FindBar {
         this.hide();
       }
     });
+
+    this.replaceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.replaceOne();
+      }
+      if (e.key === 'Escape') {
+        this.hide();
+      }
+    });
+  }
+
+  setOnReplace(cb: (search: string, replace: string, all: boolean) => void): void {
+    this.onReplace = cb;
   }
 
   show(): void {
     this.bar.style.display = 'flex';
+    this.replaceRow.style.display = this.replaceMode ? 'flex' : 'none';
+    this.input.focus();
+    this.input.select();
+  }
+
+  showReplace(): void {
+    this.replaceMode = true;
+    this.bar.style.display = 'flex';
+    this.replaceRow.style.display = 'flex';
     this.input.focus();
     this.input.select();
   }
 
   hide(): void {
     this.bar.style.display = 'none';
+    this.replaceRow.style.display = 'none';
+    this.replaceMode = false;
     this.clearHighlights();
     this.input.value = '';
+    this.replaceInput.value = '';
     this.countEl.textContent = '';
   }
 
   isVisible(): boolean {
     return this.bar.style.display !== 'none';
+  }
+
+  isReplaceVisible(): boolean {
+    return this.replaceRow.style.display !== 'none';
   }
 
   next(): void {
@@ -62,7 +100,21 @@ export class FindBar {
     this.scrollToCurrent();
   }
 
-  private search(): void {
+  private replaceOne(): void {
+    const query = this.input.value;
+    const replacement = this.replaceInput.value;
+    if (!query || !this.onReplace) return;
+    this.onReplace(query, replacement, false);
+  }
+
+  private replaceAll(): void {
+    const query = this.input.value;
+    const replacement = this.replaceInput.value;
+    if (!query || !this.onReplace) return;
+    this.onReplace(query, replacement, true);
+  }
+
+  search(): void {
     this.clearHighlights();
     const query = this.input.value;
     if (!query) {
@@ -102,7 +154,6 @@ export class FindBar {
       const parent = textNode.parentNode;
       if (!parent) continue;
 
-      // Build replacement nodes in reverse order to preserve offsets
       const frag = document.createDocumentFragment();
       let lastEnd = 0;
       for (const range of ranges) {
@@ -131,7 +182,6 @@ export class FindBar {
   }
 
   private scrollToCurrent(): void {
-    // Remove active class from all
     for (const h of this.highlights) {
       h.classList.remove('active');
     }

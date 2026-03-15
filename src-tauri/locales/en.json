@@ -6,6 +6,8 @@
     "file_save": "Save",
     "file_save_as": "Save As...",
     "file_reload": "Reload",
+    "file_export_pdf": "Export as PDF...",
+    "file_export_html": "Export as HTML...",
     "file_print": "Print",
     "file_quit": "Quit",
     "edit": "Edit",
@@ -14,6 +16,7 @@
     "edit_copy_plaintext": "Copy as Plain Text",
     "edit_select_all": "Select All",
     "edit_find": "Find",
+    "edit_find_replace": "Find and Replace",
     "edit_find_next": "Find Next",
     "edit_find_prev": "Find Previous",
     "view": "View",
@@ -24,7 +27,10 @@
     "view_font_size": "Font Size",
     "view_font_size_increase": "Zoom In",
     "view_font_size_decrease": "Zoom Out",
-    "view_always_on_top": "Always on Top"
+    "view_status_bar": "Status Bar",
+    "view_always_on_top": "Always on Top",
+    "help": "Help",
+    "help_about": "About mdcast"
   },
   "ui": {
     "unsaved_confirm": "You have unsaved changes. Close anyway?",

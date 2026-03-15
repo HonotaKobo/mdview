@@ -10,14 +10,28 @@
   </head>
   <body>
     <div id="find-bar" style="display: none">
-      <input id="find-input" type="text" placeholder="Find..." />
-      <span id="find-count"></span>
-      <button id="find-prev" title="Previous">&#9650;</button>
-      <button id="find-next" title="Next">&#9660;</button>
-      <button id="find-close" title="Close">&times;</button>
+      <div id="find-row">
+        <input id="find-input" type="text" placeholder="Find..." />
+        <span id="find-count"></span>
+        <button id="find-prev" title="Previous">&#9650;</button>
+        <button id="find-next" title="Next">&#9660;</button>
+        <button id="find-close" title="Close">&times;</button>
+      </div>
+      <div id="replace-row" style="display: none">
+        <input id="replace-input" type="text" placeholder="Replace..." />
+        <button id="replace-one" title="Replace">Replace</button>
+        <button id="replace-all" title="Replace All">All</button>
+      </div>
     </div>
     <div id="scroll-area">
       <div id="content"></div>
+    </div>
+    <div id="status-bar">
+      <span id="status-chars"></span>
+      <span class="status-sep">|</span>
+      <span id="status-words"></span>
+      <span class="status-sep">|</span>
+      <span id="status-read-time"></span>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>

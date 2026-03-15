@@ -6,6 +6,8 @@
     "file_save": "保存",
     "file_save_as": "名前を付けて保存",
     "file_reload": "再読み込み",
+    "file_export_pdf": "PDFとしてエクスポート...",
+    "file_export_html": "HTMLとしてエクスポート...",
     "file_print": "印刷",
     "file_quit": "終了",
     "edit": "編集",
@@ -14,6 +16,7 @@
     "edit_copy_plaintext": "プレーンテキストとしてコピー",
     "edit_select_all": "すべて選択",
     "edit_find": "検索",
+    "edit_find_replace": "検索と置換",
     "edit_find_next": "次を検索",
     "edit_find_prev": "前を検索",
     "view": "表示",
@@ -24,7 +27,10 @@
     "view_font_size": "フォントサイズ",
     "view_font_size_increase": "拡大",
     "view_font_size_decrease": "縮小",
-    "view_always_on_top": "常に最前面"
+    "view_status_bar": "ステータスバー",
+    "view_always_on_top": "常に最前面",
+    "help": "ヘルプ",
+    "help_about": "mdcastについて"
   },
   "ui": {
     "unsaved_confirm": "未保存の変更があります。閉じますか？",

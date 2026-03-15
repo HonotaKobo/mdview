@@ -28,6 +28,11 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .accelerator("CmdOrCtrl+R")
             .build(app)?)
         .separator()
+        .item(&MenuItemBuilder::with_id("file_export_pdf", i18n.t("menu.file_export_pdf"))
+            .accelerator("CmdOrCtrl+Shift+E")
+            .build(app)?)
+        .item(&MenuItemBuilder::with_id("file_export_html", i18n.t("menu.file_export_html"))
+            .build(app)?)
         .item(&MenuItemBuilder::with_id("file_print", i18n.t("menu.file_print"))
             .accelerator("CmdOrCtrl+P")
             .build(app)?)
@@ -66,6 +71,9 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .item(&MenuItemBuilder::with_id("edit_find", i18n.t("menu.edit_find"))
             .accelerator("CmdOrCtrl+F")
             .build(app)?)
+        .item(&MenuItemBuilder::with_id("edit_find_replace", i18n.t("menu.edit_find_replace"))
+            .accelerator("CmdOrCtrl+H")
+            .build(app)?)
         .item(&MenuItemBuilder::with_id("edit_find_next", i18n.t("menu.edit_find_next"))
             .accelerator("CmdOrCtrl+G")
             .build(app)?)
@@ -98,7 +106,16 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .item(&theme_submenu)
         .item(&font_submenu)
         .separator()
+        .item(&CheckMenuItemBuilder::with_id("view_status_bar", i18n.t("menu.view_status_bar"))
+            .checked(true)
+            .build(app)?)
         .item(&CheckMenuItemBuilder::with_id("view_always_on_top", i18n.t("menu.view_always_on_top"))
+            .build(app)?)
+        .build()?;
+
+    // --- Help menu ---
+    let help_menu = SubmenuBuilder::new(app, i18n.t("menu.help"))
+        .item(&MenuItemBuilder::with_id("help_about", i18n.t("menu.help_about"))
             .build(app)?)
         .build()?;
 
@@ -106,7 +123,8 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
     #[cfg(target_os = "macos")]
     {
         let app_menu = SubmenuBuilder::new(app, "mdcast")
-            .item(&PredefinedMenuItem::about(app, Some("About mdcast"), None)?)
+            .item(&MenuItemBuilder::with_id("app_about", i18n.t("menu.help_about"))
+                .build(app)?)
             .separator()
             .item(&PredefinedMenuItem::hide(app, None)?)
             .item(&PredefinedMenuItem::hide_others(app, None)?)
@@ -120,6 +138,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .item(&file_menu)
             .item(&edit_menu)
             .item(&view_menu)
+            .item(&help_menu)
             .build();
     }
 
@@ -129,6 +148,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .item(&file_menu)
             .item(&edit_menu)
             .item(&view_menu)
+            .item(&help_menu)
             .build()
     }
 }
@@ -156,6 +176,20 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             }
         }
 
+        "view_status_bar" => {
+            if let Some(item) = app.menu().and_then(|m| m.get("view_status_bar")) {
+                if let Some(check) = item.as_check_menuitem() {
+                    let new_state = check.is_checked().unwrap_or(false);
+                    let _ = check.set_checked(new_state);
+                }
+            }
+            let _ = app.emit("menu-action", serde_json::json!({ "action": "view_status_bar" }));
+        }
+
+        "help_about" | "app_about" => {
+            open_about_window();
+        }
+
         // Theme — update check marks and emit to frontend
         "theme_dark" | "theme_light" | "theme_auto" => {
             update_theme_checks(app, id);
@@ -172,6 +206,26 @@ pub fn execute_action(app: &AppHandle, id: &str) {
 
 pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     execute_action(app, event.id().as_ref());
+}
+
+fn open_about_window() {
+    let version = env!("CARGO_PKG_VERSION");
+    let body = format!(
+        "# mdcast\n\n\
+         **Version {version}**\n\n\
+         Markdown viewer for the AI age.\n\n\
+         ---\n\n\
+         - GitHub: https://github.com/honokamori/mdcast\n\
+         - License: MIT\n"
+    );
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = std::process::Command::new(exe)
+            .args(["--body", &body, "--title", "About mdcast"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::inherit())
+            .spawn();
+    }
 }
 
 fn update_theme_checks(app: &AppHandle, selected_id: &str) {

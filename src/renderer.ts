@@ -4,6 +4,9 @@ import markdownItTaskLists from 'markdown-it-task-lists';
 import markdownItDeflist from 'markdown-it-deflist';
 import markdownItFootnote from 'markdown-it-footnote';
 import markdownItFrontMatter from 'markdown-it-front-matter';
+import markdownItMark from 'markdown-it-mark';
+import markdownItSup from 'markdown-it-sup';
+import markdownItSub from 'markdown-it-sub';
 import texmath from 'markdown-it-texmath';
 import katex from 'katex';
 import hljs from 'highlight.js';
@@ -25,6 +28,8 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+const slugify = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '-');
 
 let capturedFrontMatter = '';
 
@@ -53,12 +58,14 @@ const md: MarkdownIt = new MarkdownIt({
   })
   .use(markdownItAnchor, {
     permalink: false,
-    slugify: (s: string) =>
-      encodeURIComponent(s.trim().toLowerCase().replace(/\s+/g, '-')),
+    slugify,
   })
   .use(markdownItTaskLists, { enabled: true })
   .use(markdownItDeflist)
   .use(markdownItFootnote)
+  .use(markdownItMark)
+  .use(markdownItSup)
+  .use(markdownItSub)
   .use(texmath, {
     engine: katex,
     delimiters: 'dollars',
@@ -190,6 +197,79 @@ function deflistTaskPlugin(md: MarkdownIt): void {
 }
 
 md.use(deflistTaskPlugin);
+
+function tocPlugin(mdInstance: MarkdownIt): void {
+  mdInstance.core.ruler.after('inline', 'toc', (state) => {
+    const tokens = state.tokens;
+
+    const headings: { level: number; text: string; slug: string }[] = [];
+    const usedSlugs = new Map<string, boolean>();
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i].type === 'heading_open') {
+        const level = parseInt(tokens[i].tag.slice(1), 10);
+        if (i + 1 < tokens.length && tokens[i + 1].type === 'inline') {
+          const children = tokens[i + 1].children ?? [];
+          const text = children
+            .filter((t: { type: string }) => t.type === 'text' || t.type === 'code_inline' || t.type === 'softbreak')
+            .map((t: { type: string; content: string }) => t.type === 'softbreak' ? ' ' : t.content)
+            .join('');
+          let slug = slugify(text);
+          let uniq = slug;
+          let n = 1;
+          while (usedSlugs.has(uniq)) {
+            uniq = `${slug}-${n++}`;
+          }
+          usedSlugs.set(uniq, true);
+          headings.push({ level, text, slug: uniq });
+        }
+      }
+    }
+
+    if (headings.length === 0) return;
+
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i].type !== 'paragraph_open') continue;
+      if (i + 1 >= tokens.length || tokens[i + 1].type !== 'inline') continue;
+
+      const content = tokens[i + 1].content.trim();
+      if (content !== '[TOC]' && content !== '[toc]') continue;
+
+      let closeIdx = i + 2;
+      while (closeIdx < tokens.length && tokens[closeIdx].type !== 'paragraph_close') {
+        closeIdx++;
+      }
+
+      const minLevel = Math.min(...headings.map(h => h.level));
+      let html = '<nav class="toc">\n';
+      let prevLevel = minLevel - 1;
+
+      for (const heading of headings) {
+        const level = heading.level;
+        if (level > prevLevel) {
+          for (let j = prevLevel; j < level; j++) html += '<ul>';
+        } else if (level < prevLevel) {
+          html += '</li>';
+          for (let j = prevLevel; j > level; j--) html += '</ul></li>';
+        } else {
+          if (prevLevel >= minLevel) html += '</li>';
+        }
+        html += `<li><a href="#${escapeHtml(heading.slug)}">${escapeHtml(heading.text)}</a>`;
+        prevLevel = level;
+      }
+
+      html += '</li>';
+      for (let j = prevLevel; j > minLevel; j--) html += '</ul></li>';
+      html += '</ul>\n</nav>\n';
+
+      const tocToken = new state.Token('html_block', '', 0);
+      tocToken.content = html;
+      tocToken.map = tokens[i].map;
+      tokens.splice(i, closeIdx - i + 1, tocToken);
+    }
+  });
+}
+
+md.use(tocPlugin);
 
 /** Expose the markdown-it instance for block parsing in editor mode */
 export function getMarkdownIt(): MarkdownIt {

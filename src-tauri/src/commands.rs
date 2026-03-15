@@ -58,6 +58,11 @@ pub fn rename_file(old_path: String, new_path: String, state: tauri::State<'_, A
 }
 
 #[command]
+pub fn save_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    std::fs::write(&path, &data).map_err(|e| format!("Failed to write {}: {}", path, e))
+}
+
+#[command]
 pub fn get_translations(i18n: tauri::State<'_, I18n>) -> HashMap<String, String> {
     i18n.flat_map()
 }

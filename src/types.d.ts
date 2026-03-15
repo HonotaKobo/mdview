@@ -16,6 +16,24 @@ declare module 'markdown-it-footnote' {
   export default plugin;
 }
 
+declare module 'markdown-it-mark' {
+  import MarkdownIt from 'markdown-it';
+  const plugin: MarkdownIt.PluginSimple;
+  export default plugin;
+}
+
+declare module 'markdown-it-sup' {
+  import MarkdownIt from 'markdown-it';
+  const plugin: MarkdownIt.PluginSimple;
+  export default plugin;
+}
+
+declare module 'markdown-it-sub' {
+  import MarkdownIt from 'markdown-it';
+  const plugin: MarkdownIt.PluginSimple;
+  export default plugin;
+}
+
 declare module 'markdown-it-texmath' {
   import MarkdownIt from 'markdown-it';
   interface TexmathOptions {

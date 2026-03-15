@@ -144,6 +144,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::save_file,
+            commands::save_binary_file,
             commands::notify_saved,
             commands::get_saved_path,
             commands::sync_content,

@@ -189,6 +189,9 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
     { html: 'Code', title: 'Inline Code', prefix: '`', suffix: '`' },
     { html: 'Link', title: 'Link', prefix: '[', suffix: '](url)' },
     { html: '$', title: 'Math', prefix: '$', suffix: '$' },
+    { html: '<mark>M</mark>', title: 'Highlight', prefix: '==', suffix: '==' },
+    { html: 'X<sup>2</sup>', title: 'Superscript', prefix: '^', suffix: '^' },
+    { html: 'X<sub>2</sub>', title: 'Subscript', prefix: '~', suffix: '~' },
   ];
 
   for (const btn of inlineButtons) {

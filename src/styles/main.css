@@ -248,12 +248,19 @@ body {
 /* Find bar */
 #find-bar {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
   padding: 4px 12px;
   background: var(--titlebar-bg);
   border-bottom: 1px solid var(--titlebar-border);
   flex-shrink: 0;
+}
+
+#find-row,
+#replace-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 #find-input {
@@ -268,8 +275,21 @@ body {
   outline: none;
 }
 
-#find-input:focus {
+#find-input:focus,
+#replace-input:focus {
   border-color: var(--link-color);
+}
+
+#replace-input {
+  flex: 1;
+  max-width: 300px;
+  padding: 3px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
 }
 
 #find-count {
@@ -292,6 +312,18 @@ body {
 #find-bar button:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+/* ==highlight== (markdown-it-mark) */
+#content mark:not(.find-highlight) {
+  background: rgba(255, 235, 59, 0.4);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0.1em 0.2em;
+}
+
+:root[data-theme='dark'] #content mark:not(.find-highlight) {
+  background: rgba(255, 235, 59, 0.25);
 }
 
 /* Search highlight */
@@ -319,10 +351,29 @@ mark.find-highlight.active {
   width: 100%;
 }
 
+/* Status bar */
+#status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.status-sep {
+  color: var(--border-color);
+}
+
 /* Print styles */
 @media print {
   #custom-titlebar,
-  #find-bar {
+  #find-bar,
+  #status-bar {
     display: none !important;
   }
 
@@ -333,5 +384,23 @@ mark.find-highlight.active {
   #content {
     max-width: none;
     padding: 0;
+  }
+
+  #content pre {
+    overflow-x: visible;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  #content table {
+    overflow: visible;
+  }
+
+  .mermaid-container {
+    overflow-x: visible;
+  }
+
+  .katex-display > .katex {
+    overflow-x: visible;
   }
 }
