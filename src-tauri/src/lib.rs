@@ -245,16 +245,20 @@ pub fn run() {
 }
 
 fn file_to_id(file: &str) -> String {
+    let canonical = std::fs::canonicalize(file)
+        .unwrap_or_else(|_| std::path::PathBuf::from(file));
+    let path_str = canonical.to_string_lossy();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    std::hash::Hasher::write(&mut hasher, path_str.as_bytes());
+    let hash = std::hash::Hasher::finish(&hasher);
     let name = std::path::Path::new(file)
         .file_name()
         .map(|f| f.to_string_lossy().to_string())
-        .unwrap_or_else(|| file.to_string());
-    format!(
-        "file-{}",
-        name.to_lowercase()
-            .replace('.', "-")
-            .replace(' ', "-")
-    )
+        .unwrap_or_else(|| "unknown".to_string())
+        .to_lowercase()
+        .replace('.', "-")
+        .replace(' ', "-");
+    format!("file-{}-{:016x}", name, hash)
 }
 
 fn rand_u16() -> u16 {

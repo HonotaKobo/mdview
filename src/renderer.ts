@@ -322,7 +322,7 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
     try {
       const id = `mermaid-${mermaidCounter++}`;
       const { svg } = await mermaid.render(id, source);
-      wrapper.innerHTML = svg;
+      wrapper.innerHTML = sanitizeHtml(svg);
     } catch {
       wrapper.innerHTML = `<pre class="mermaid-error"><code>${escapeHtml(source)}</code></pre>`;
     }
