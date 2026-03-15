@@ -33,6 +33,7 @@ const editorController = new EditorController(document.getElementById('content')
 editorController.setOnContentChange((markdown) => {
   currentContent = markdown;
   isDirty = true;
+  invoke('sync_content', { content: markdown });
 });
 
 function updateWindowTitle(title: string) {

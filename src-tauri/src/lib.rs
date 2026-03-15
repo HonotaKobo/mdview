@@ -146,6 +146,7 @@ pub fn run() {
             commands::save_file,
             commands::notify_saved,
             commands::get_saved_path,
+            commands::sync_content,
             commands::get_initial_content,
             commands::rename_file,
             commands::get_translations,

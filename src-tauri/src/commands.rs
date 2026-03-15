@@ -28,6 +28,13 @@ pub fn get_saved_path(state: tauri::State<'_, AppState>) -> Option<String> {
 }
 
 #[command]
+pub fn sync_content(content: String, state: tauri::State<'_, AppState>) {
+    let mut state = state.lock().unwrap();
+    state.current_content = content;
+    state.dirty = true;
+}
+
+#[command]
 pub fn get_initial_content(state: tauri::State<'_, AppState>) -> (String, String, bool) {
     let state = state.lock().unwrap();
     (state.current_content.clone(), state.title.clone(), state.content_explicitly_set)
