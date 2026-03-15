@@ -85,9 +85,6 @@ pub struct CliArgs {
     #[arg(long = "_foreground", hide = true)]
     pub foreground: bool,
 
-    /// Internal: open tag manager window
-    #[arg(long = "_tag-manager", hide = true)]
-    pub tag_manager: bool,
 }
 
 #[derive(Debug, Clone, ValueEnum)]

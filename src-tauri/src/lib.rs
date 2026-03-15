@@ -129,7 +129,6 @@ pub fn run() {
     let content_explicitly_set = args.body.is_some() || initial_file.is_some();
     let mut app_state = AppStateInner::new(resolved_title, resolved_content);
     app_state.content_explicitly_set = content_explicitly_set;
-    app_state.tag_manager_mode = args.tag_manager;
     if let Some(ref fp) = resolved_file_path {
         app_state.saved_path = Some(fp.clone());
     }
@@ -156,7 +155,6 @@ pub fn run() {
             commands::rename_file,
             commands::get_translations,
             commands::get_platform,
-            commands::get_window_mode,
             commands::execute_menu_action,
             commands::open_new_window,
             commands::tag_add,

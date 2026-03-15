@@ -74,12 +74,6 @@ pub fn get_platform() -> String {
 }
 
 #[command]
-pub fn get_window_mode(state: tauri::State<'_, AppState>) -> String {
-    let state = state.lock().unwrap();
-    if state.tag_manager_mode { "tag-manager".to_string() } else { "editor".to_string() }
-}
-
-#[command]
 pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
     crate::menu::execute_action(&app, &id);
 }

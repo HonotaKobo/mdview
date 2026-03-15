@@ -152,11 +152,9 @@ function debounced(action: string, fn: () => void) {
 
 // Pull initial content from Rust backend (reliable, no race condition)
 async function loadInitialContent() {
-  const mode = await invoke<string>('get_window_mode');
-  if (mode === 'tag-manager') {
+  if (getCurrentWindow().label === 'tag-manager') {
     const tm = new TagManager();
     await tm.init();
-    getCurrentWindow().setTitle('Tag Manager — mdcast');
     return;
   }
   const [body, title, _contentSet] = await invoke<[string, string, boolean]>('get_initial_content');

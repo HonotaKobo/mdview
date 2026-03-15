@@ -20,7 +20,13 @@ export class TagManager {
     document.getElementById('scroll-area')!.style.overflow = 'auto';
     document.getElementById('status-bar')!.style.display = 'none';
     document.getElementById('tag-sidebar')!.style.display = 'none';
-    await this.load();
+    this.entries = await invoke<TagEntry[]>('tag_get_all');
+    this.render();
+    const validation = await invoke<[string, boolean][]>('tag_validate_paths');
+    this.pathStatus.clear();
+    for (const [path, exists] of validation) {
+      this.pathStatus.set(path, exists);
+    }
     this.render();
   }
 

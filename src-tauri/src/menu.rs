@@ -201,7 +201,7 @@ pub fn execute_action(app: &AppHandle, id: &str) {
         }
 
         "tag_manage" => {
-            open_tag_manager();
+            open_tag_manager(app);
         }
 
         "help_about" | "app_about" => {
@@ -246,14 +246,23 @@ fn open_about_window() {
     }
 }
 
-fn open_tag_manager() {
-    if let Ok(exe) = std::env::current_exe() {
-        let _ = std::process::Command::new(exe)
-            .args(["--_tag-manager"])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::inherit())
-            .spawn();
+fn open_tag_manager(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("tag-manager") {
+        let _ = window.set_focus();
+        return;
+    }
+    if let Ok(_window) = tauri::WebviewWindowBuilder::new(
+        app,
+        "tag-manager",
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("Tag Manager — mdcast")
+    .inner_size(700.0, 500.0)
+    .min_inner_size(400.0, 300.0)
+    .build()
+    {
+        #[cfg(not(target_os = "macos"))]
+        let _ = window.remove_menu();
     }
 }
 
