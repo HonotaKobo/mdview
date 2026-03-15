@@ -259,20 +259,23 @@ fn open_tag_manager(app: &AppHandle) {
         let _ = window.set_focus();
         return;
     }
-    #[allow(unused_variables)]
-    if let Ok(window) = tauri::WebviewWindowBuilder::new(
-        app,
-        "tag-manager",
-        tauri::WebviewUrl::App("index.html".into()),
-    )
-    .title("タグ管理 — mdcast")
-    .inner_size(700.0, 500.0)
-    .min_inner_size(400.0, 300.0)
-    .build()
-    {
-        #[cfg(not(target_os = "macos"))]
-        let _ = window.remove_menu();
-    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        #[allow(unused_variables)]
+        if let Ok(window) = tauri::WebviewWindowBuilder::new(
+            &app,
+            "tag-manager",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("タグ管理 — mdcast")
+        .inner_size(700.0, 500.0)
+        .min_inner_size(400.0, 300.0)
+        .build()
+        {
+            #[cfg(not(target_os = "macos"))]
+            let _ = window.remove_menu();
+        }
+    });
 }
 
 fn update_theme_checks(app: &AppHandle, selected_id: &str) {

@@ -224,7 +224,7 @@ if (!isTagManager) {
     const update = event.payload as ContentUpdate;
     if (update.body !== undefined) {
       currentContent = update.body;
-      isDirty = true;
+      isDirty = false;
       editorController.updateContent(update.body);
       statusBar.update(update.body);
     }
@@ -233,6 +233,19 @@ if (!isTagManager) {
       updateWindowTitle(currentTitle);
     }
   });
+
+  // Re-check for content set by macOS file open event (race condition workaround)
+  setTimeout(async () => {
+    const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
+    if (contentSet && body && body !== currentContent) {
+      currentContent = body;
+      currentTitle = title || 'Untitled';
+      editorController.updateContent(body);
+      updateWindowTitle(currentTitle);
+      statusBar.update(body);
+      isDirty = false;
+    }
+  }, 500);
 
   listen('menu-action', (event) => {
     const { action, value } = event.payload as MenuAction;

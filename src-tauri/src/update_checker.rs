@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-const GITHUB_REPO: &str = "honokamori/mdcast";
+const GITHUB_REPO: &str = "HonotaKobo/mdcast";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize)]

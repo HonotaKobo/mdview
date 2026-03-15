@@ -149,6 +149,8 @@ export class CustomTitleBar {
         id: 'help',
         label: this.t('menu.help'),
         items: [
+          { type: 'normal', id: 'help_check_updates', label: this.t('menu.help_check_updates') },
+          { type: 'separator' },
           { type: 'normal', id: 'help_about', label: this.t('menu.help_about') },
         ],
       },

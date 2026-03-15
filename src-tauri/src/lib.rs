@@ -226,6 +226,7 @@ pub fn run() {
                                 state.title = title.clone();
                                 state.saved_path = Some(abs_path);
                                 state.dirty = false;
+                                state.content_explicitly_set = true;
                             }
 
                             let _ = _app_handle.emit("content-update", serde_json::json!({
