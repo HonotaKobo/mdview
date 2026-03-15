@@ -42,44 +42,66 @@ export class TagManager {
     });
 
     this.container.innerHTML = '';
-    this.container.style.padding = '16px 24px';
+    this.container.style.padding = '0';
     this.container.style.maxWidth = '100%';
 
-    const header = document.createElement('div');
-    header.className = 'tm-header';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tm-container';
 
-    const title = document.createElement('h2');
-    title.textContent = 'Tag Manager';
-    title.style.margin = '0';
-    title.style.fontSize = '18px';
-    title.style.color = 'var(--text-primary)';
-    header.appendChild(title);
+    const title = document.createElement('h1');
+    title.className = 'tm-title';
+    title.textContent = 'タグ管理';
+    wrapper.appendChild(title);
+
+    const subtitle = document.createElement('p');
+    subtitle.className = 'tm-subtitle';
+    subtitle.textContent = 'ファイルに紐づけたタグを一覧・検索・管理できます';
+    wrapper.appendChild(subtitle);
+
+    const searchBar = document.createElement('div');
+    searchBar.className = 'tm-search-bar';
+
+    const searchIcon = document.createElement('div');
+    searchIcon.className = 'tm-search-icon';
+    searchIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+    searchBar.appendChild(searchIcon);
 
     const search = document.createElement('input');
     search.type = 'text';
-    search.placeholder = 'Search tags or files...';
+    search.placeholder = 'ファイル名やタグで検索…';
     search.className = 'tm-search';
     search.value = this.searchQuery;
     search.addEventListener('input', () => {
       this.searchQuery = search.value;
       this.render();
     });
-    header.appendChild(search);
+    searchBar.appendChild(search);
+    wrapper.appendChild(searchBar);
 
-    this.container.appendChild(header);
+    const resultsCount = document.createElement('div');
+    resultsCount.className = 'tm-results-count';
+    resultsCount.textContent = filtered.length + ' 件';
+    wrapper.appendChild(resultsCount);
 
     if (filtered.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tm-empty';
-      empty.textContent = this.searchQuery ? 'No matches found.' : 'No tagged files.';
-      this.container.appendChild(empty);
+      empty.textContent = this.searchQuery ? '一致する結果がありません' : 'タグ付きファイルがありません';
+      wrapper.appendChild(empty);
+      this.container.appendChild(wrapper);
       return;
     }
+
+    const cardList = document.createElement('div');
+    cardList.className = 'tm-card-list';
 
     for (const entry of filtered) {
       const exists = this.pathStatus.get(entry.path) ?? true;
       const row = document.createElement('div');
       row.className = 'tm-row' + (exists ? '' : ' tm-invalid');
+
+      const body = document.createElement('div');
+      body.className = 'tm-body';
 
       const pathRow = document.createElement('div');
       pathRow.className = 'tm-path-row';
@@ -88,7 +110,7 @@ export class TagManager {
         const warn = document.createElement('span');
         warn.className = 'tm-warn';
         warn.textContent = '!';
-        warn.title = 'File not found';
+        warn.title = 'ファイルが見つかりません';
         pathRow.appendChild(warn);
       }
 
@@ -97,8 +119,7 @@ export class TagManager {
       pathEl.textContent = entry.path;
       pathEl.title = entry.path;
       pathRow.appendChild(pathEl);
-
-      row.appendChild(pathRow);
+      body.appendChild(pathRow);
 
       const tagsRow = document.createElement('div');
       tagsRow.className = 'tm-tags';
@@ -108,7 +129,8 @@ export class TagManager {
         chip.textContent = tag;
         tagsRow.appendChild(chip);
       }
-      row.appendChild(tagsRow);
+      body.appendChild(tagsRow);
+      row.appendChild(body);
 
       const actions = document.createElement('div');
       actions.className = 'tm-actions';
@@ -123,20 +145,23 @@ export class TagManager {
 
       const openBtn = document.createElement('button');
       openBtn.className = 'tm-btn';
-      openBtn.textContent = 'Open';
+      openBtn.textContent = '開く';
       openBtn.addEventListener('click', () => this.openFile(entry.path));
       if (!exists) openBtn.disabled = true;
       actions.appendChild(openBtn);
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'tm-btn tm-btn-danger';
-      deleteBtn.textContent = 'Delete';
+      deleteBtn.textContent = '削除';
       deleteBtn.addEventListener('click', () => this.deleteEntry(entry.path));
       actions.appendChild(deleteBtn);
 
       row.appendChild(actions);
-      this.container.appendChild(row);
+      cardList.appendChild(row);
     }
+
+    wrapper.appendChild(cardList);
+    this.container.appendChild(wrapper);
   }
 
   private async relinkEntry(oldPath: string): Promise<void> {

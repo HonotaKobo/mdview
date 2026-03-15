@@ -12,6 +12,7 @@ import { StatusBar } from './status-bar';
 import { getMarkdownIt } from './renderer';
 import { exportAsPdf } from './pdf-export';
 import { exportAsHtml } from './html-export';
+import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
 import { TagManager } from './tag-manager';
 
@@ -35,7 +36,12 @@ const findBar = new FindBar();
 const fontSizeManager = new FontSizeManager();
 const editorController = new EditorController(document.getElementById('content')!);
 const statusBar = new StatusBar();
+const tagAddModal = new TagAddModal();
 const tagSidebar = new TagSidebar();
+
+tagAddModal.onTagAdded(() => {
+  tagSidebar.refresh();
+});
 
 findBar.setOnReplace((search, replace, all) => {
   let content = editorController.getCurrentContent();
@@ -260,7 +266,7 @@ listen('menu-action', (event) => {
       debounced('font_decrease', () => fontSizeManager.decrease());
       break;
     case 'tag_add':
-      debounced('tag_add', () => tagSidebar.show('add'));
+      debounced('tag_add', () => tagAddModal.show());
       break;
     case 'tag_edit':
       debounced('tag_edit', () => tagSidebar.toggle());
@@ -406,7 +412,7 @@ document.addEventListener('keydown', (e) => {
     case 't':
       if (!inTextarea) {
         e.preventDefault();
-        debounced('tag_add', () => tagSidebar.show('add'));
+        debounced('tag_add', () => tagAddModal.show());
       }
       break;
     case '=':

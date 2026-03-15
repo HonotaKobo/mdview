@@ -6,6 +6,8 @@ export class TagSidebar {
   private addBtn: HTMLElement;
   private tagList: HTMLElement;
   private closeBtn: HTMLElement;
+  private fileLabel: HTMLElement;
+  private tagCount: HTMLElement;
   private currentPath: string | null = null;
 
   constructor() {
@@ -14,6 +16,8 @@ export class TagSidebar {
     this.addBtn = document.getElementById('tag-add-btn')!;
     this.tagList = document.getElementById('tag-list')!;
     this.closeBtn = document.getElementById('tag-sidebar-close')!;
+    this.fileLabel = document.getElementById('tag-sidebar-file-label')!;
+    this.tagCount = document.getElementById('tag-count')!;
 
     this.addBtn.addEventListener('click', () => this.addTagFromInput());
     (this.input as HTMLInputElement).addEventListener('keydown', (e) => {
@@ -26,18 +30,16 @@ export class TagSidebar {
     return this.sidebar.style.display !== 'none';
   }
 
-  async show(mode: 'add' | 'edit' = 'edit'): Promise<void> {
+  async show(): Promise<void> {
     this.currentPath = await invoke<string | null>('get_saved_path');
     if (!this.currentPath) {
-      alert('ファイルを保存してからタグを追加してください。');
+      alert('ファイルを保存してからタグを編集してください。');
       return;
     }
     this.sidebar.style.display = 'flex';
+    this.fileLabel.textContent = this.currentPath.split(/[/\\]/).pop() || '';
+    this.fileLabel.title = this.currentPath;
     await this.loadTags();
-    if (mode === 'add') {
-      (this.input as HTMLInputElement).value = '';
-      this.input.focus();
-    }
   }
 
   hide(): void {
@@ -48,13 +50,15 @@ export class TagSidebar {
     if (this.isVisible()) {
       this.hide();
     } else {
-      this.show('edit');
+      this.show();
     }
   }
 
   async refresh(): Promise<void> {
     this.currentPath = await invoke<string | null>('get_saved_path');
     if (this.isVisible() && this.currentPath) {
+      this.fileLabel.textContent = this.currentPath.split(/[/\\]/).pop() || '';
+      this.fileLabel.title = this.currentPath;
       await this.loadTags();
     }
   }
@@ -70,27 +74,37 @@ export class TagSidebar {
     if (tags.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tag-empty';
-      empty.textContent = 'No tags';
+      empty.textContent = 'タグがありません';
       this.tagList.appendChild(empty);
+      this.tagCount.textContent = '';
       return;
     }
-    for (const tag of tags) {
-      const chip = document.createElement('div');
-      chip.className = 'tag-chip';
 
-      const label = document.createElement('span');
-      label.className = 'tag-chip-label';
-      label.textContent = tag;
-      chip.appendChild(label);
+    const label = document.createElement('div');
+    label.className = 'tag-list-label';
+    label.textContent = 'タグ一覧';
+    this.tagList.appendChild(label);
+
+    for (const tag of tags) {
+      const item = document.createElement('div');
+      item.className = 'tag-item';
+
+      const name = document.createElement('span');
+      name.className = 'tag-item-name';
+      name.textContent = tag;
+      item.appendChild(name);
 
       const del = document.createElement('button');
-      del.className = 'tag-chip-delete';
+      del.className = 'tag-item-remove';
       del.textContent = '\u00d7';
+      del.title = '削除';
       del.addEventListener('click', () => this.removeTag(tag));
-      chip.appendChild(del);
+      item.appendChild(del);
 
-      this.tagList.appendChild(chip);
+      this.tagList.appendChild(item);
     }
+
+    this.tagCount.textContent = tags.length + ' 個のタグ';
   }
 
   private async addTagFromInput(): Promise<void> {
