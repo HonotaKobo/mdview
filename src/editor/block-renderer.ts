@@ -1,5 +1,5 @@
 import type { Block } from './block-model';
-import { getMarkdownIt, addCopyButtons } from '../renderer';
+import { getMarkdownIt, addCopyButtons, sanitizeHtml } from '../renderer';
 import katex from 'katex';
 import hljs from 'highlight.js';
 
@@ -97,16 +97,15 @@ function renderPreview(block: Block, preview: HTMLElement): void {
       }
       break;
     case 'fence':
-      preview.innerHTML = md.render('```' + (block.lang || '') + '\n' + block.text + '\n```');
+      preview.innerHTML = sanitizeHtml(md.render('```' + (block.lang || '') + '\n' + block.text + '\n```'));
       break;
     case 'code':
-      preview.innerHTML = md.render(block.text.split('\n').map(l => '    ' + l).join('\n'));
+      preview.innerHTML = sanitizeHtml(md.render(block.text.split('\n').map(l => '    ' + l).join('\n')));
       break;
     default: {
       const isFootnoteDef = /^\[\^[^\]]+\]:/m.test(block.text);
 
       if (isFootnoteDef) {
-        // Render footnote definitions with a dummy reference so they display
         const refs: string[] = [];
         block.text.replace(/^\[\^([^\]]+)\]:/gm, (_m, id) => {
           refs.push(`[^${id}]`);
@@ -115,25 +114,22 @@ function renderPreview(block: Block, preview: HTMLElement): void {
         const dummyRefs = refs.join(' ');
         const renderText = dummyRefs + '\n\n' + block.text;
         let html = md.render(renderText);
-        // Strip the dummy reference paragraph
         html = html.replace(/^<p>.*?<\/p>\n?/, '');
-        preview.innerHTML = html;
+        preview.innerHTML = sanitizeHtml(html);
       } else {
         let renderText = block.text;
 
-        // Inject footnote definitions so references resolve in preview
         if (_footnoteContext) {
           renderText += '\n\n' + _footnoteContext;
         }
 
         let html = md.render(renderText);
 
-        // Strip the footnote section for non-definition blocks
         if (_footnoteContext) {
           html = html.replace(/<hr class="footnotes-sep">[\s\S]*$/, '');
         }
 
-        preview.innerHTML = html;
+        preview.innerHTML = sanitizeHtml(html);
       }
       break;
     }

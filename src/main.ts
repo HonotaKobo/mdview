@@ -9,7 +9,7 @@ import { FontSizeManager } from './font-size';
 import { CustomTitleBar } from './titlebar';
 import { EditorController } from './editor/editor-controller';
 import { StatusBar } from './status-bar';
-import { getMarkdownIt } from './renderer';
+import { getMarkdownIt, sanitizeHtml } from './renderer';
 import { exportAsPdf } from './pdf-export';
 import { exportAsHtml } from './html-export';
 import { TagAddModal } from './tag-add-modal';
@@ -119,7 +119,7 @@ async function copyAsMarkdown() {
 async function copyAsHtml() {
   currentContent = editorController.getCurrentContent();
   const md = getMarkdownIt();
-  const html = md.render(currentContent);
+  const html = sanitizeHtml(md.render(currentContent));
   await navigator.clipboard.writeText(html);
 }
 

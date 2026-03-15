@@ -34,7 +34,7 @@ const slugify = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '-');
 let capturedFrontMatter = '';
 
 const md: MarkdownIt = new MarkdownIt({
-  html: true,
+  html: false,
   linkify: true,
   typographer: true,
   breaks: true,
@@ -276,6 +276,22 @@ export function getMarkdownIt(): MarkdownIt {
   return md;
 }
 
+const PURIFY_CONFIG = {
+  ADD_TAGS: ['semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn', 'ms', 'mtext',
+             'mfrac', 'msqrt', 'mroot', 'msup', 'msub', 'msubsup', 'munder',
+             'mover', 'munderover', 'mtable', 'mtr', 'mtd', 'mspace', 'mpadded',
+             'menclose', 'mglyph', 'mmultiscripts', 'mprescripts', 'none',
+             'math', 'mjx-container', 'eq', 'eqn'],
+  ADD_ATTR: ['encoding', 'mathvariant', 'stretchy', 'fence', 'separator',
+             'lspace', 'rspace', 'accent', 'accentunder', 'columnalign',
+             'rowalign', 'columnspan', 'rowspan', 'depth', 'height', 'width',
+             'displaystyle', 'scriptlevel', 'xmlns', 'class', 'style', 'aria-hidden'],
+};
+
+export function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, PURIFY_CONFIG);
+}
+
 export async function renderMarkdown(
   content: string,
   container: HTMLElement
@@ -287,17 +303,7 @@ export async function renderMarkdown(
     const highlighted = hljs.highlight(capturedFrontMatter, { language: 'yaml' }).value;
     fmHtml = `<pre class="hljs"><code>${highlighted}</code></pre>`;
   }
-  container.innerHTML = DOMPurify.sanitize(fmHtml + html, {
-    ADD_TAGS: ['semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn', 'ms', 'mtext',
-               'mfrac', 'msqrt', 'mroot', 'msup', 'msub', 'msubsup', 'munder',
-               'mover', 'munderover', 'mtable', 'mtr', 'mtd', 'mspace', 'mpadded',
-               'menclose', 'mglyph', 'mmultiscripts', 'mprescripts', 'none',
-               'math', 'mjx-container', 'eq', 'eqn'],
-    ADD_ATTR: ['encoding', 'mathvariant', 'stretchy', 'fence', 'separator',
-               'lspace', 'rspace', 'accent', 'accentunder', 'columnalign',
-               'rowalign', 'columnspan', 'rowspan', 'depth', 'height', 'width',
-               'displaystyle', 'scriptlevel', 'xmlns', 'class', 'style', 'aria-hidden'],
-  });
+  container.innerHTML = sanitizeHtml(fmHtml + html);
   await renderMermaidDiagrams(container);
   addCopyButtons(container);
 }
