@@ -128,6 +128,7 @@
 /* Edit mode body */
 body.edit-mode #content {
   cursor: default;
+  min-height: 100%;
 }
 
 

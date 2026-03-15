@@ -94,7 +94,6 @@ export class EditorController {
   private renderAllBlocks(): void {
     this.container.innerHTML = '';
 
-    let autoFocusEmpty = false;
     if (this.blocks.length === 0) {
       const emptyBlock: Block = {
         key: generateBlockKey(),
@@ -104,13 +103,17 @@ export class EditorController {
         sourceEnd: 0,
       };
       this.blocks.push(emptyBlock);
-      autoFocusEmpty = true;
     }
 
     this.updateFootnoteContext();
 
+    const isSingleEmpty = this.blocks.length === 1 && this.blocks[0].text.trim() === '';
+
     for (let i = 0; i < this.blocks.length; i++) {
-      this.container.appendChild(this.createGapElement());
+      // Skip gap before the first block when it's the only empty block
+      if (!(isSingleEmpty && i === 0)) {
+        this.container.appendChild(this.createGapElement());
+      }
 
       const block = this.blocks[i];
       const el = renderBlockElement(block);
@@ -121,15 +124,6 @@ export class EditorController {
     // Gap after last block
     this.container.appendChild(this.createGapElement());
 
-    // Auto-focus empty block on new/blank view
-    if (autoFocusEmpty && this.blocks.length === 1) {
-      const block = this.blocks[0];
-      this.originalBlockState.set(block.key, { text: '', lang: undefined });
-      this.activeBlockKey = block.key;
-      requestAnimationFrame(() => {
-        this.focusBlock(block, 'start');
-      });
-    }
   }
 
   private rerenderBlock(block: Block): void {
@@ -257,6 +251,13 @@ export class EditorController {
         }
 
         this.detectTypeChange(block);
+
+        // Re-parse if pasted content should split into multiple blocks
+        if (this.reparseIfBlockStructureChanged()) {
+          this.notifyChange();
+          return;
+        }
+
         this.rerenderBlock(block);
         this.notifyChange();
       });
@@ -438,9 +439,73 @@ export class EditorController {
     // Detect type changes (e.g., user typed # at start of paragraph)
     this.detectTypeChange(block);
 
+    // Re-parse if pasted content should split into multiple blocks
+    if (this.reparseIfBlockStructureChanged()) {
+      this.notifyChange();
+      return;
+    }
+
     // Re-render the block (exits editing, shows updated preview)
     this.rerenderBlock(block);
     this.notifyChange();
+  }
+
+  /** Re-parse all blocks if the block structure has changed (e.g., pasted multi-block content) */
+  private reparseIfBlockStructureChanged(): boolean {
+    const fullContent = exportMarkdown(this.blocks);
+    const reparsed = parseBlocks(fullContent);
+
+    if (reparsed.length === this.blocks.length) return false;
+
+    this.blocks = reparsed;
+    this.activeBlockKey = null;
+    this.renderAllBlocks();
+    return true;
+  }
+
+  /** Add a new block at the end (called from scroll-area dblclick) */
+  addBlockAtEnd(): void {
+    // If the only block is empty, just focus it
+    if (this.blocks.length === 1 && this.blocks[0].text.trim() === '') {
+      const block = this.blocks[0];
+      this.originalBlockState.set(block.key, { text: '', lang: undefined });
+      this.activeBlockKey = block.key;
+      this.focusBlock(block, 'start');
+      return;
+    }
+
+    // Sync current active block
+    if (this.activeBlockKey) {
+      const activeBlock = this.blocks.find(b => b.key === this.activeBlockKey);
+      if (activeBlock) {
+        const textarea = this.getTextarea(activeBlock);
+        if (textarea) {
+          this.syncBlockText(activeBlock, textarea);
+          if (activeBlock.text.trim() === '' && this.blocks.length > 1) {
+            const idx = this.blocks.indexOf(activeBlock);
+            if (idx !== -1) this.blocks.splice(idx, 1);
+          } else {
+            this.detectTypeChange(activeBlock);
+          }
+        }
+      }
+      this.activeBlockKey = null;
+    }
+
+    const newBlock: Block = {
+      key: generateBlockKey(),
+      type: 'paragraph',
+      text: '',
+      sourceStart: 0,
+      sourceEnd: 0,
+    };
+
+    this.blocks.push(newBlock);
+    this.renderAllBlocks();
+
+    this.originalBlockState.set(newBlock.key, { text: '', lang: undefined });
+    this.activeBlockKey = newBlock.key;
+    this.focusBlock(newBlock, 'start');
   }
 
   private detectTypeChange(block: Block): void {

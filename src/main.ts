@@ -206,6 +206,15 @@ listen('menu-action', (event) => {
   }
 });
 
+// Double-click on empty area to add a block
+document.getElementById('scroll-area')!.addEventListener('dblclick', (e) => {
+  const target = e.target as HTMLElement;
+  if (target.id === 'scroll-area' || target.id === 'content') {
+    e.preventDefault();
+    editorController.addBlockAtEnd();
+  }
+});
+
 // Drag & drop support
 document.addEventListener('dragover', (e) => {
   e.preventDefault();
