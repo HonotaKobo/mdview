@@ -4,6 +4,7 @@ use tauri::command;
 use crate::i18n::I18n;
 use crate::state::AppState;
 use crate::tags::{TagEntry, TagState};
+use crate::update_checker::{UpdateInfo, UpdateResult};
 
 #[command]
 pub fn read_file(path: String) -> Result<String, String> {
@@ -140,6 +141,29 @@ pub fn tag_delete_entry(path: String, state: tauri::State<'_, TagState>) {
 pub fn tag_relink(old_path: String, new_path: String, state: tauri::State<'_, TagState>) {
     let mut store = state.lock().unwrap();
     store.relink(&old_path, &new_path);
+}
+
+#[command]
+pub fn check_for_updates() -> Result<UpdateInfo, String> {
+    crate::update_checker::check_update()
+}
+
+#[command]
+pub fn perform_update() -> UpdateResult {
+    crate::update_checker::perform_update()
+}
+
+#[command]
+pub fn restart_app() {
+    let exe = std::env::current_exe().ok();
+    if let Some(exe) = exe {
+        let _ = std::process::Command::new(exe)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::inherit())
+            .spawn();
+    }
+    std::process::exit(0);
 }
 
 #[command]

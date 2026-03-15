@@ -34,6 +34,7 @@
     "tag_edit": "Edit Tags",
     "tag_manage": "Manage Tags...",
     "help": "Help",
+    "help_check_updates": "Check for Updates...",
     "help_about": "About mdcast"
   },
   "ui": {

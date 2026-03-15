@@ -16,6 +16,44 @@ import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
 import { TagManager } from './tag-manager';
 
+interface UpdateInfo {
+  has_update: boolean;
+  current_version: string;
+  latest_version: string;
+  release_url: string;
+}
+
+interface UpdateResult {
+  success: boolean;
+  message: string;
+}
+
+async function checkForUpdates(silent: boolean) {
+  try {
+    const info = await invoke<UpdateInfo>('check_for_updates');
+    if (info.has_update) {
+      const yes = confirm(`v${info.latest_version} が利用可能です（現在 v${info.current_version}）。\n更新しますか？`);
+      if (yes) {
+        const result = await invoke<UpdateResult>('perform_update');
+        if (result.success) {
+          const restart = confirm('更新が完了しました。再起動しますか？');
+          if (restart) {
+            await invoke('restart_app');
+          }
+        } else {
+          alert(`更新に失敗しました。\n${result.message}`);
+        }
+      }
+    } else if (!silent) {
+      alert(`最新バージョン（v${info.current_version}）を使用中です。`);
+    }
+  } catch (e) {
+    if (!silent) {
+      alert('アップデートの確認に失敗しました。');
+    }
+  }
+}
+
 interface ContentUpdate {
   body?: string;
   title?: string;
@@ -178,6 +216,10 @@ async function loadInitialContent() {
 loadInitialContent();
 
 if (!isTagManager) {
+  setTimeout(() => checkForUpdates(true), 3000);
+}
+
+if (!isTagManager) {
   listen('content-update', async (event) => {
     const update = event.payload as ContentUpdate;
     if (update.body !== undefined) {
@@ -277,6 +319,9 @@ if (!isTagManager) {
         break;
       case 'tag_edit':
         debounced('tag_edit', () => tagSidebar.toggle());
+        break;
+      case 'help_check_updates':
+        debounced('help_check_updates', () => checkForUpdates(false));
         break;
     }
   });

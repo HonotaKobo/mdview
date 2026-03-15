@@ -34,6 +34,7 @@
     "tag_edit": "タグを編集",
     "tag_manage": "タグ管理...",
     "help": "ヘルプ",
+    "help_check_updates": "アップデートを確認...",
     "help_about": "mdcastについて"
   },
   "ui": {

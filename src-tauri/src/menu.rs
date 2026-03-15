@@ -128,6 +128,9 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
 
     // --- Help menu ---
     let help_menu = SubmenuBuilder::new(app, i18n.t("menu.help"))
+        .item(&MenuItemBuilder::with_id("help_check_updates", i18n.t("menu.help_check_updates"))
+            .build(app)?)
+        .separator()
         .item(&MenuItemBuilder::with_id("help_about", i18n.t("menu.help_about"))
             .build(app)?)
         .build()?;
@@ -203,6 +206,10 @@ pub fn execute_action(app: &AppHandle, id: &str) {
 
         "tag_manage" => {
             open_tag_manager(app);
+        }
+
+        "help_check_updates" => {
+            let _ = app.emit("menu-action", serde_json::json!({ "action": "help_check_updates" }));
         }
 
         "help_about" | "app_about" => {

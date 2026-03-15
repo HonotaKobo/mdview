@@ -6,6 +6,7 @@ mod ipc;
 mod menu;
 mod state;
 mod tags;
+mod update_checker;
 mod watcher;
 
 use clap::Parser;
@@ -167,6 +168,9 @@ pub fn run() {
             commands::tag_delete_entry,
             commands::tag_relink,
             commands::tag_validate_paths,
+            commands::check_for_updates,
+            commands::perform_update,
+            commands::restart_app,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
