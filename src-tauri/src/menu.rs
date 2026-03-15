@@ -258,7 +258,7 @@ fn open_tag_manager(app: &AppHandle) {
         "tag-manager",
         tauri::WebviewUrl::App("index.html".into()),
     )
-    .title("Tag Manager — mdcast")
+    .title("タグ管理 — mdcast")
     .inner_size(700.0, 500.0)
     .min_inner_size(400.0, 300.0)
     .build()
