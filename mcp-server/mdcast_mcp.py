@@ -3,7 +3,10 @@
 
 import logging
 import os
+import shutil
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -71,7 +74,62 @@ def _resolve_instance(instance_id: str | None) -> str:
     )
 
 
+def _find_mdcast_bin() -> str:
+    """mdcast バイナリのパスを探す."""
+    # PATH から探す
+    found = shutil.which("mdcast")
+    if found:
+        return found
+    # macOS: よくあるインストール先
+    candidates = [
+        Path.home() / ".cargo" / "bin" / "mdcast",
+        Path("/usr/local/bin/mdcast"),
+        Path("/opt/homebrew/bin/mdcast"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p)
+    raise FileNotFoundError(
+        "mdcast binary not found. Install mdcast or add it to PATH."
+    )
+
+
 # --- Tools ---
+
+
+@mcp.tool()
+def launch(body: str = "", title: str | None = None) -> str:
+    """新しい mdcast ウィンドウを開いてコンテンツを表示する.
+
+    新規ウィンドウを開き、自動生成されたインスタンスIDを返す。
+    返されたIDを使って update / query 等で操作できる。
+
+    Args:
+        body: 表示する Markdown 本文（省略時は空のウィンドウ）
+        title: ドキュメントタイトル（省略時は "Untitled"）
+    """
+    bin_path = _find_mdcast_bin()
+    cmd: list[str] = [bin_path]
+    if body:
+        cmd += ["--body", body]
+    if title:
+        cmd += ["--title", title]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    auto_id = result.stdout.strip()
+    if not auto_id:
+        raise RuntimeError(
+            f"Failed to launch mdcast: {result.stderr.strip() or 'no output'}"
+        )
+
+    # ポートファイルが生成されるまで待機
+    port_file = _instance_dir() / f"{auto_id}.http"
+    for _ in range(20):
+        if port_file.exists():
+            return auto_id
+        time.sleep(0.25)
+
+    return auto_id
 
 
 @mcp.tool()

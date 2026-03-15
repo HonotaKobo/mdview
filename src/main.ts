@@ -207,10 +207,16 @@ listen('menu-action', (event) => {
   }
 });
 
-// Double-click on empty area to add a block
+// Double-click on empty area below last block to add a block
 document.getElementById('scroll-area')!.addEventListener('dblclick', (e) => {
   const target = e.target as HTMLElement;
   if (target.id === 'scroll-area' || target.id === 'content') {
+    const content = document.getElementById('content')!;
+    const lastBlock = content.querySelector('.md-block:last-of-type, .block-gap:last-child');
+    if (lastBlock) {
+      const lastBottom = lastBlock.getBoundingClientRect().bottom;
+      if (e.clientY <= lastBottom) return;
+    }
     e.preventDefault();
     editorController.addBlockAtEnd();
   }
