@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nickel-org/nickel.rs/master/examples/example_json/schema.json",
   "productName": "mdcast",
-  "version": "0.2.18",
+  "version": "0.2.19",
   "identifier": "com.mdcast.app",
   "build": {
     "beforeDevCommand": "npm run dev",
