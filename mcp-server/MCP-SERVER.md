@@ -10,26 +10,30 @@ Claude Code / Claude Desktop / Codex CLI から mdcast を操作するための 
 
 Python 3.10 以上が必要。未インストールの場合は [python.org](https://www.python.org/downloads/) からダウンロードしてインストールする。
 
-### 2. 依存パッケージのインストール
+### 2. MCP サーバーのダウンロード
+
+このリポジトリの `mcp-server/mdcast_mcp.py` をダウンロードし、任意の場所に保存する。
+
+### 3. 依存パッケージのインストール
 
 ```bash
 pip install "mcp[cli]" httpx
 ```
 
-### 3. MCP サーバーの登録
+### 4. MCP サーバーの登録
 
-以下の例では `<ダウンロード先>` を、`mcp-server/mdcast_mcp.py` を配置した実際のパスに置き換えること。
+以下の例では `<保存先>` を、`mdcast_mcp.py` を保存した実際のパスに置き換えること。
 
 #### Claude Code の場合
 
 macOS / Linux:
 ```bash
-claude mcp add mdcast -- python3 <ダウンロード先>/mcp-server/mdcast_mcp.py
+claude mcp add mdcast -- python3 <保存先>/mdcast_mcp.py
 ```
 
 Windows:
 ```bash
-claude mcp add mdcast -- python <ダウンロード先>\mcp-server\mdcast_mcp.py
+claude mcp add mdcast -- python <保存先>\mdcast_mcp.py
 ```
 
 #### Claude Desktop の場合
@@ -47,7 +51,7 @@ macOS / Linux:
   "mcpServers": {
     "mdcast": {
       "command": "python3",
-      "args": ["<ダウンロード先>/mcp-server/mdcast_mcp.py"]
+      "args": ["<保存先>/mdcast_mcp.py"]
     }
   }
 }
@@ -59,7 +63,7 @@ Windows:
   "mcpServers": {
     "mdcast": {
       "command": "python",
-      "args": ["<ダウンロード先>\\mcp-server\\mdcast_mcp.py"]
+      "args": ["<保存先>\\mdcast_mcp.py"]
     }
   }
 }
@@ -71,12 +75,12 @@ Windows:
 
 macOS / Linux:
 ```bash
-codex mcp add mdcast -- python3 <ダウンロード先>/mcp-server/mdcast_mcp.py
+codex mcp add mdcast -- python3 <保存先>/mdcast_mcp.py
 ```
 
 Windows:
 ```bash
-codex mcp add mdcast -- python <ダウンロード先>\mcp-server\mdcast_mcp.py
+codex mcp add mdcast -- python <保存先>\mdcast_mcp.py
 ```
 
 または `~/.codex/config.toml` を直接編集する:
@@ -84,7 +88,7 @@ codex mcp add mdcast -- python <ダウンロード先>\mcp-server\mdcast_mcp.py
 ```toml
 [mcp_servers.mdcast]
 command = "python3"  # Windows の場合は "python"
-args = ["<ダウンロード先>/mcp-server/mdcast_mcp.py"]
+args = ["<保存先>/mdcast_mcp.py"]
 ```
 
 以上で準備完了。AI エージェントから mdcast のツールが使えるようになる。
