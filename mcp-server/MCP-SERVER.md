@@ -24,52 +24,36 @@ pip install "mcp[cli]" httpx
 
 以下の例では `<保存先>` を、`mdcast_mcp.py` を保存した実際のパスに置き換えること。
 
-#### Claude Code の場合
+#### Claude Code / Claude Desktop の場合
+
+scope を指定することで、設定の適用範囲を選べる。
+
+| scope | 適用範囲 | 用途 |
+|---|---|---|
+| `--scope local`（デフォルト） | 自分だけ・現在のプロジェクトのみ | 個人的に試す場合 |
+| `--scope project` | チーム全員（`.mcp.json` に保存、Git で共有可能） | プロジェクトで共有する場合 |
+| `--scope user` | 自分だけ・全プロジェクト共通 | 個人で常に使う場合 |
 
 macOS / Linux:
 ```bash
-claude mcp add mdcast -- python3 <保存先>/mdcast_mcp.py
+claude mcp add mdcast --scope user -- python3 <保存先>/mdcast_mcp.py
 ```
 
 Windows:
 ```bash
-claude mcp add mdcast -- python <保存先>\mdcast_mcp.py
+claude mcp add mdcast --scope user -- python <保存先>\mdcast_mcp.py
 ```
 
-#### Claude Desktop の場合
+用途に合わせて `--scope` を変更する。省略した場合は `local` になる。
 
-設定ファイルを編集する。
+登録後、新しいセッションを開始する。
 
-| OS | 設定ファイルのパス |
-|---|---|
-| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
-
-macOS / Linux:
-```json
-{
-  "mcpServers": {
-    "mdcast": {
-      "command": "python3",
-      "args": ["<保存先>/mdcast_mcp.py"]
-    }
-  }
-}
+削除する場合:
+```bash
+claude mcp remove mdcast -s user
 ```
 
-Windows:
-```json
-{
-  "mcpServers": {
-    "mdcast": {
-      "command": "python",
-      "args": ["<保存先>\\mdcast_mcp.py"]
-    }
-  }
-}
-```
-
-設定後、Claude Desktop を再起動する。
+`-s` には登録時に指定した scope を指定する。
 
 #### Codex CLI の場合
 
@@ -83,7 +67,7 @@ Windows:
 codex mcp add mdcast -- python <保存先>\mdcast_mcp.py
 ```
 
-または `~/.codex/config.toml` を直接編集する:
+手動で設定する場合は `~/.codex/config.toml` を直接編集する:
 
 ```toml
 [mcp_servers.mdcast]
