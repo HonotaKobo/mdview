@@ -6,7 +6,29 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+    steps:
+      - name: Create draft release
+        id: create
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_id=$(gh api repos/${{ github.repository }}/releases \
+            -f tag_name=${{ github.ref_name }} \
+            -f name="mdcast ${{ github.ref_name }}" \
+            -f body="See the assets to download and install this version." \
+            -F draft=true \
+            -F prerelease=false \
+            -q '.id')
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -44,9 +66,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'mdcast ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: true
-          prerelease: false
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
