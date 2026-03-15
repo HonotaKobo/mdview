@@ -23,8 +23,21 @@
         <button id="replace-all" title="Replace All">All</button>
       </div>
     </div>
-    <div id="scroll-area">
-      <div id="content"></div>
+    <div id="main-area">
+      <div id="scroll-area">
+        <div id="content"></div>
+      </div>
+      <div id="tag-sidebar" style="display: none">
+        <div id="tag-sidebar-header">
+          <span>Tags</span>
+          <button id="tag-sidebar-close">&times;</button>
+        </div>
+        <div id="tag-add-row">
+          <input id="tag-input" type="text" placeholder="Add tag..." />
+          <button id="tag-add-btn">+</button>
+        </div>
+        <div id="tag-list"></div>
+      </div>
     </div>
     <div id="status-bar">
       <span id="status-chars"></span>
@@ -32,6 +45,10 @@
       <span id="status-words"></span>
       <span class="status-sep">|</span>
       <span id="status-read-time"></span>
+      <span class="status-spacer"></span>
+      <span id="status-tag-add" class="status-action" title="Add Tag">+ Tag</span>
+      <span id="status-tag-edit" class="status-action" title="Edit Tags">Tags</span>
+      <span id="status-tag-manage" class="status-action" title="Manage Tags">Manage</span>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>

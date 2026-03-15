@@ -1,3 +1,5 @@
+import { invoke } from '@tauri-apps/api/core';
+
 export class StatusBar {
   private bar: HTMLElement;
   private charCountEl: HTMLElement;
@@ -16,6 +18,16 @@ export class StatusBar {
     } else {
       this.bar.style.display = 'flex';
     }
+
+    document.getElementById('status-tag-add')?.addEventListener('click', () => {
+      invoke('execute_menu_action', { id: 'tag_add' });
+    });
+    document.getElementById('status-tag-edit')?.addEventListener('click', () => {
+      invoke('execute_menu_action', { id: 'tag_edit' });
+    });
+    document.getElementById('status-tag-manage')?.addEventListener('click', () => {
+      invoke('execute_menu_action', { id: 'tag_manage' });
+    });
   }
 
   isVisible(): boolean {

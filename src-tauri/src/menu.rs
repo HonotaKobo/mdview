@@ -82,6 +82,18 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
+    // --- Tag menu ---
+    let tag_menu = SubmenuBuilder::new(app, i18n.t("menu.tag"))
+        .item(&MenuItemBuilder::with_id("tag_add", i18n.t("menu.tag_add"))
+            .accelerator("CmdOrCtrl+T")
+            .build(app)?)
+        .item(&MenuItemBuilder::with_id("tag_edit", i18n.t("menu.tag_edit"))
+            .build(app)?)
+        .separator()
+        .item(&MenuItemBuilder::with_id("tag_manage", i18n.t("menu.tag_manage"))
+            .build(app)?)
+        .build()?;
+
     // --- View menu ---
     let theme_submenu = SubmenuBuilder::new(app, i18n.t("menu.view_theme"))
         .item(&CheckMenuItemBuilder::with_id("theme_dark", i18n.t("menu.view_theme_dark"))
@@ -137,6 +149,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .item(&app_menu)
             .item(&file_menu)
             .item(&edit_menu)
+            .item(&tag_menu)
             .item(&view_menu)
             .item(&help_menu)
             .build();
@@ -147,6 +160,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         MenuBuilder::new(app)
             .item(&file_menu)
             .item(&edit_menu)
+            .item(&tag_menu)
             .item(&view_menu)
             .item(&help_menu)
             .build()
@@ -186,6 +200,10 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             let _ = app.emit("menu-action", serde_json::json!({ "action": "view_status_bar" }));
         }
 
+        "tag_manage" => {
+            open_tag_manager();
+        }
+
         "help_about" | "app_about" => {
             open_about_window();
         }
@@ -221,6 +239,17 @@ fn open_about_window() {
     if let Ok(exe) = std::env::current_exe() {
         let _ = std::process::Command::new(exe)
             .args(["--body", &body, "--title", "About mdcast"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::inherit())
+            .spawn();
+    }
+}
+
+fn open_tag_manager() {
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = std::process::Command::new(exe)
+            .args(["--_tag-manager"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::inherit())

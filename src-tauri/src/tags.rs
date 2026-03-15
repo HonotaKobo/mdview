@@ -1,0 +1,154 @@
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TagEntry {
+    pub path: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TagData {
+    version: u32,
+    entries: Vec<TagEntry>,
+}
+
+pub struct TagStore {
+    data: TagData,
+    file_path: PathBuf,
+}
+
+pub type TagState = Mutex<TagStore>;
+
+impl TagStore {
+    pub fn load() -> Self {
+        let file_path = Self::storage_path();
+        let data = if file_path.exists() {
+            match std::fs::read_to_string(&file_path) {
+                Ok(json) => serde_json::from_str(&json).unwrap_or(TagData {
+                    version: 1,
+                    entries: vec![],
+                }),
+                Err(_) => TagData {
+                    version: 1,
+                    entries: vec![],
+                },
+            }
+        } else {
+            TagData {
+                version: 1,
+                entries: vec![],
+            }
+        };
+        Self { data, file_path }
+    }
+
+    pub fn reload(&mut self) {
+        if self.file_path.exists() {
+            if let Ok(json) = std::fs::read_to_string(&self.file_path) {
+                if let Ok(data) = serde_json::from_str(&json) {
+                    self.data = data;
+                }
+            }
+        }
+    }
+
+    fn save(&self) {
+        if let Some(parent) = self.file_path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        let tmp = self.file_path.with_extension("tmp");
+        if let Ok(json) = serde_json::to_string_pretty(&self.data) {
+            if std::fs::write(&tmp, &json).is_ok() {
+                std::fs::rename(&tmp, &self.file_path).ok();
+            }
+        }
+    }
+
+    fn storage_path() -> PathBuf {
+        let base = if cfg!(target_os = "macos") {
+            dirs::config_dir().unwrap_or_else(|| PathBuf::from("."))
+        } else if cfg!(target_os = "windows") {
+            dirs::data_dir().unwrap_or_else(|| PathBuf::from("."))
+        } else {
+            dirs::config_dir().unwrap_or_else(|| PathBuf::from("."))
+        };
+        base.join("mdcast").join("tags.json")
+    }
+
+    fn find_entry_mut(&mut self, path: &str) -> Option<&mut TagEntry> {
+        self.data.entries.iter_mut().find(|e| e.path == path)
+    }
+
+    pub fn add_tag(&mut self, path: &str, tag: &str) {
+        if let Some(entry) = self.find_entry_mut(path) {
+            if !entry.tags.contains(&tag.to_string()) {
+                entry.tags.push(tag.to_string());
+            }
+        } else {
+            self.data.entries.push(TagEntry {
+                path: path.to_string(),
+                tags: vec![tag.to_string()],
+            });
+        }
+        self.save();
+    }
+
+    pub fn remove_tag(&mut self, path: &str, tag: &str) {
+        if let Some(entry) = self.find_entry_mut(path) {
+            entry.tags.retain(|t| t != tag);
+            if entry.tags.is_empty() {
+                self.data.entries.retain(|e| e.path != path);
+            }
+        }
+        self.save();
+    }
+
+    pub fn set_tags(&mut self, path: &str, tags: Vec<String>) {
+        if tags.is_empty() {
+            self.data.entries.retain(|e| e.path != path);
+        } else if let Some(entry) = self.find_entry_mut(path) {
+            entry.tags = tags;
+        } else {
+            self.data.entries.push(TagEntry {
+                path: path.to_string(),
+                tags,
+            });
+        }
+        self.save();
+    }
+
+    pub fn get_tags(&self, path: &str) -> Vec<String> {
+        self.data
+            .entries
+            .iter()
+            .find(|e| e.path == path)
+            .map(|e| e.tags.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn get_all_entries(&self) -> Vec<TagEntry> {
+        self.data.entries.clone()
+    }
+
+    pub fn delete_entry(&mut self, path: &str) {
+        self.data.entries.retain(|e| e.path != path);
+        self.save();
+    }
+
+    pub fn relink(&mut self, old_path: &str, new_path: &str) {
+        if let Some(entry) = self.find_entry_mut(old_path) {
+            entry.path = new_path.to_string();
+        }
+        self.save();
+    }
+
+    pub fn validate_paths(&self) -> Vec<(String, bool)> {
+        self.data
+            .entries
+            .iter()
+            .map(|e| (e.path.clone(), std::path::Path::new(&e.path).exists()))
+            .collect()
+    }
+}

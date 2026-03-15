@@ -29,6 +29,10 @@
     "view_font_size_decrease": "Zoom Out",
     "view_status_bar": "Status Bar",
     "view_always_on_top": "Always on Top",
+    "tag": "Tag",
+    "tag_add": "Add Tag",
+    "tag_edit": "Edit Tags",
+    "tag_manage": "Manage Tags...",
     "help": "Help",
     "help_about": "About mdcast"
   },

@@ -15,6 +15,8 @@ pub struct AppStateInner {
     pub path_disclosure: bool,
     /// Whether content was explicitly provided (--body or --file)
     pub content_explicitly_set: bool,
+    /// Whether this window is the tag manager
+    pub tag_manager_mode: bool,
 }
 
 impl AppStateInner {
@@ -26,6 +28,7 @@ impl AppStateInner {
             dirty: false,
             path_disclosure: false,
             content_explicitly_set: false,
+            tag_manager_mode: false,
         }
     }
 }

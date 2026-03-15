@@ -29,6 +29,10 @@
     "view_font_size_decrease": "縮小",
     "view_status_bar": "ステータスバー",
     "view_always_on_top": "常に最前面",
+    "tag": "タグ",
+    "tag_add": "タグを追加",
+    "tag_edit": "タグを編集",
+    "tag_manage": "タグ管理...",
     "help": "ヘルプ",
     "help_about": "mdcastについて"
   },

@@ -12,6 +12,8 @@ import { StatusBar } from './status-bar';
 import { getMarkdownIt } from './renderer';
 import { exportAsPdf } from './pdf-export';
 import { exportAsHtml } from './html-export';
+import { TagSidebar } from './tag-sidebar';
+import { TagManager } from './tag-manager';
 
 interface ContentUpdate {
   body?: string;
@@ -33,6 +35,7 @@ const findBar = new FindBar();
 const fontSizeManager = new FontSizeManager();
 const editorController = new EditorController(document.getElementById('content')!);
 const statusBar = new StatusBar();
+const tagSidebar = new TagSidebar();
 
 findBar.setOnReplace((search, replace, all) => {
   let content = editorController.getCurrentContent();
@@ -143,6 +146,13 @@ function debounced(action: string, fn: () => void) {
 
 // Pull initial content from Rust backend (reliable, no race condition)
 async function loadInitialContent() {
+  const mode = await invoke<string>('get_window_mode');
+  if (mode === 'tag-manager') {
+    const tm = new TagManager();
+    await tm.init();
+    getCurrentWindow().setTitle('Tag Manager — mdcast');
+    return;
+  }
   const [body, title, _contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
   currentContent = body;
   currentTitle = title || 'Untitled';
@@ -248,6 +258,12 @@ listen('menu-action', (event) => {
       break;
     case 'font_decrease':
       debounced('font_decrease', () => fontSizeManager.decrease());
+      break;
+    case 'tag_add':
+      debounced('tag_add', () => tagSidebar.show('add'));
+      break;
+    case 'tag_edit':
+      debounced('tag_edit', () => tagSidebar.toggle());
       break;
   }
 });
@@ -385,6 +401,12 @@ document.addEventListener('keydown', (e) => {
       if (e.shiftKey && !inTextarea) {
         e.preventDefault();
         debounced('edit_copy_markdown', () => copyAsMarkdown());
+      }
+      break;
+    case 't':
+      if (!inTextarea) {
+        e.preventDefault();
+        debounced('tag_add', () => tagSidebar.show('add'));
       }
       break;
     case '=':

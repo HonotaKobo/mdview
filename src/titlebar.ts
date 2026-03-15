@@ -53,6 +53,7 @@ export class CustomTitleBar {
       theme_dark: savedTheme === 'dark',
       theme_light: savedTheme === 'light',
       theme_auto: savedTheme === 'auto',
+      view_status_bar: true,
       view_always_on_top: false,
     };
 
@@ -85,6 +86,10 @@ export class CustomTitleBar {
           { type: 'normal', id: 'file_save', label: this.t('menu.file_save'), accelerator: 'Ctrl+S' },
           { type: 'normal', id: 'file_save_as', label: this.t('menu.file_save_as'), accelerator: 'Ctrl+Shift+S' },
           { type: 'separator' },
+          { type: 'normal', id: 'file_reload', label: this.t('menu.file_reload'), accelerator: 'Ctrl+R' },
+          { type: 'separator' },
+          { type: 'normal', id: 'file_export_pdf', label: this.t('menu.file_export_pdf'), accelerator: 'Ctrl+Shift+E' },
+          { type: 'normal', id: 'file_export_html', label: this.t('menu.file_export_html') },
           { type: 'normal', id: 'file_print', label: this.t('menu.file_print'), accelerator: 'Ctrl+P' },
           { type: 'separator' },
           { type: 'normal', id: 'file_quit', label: this.t('menu.file_quit'), accelerator: 'Ctrl+Q' },
@@ -102,6 +107,16 @@ export class CustomTitleBar {
           { type: 'normal', id: 'edit_find_replace', label: this.t('menu.edit_find_replace'), accelerator: 'Ctrl+H' },
           { type: 'normal', id: 'edit_find_next', label: this.t('menu.edit_find_next'), accelerator: 'Ctrl+G' },
           { type: 'normal', id: 'edit_find_prev', label: this.t('menu.edit_find_prev'), accelerator: 'Ctrl+Shift+G' },
+        ],
+      },
+      {
+        id: 'tag',
+        label: this.t('menu.tag'),
+        items: [
+          { type: 'normal', id: 'tag_add', label: this.t('menu.tag_add'), accelerator: 'Ctrl+T' },
+          { type: 'normal', id: 'tag_edit', label: this.t('menu.tag_edit') },
+          { type: 'separator' },
+          { type: 'normal', id: 'tag_manage', label: this.t('menu.tag_manage') },
         ],
       },
       {
@@ -126,6 +141,7 @@ export class CustomTitleBar {
             ],
           },
           { type: 'separator' },
+          { type: 'check', id: 'view_status_bar', label: this.t('menu.view_status_bar') },
           { type: 'check', id: 'view_always_on_top', label: this.t('menu.view_always_on_top') },
         ],
       },
@@ -409,6 +425,8 @@ export class CustomTitleBar {
         this.setThemeCheck(value);
       } else if (action === 'always_on_top_changed') {
         this.setCheck('view_always_on_top', value === true);
+      } else if (action === 'view_status_bar') {
+        this.setCheck('view_status_bar', !this.checkStates['view_status_bar']);
       }
     });
   }

@@ -3,6 +3,7 @@ use tauri::command;
 
 use crate::i18n::I18n;
 use crate::state::AppState;
+use crate::tags::{TagEntry, TagState};
 
 #[command]
 pub fn read_file(path: String) -> Result<String, String> {
@@ -73,6 +74,12 @@ pub fn get_platform() -> String {
 }
 
 #[command]
+pub fn get_window_mode(state: tauri::State<'_, AppState>) -> String {
+    let state = state.lock().unwrap();
+    if state.tag_manager_mode { "tag-manager".to_string() } else { "editor".to_string() }
+}
+
+#[command]
 pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
     crate::menu::execute_action(&app, &id);
 }
@@ -96,4 +103,54 @@ pub fn open_new_window(file: Option<String>) -> Result<(), String> {
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[command]
+pub fn tag_add(path: String, tag: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.add_tag(&path, &tag);
+}
+
+#[command]
+pub fn tag_remove(path: String, tag: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.remove_tag(&path, &tag);
+}
+
+#[command]
+pub fn tag_set(path: String, tags: Vec<String>, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.set_tags(&path, tags);
+}
+
+#[command]
+pub fn tag_get(path: String, state: tauri::State<'_, TagState>) -> Vec<String> {
+    let store = state.lock().unwrap();
+    store.get_tags(&path)
+}
+
+#[command]
+pub fn tag_get_all(state: tauri::State<'_, TagState>) -> Vec<TagEntry> {
+    let mut store = state.lock().unwrap();
+    store.reload();
+    store.get_all_entries()
+}
+
+#[command]
+pub fn tag_delete_entry(path: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.delete_entry(&path);
+}
+
+#[command]
+pub fn tag_relink(old_path: String, new_path: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.relink(&old_path, &new_path);
+}
+
+#[command]
+pub fn tag_validate_paths(state: tauri::State<'_, TagState>) -> Vec<(String, bool)> {
+    let mut store = state.lock().unwrap();
+    store.reload();
+    store.validate_paths()
 }

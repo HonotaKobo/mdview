@@ -5,11 +5,13 @@ mod i18n;
 mod ipc;
 mod menu;
 mod state;
+mod tags;
 mod watcher;
 
 use clap::Parser;
 use tauri::{Emitter, Manager as _};
 use state::{AppState, AppStateInner};
+use tags::{TagState, TagStore};
 use watcher::FileWatcher;
 
 pub fn run() {
@@ -127,6 +129,7 @@ pub fn run() {
     let content_explicitly_set = args.body.is_some() || initial_file.is_some();
     let mut app_state = AppStateInner::new(resolved_title, resolved_content);
     app_state.content_explicitly_set = content_explicitly_set;
+    app_state.tag_manager_mode = args.tag_manager;
     if let Some(ref fp) = resolved_file_path {
         app_state.saved_path = Some(fp.clone());
     }
@@ -141,6 +144,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::new(app_state))
+        .manage(TagState::new(TagStore::load()))
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::save_file,
@@ -152,8 +156,17 @@ pub fn run() {
             commands::rename_file,
             commands::get_translations,
             commands::get_platform,
+            commands::get_window_mode,
             commands::execute_menu_action,
             commands::open_new_window,
+            commands::tag_add,
+            commands::tag_remove,
+            commands::tag_set,
+            commands::tag_get,
+            commands::tag_get_all,
+            commands::tag_delete_entry,
+            commands::tag_relink,
+            commands::tag_validate_paths,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
