@@ -191,6 +191,11 @@
   background: var(--code-bg);
 }
 
+/* Code block wrapper */
+.code-block-wrapper {
+  position: relative;
+}
+
 /* Code block copy button */
 .code-copy-btn {
   position: absolute;
@@ -206,9 +211,10 @@
   opacity: 0;
   transition: opacity 0.15s;
   line-height: 0;
+  z-index: 1;
 }
 
-#content pre:hover .code-copy-btn {
+.code-block-wrapper:hover .code-copy-btn {
   opacity: 1;
 }
 

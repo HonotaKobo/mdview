@@ -32,7 +32,7 @@ const md: MarkdownIt = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
-  breaks: false,
+  breaks: true,
   highlight: (str: string, lang: string): string => {
     // Mermaid blocks: don't highlight, leave for post-processing
     if (lang === 'mermaid') {
@@ -251,7 +251,10 @@ const CHECK_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="1
 export function addCopyButtons(container: HTMLElement): void {
   const preBlocks = container.querySelectorAll('pre');
   for (const pre of preBlocks) {
-    pre.style.position = 'relative';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'code-block-wrapper';
+    pre.parentNode!.insertBefore(wrapper, pre);
+    wrapper.appendChild(pre);
 
     const btn = document.createElement('button');
     btn.className = 'code-copy-btn';
@@ -266,6 +269,6 @@ export function addCopyButtons(container: HTMLElement): void {
       }, 1500);
     });
 
-    pre.appendChild(btn);
+    wrapper.appendChild(btn);
   }
 }
