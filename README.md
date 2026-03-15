@@ -10,33 +10,31 @@ AIエージェントを使って作業をしていると、エージェントが
 
 mdcast は、こうした問題のいいとこ取りを目指して作りました。
 
-AIエージェントが CLI 経由で Markdown の内容をウィンドウに表示するので、一時ファイルを作る必要がありません。内容の確認が済んでファイルとして保存する必要がなければ、ウィンドウを閉じるだけで終わりです。保存したければ、ウィンドウ上の保存ボタンからいつでもファイルに書き出せます。ファイルとして保存していない状態でも、AIエージェントは CLI 経由でウィンドウ上の内容を自由に更新できます。
+AIエージェントが MCP サーバー経由で Markdown の内容をウィンドウに表示するので、一時ファイルを作る必要がありません。内容の確認が済んでファイルとして保存する必要がなければ、ウィンドウを閉じるだけで終わりです。保存したければ、ウィンドウ上の保存ボタンからいつでもファイルに書き出せます。ファイルとして保存していない状態でも、AIエージェントは MCP 経由でウィンドウ上の内容を自由に更新できます。
 
-また、AIとのキャッチボールを安定してスムーズに出来るようにカスタム記法も導入しています。
+AIエージェントとのやり取りをよりスムーズにするために、独自のカスタム記法にも対応しています。
 
 ## 想定する使い方
 
-AIエージェントが文章を生成しながら、同じウィンドウに逐次反映していく流れを想定しています。
+AIエージェントが文章を生成しながら、同じウィンドウに逐次反映していく流れを想定しています。MCP サーバーを導入すると、自然言語で指示するだけで mdcast が操作されます。
 
-```bash
-# 1. AIがウィンドウを開き、生成した Markdown を表示する
-mdcast --id draft --title "設計書" --body "## 第1章\n概要を書いています..."
+```
+「mdcast に調査結果をまとめて表示して」
+→ launch ツールで新しいウィンドウが開き、Markdown が表示される
 
-# 2. 内容を追記・更新する（同じ --id なので同じウィンドウが更新される）
-mdcast --id draft --body "## 第1章\n概要\n\n## 第2章\n詳細設計..."
+「内容を更新して」
+→ update ツールで既存ウィンドウの内容が更新される
 
-# 3. 全文再送せずに行単位で編集する
-mdcast --id draft --grep "古い記述"                          # 検索して行番号を確認
-mdcast --id draft --replace 42-43 --content "新しい記述"      # その行だけ置換
+「10〜20 行目だけ書き換えて」
+→ edit_replace ツールで指定行だけが置換される
 
-# 4. ユーザーが💾ボタンで保存すると、AIは保存先パスを取得できる
-mdcast --id draft --query path
-# → /Users/xxx/Documents/設計書.md
-
-# 5. 以降はファイルを直接編集すれば、mdcast が変更を検知して自動反映する
+「内容を確認して」
+→ query ツールで現在の本文が取得される
 ```
 
-`--id` がこのツールの核です。同じ ID なら既存ウィンドウを更新し、なければ新規作成します。AIエージェントはウィンドウの参照を保持する必要がなく、毎回同じコマンドを叩くだけで済みます。
+ウィンドウごとにインスタンス ID が自動的に割り振られ、複数のウィンドウを同時に扱うこともできます。
+
+MCP サーバーの導入方法は [mcp-server/MCP-SERVER.md](mcp-server/MCP-SERVER.md) を参照してください。
 
 もちろん、AIエージェントを使わずに普通の Markdown ビューアとしても使えます。
 
@@ -75,7 +73,7 @@ scoop install mdcast
 
 ## 使い方
 
-### 基本
+### Markdown ビューアとして
 
 ```bash
 mdcast README.md                    # ファイルを開く
@@ -83,32 +81,11 @@ mdcast --title "メモ" notes.md      # タイトルを指定して開く
 mdcast                              # GUIファイル選択ダイアログから開く
 ```
 
-### ウィンドウの操作（`--id` を使った CLI 操作）
+### AIエージェントから（MCP サーバー）
 
-```bash
-# ID を指定してファイルを開く
-mdcast --file notes.md --id my-notes
+MCP サーバーを登録すると、Claude Code / Claude Desktop / Codex CLI から mdcast を操作できます。
 
-# 情報を取得
-mdcast --id my-notes --query body        # Markdown ソース
-mdcast --id my-notes --query title       # タイトル
-mdcast --id my-notes --query path        # 保存先パス
-mdcast --id my-notes --query linecount   # 総行数
-mdcast --id my-notes --query status      # 状態（JSON）
-
-# 検索・行の取得
-mdcast --id my-notes --grep "TODO"       # 正規表現検索（行番号付き）
-mdcast --id my-notes --lines 10-20       # 10〜20行目を取得
-
-# 編集
-mdcast --id my-notes --body "# 新しい内容"                    # 全体を置換
-mdcast --id my-notes --insert 5 --content "新しい行"           # 5行目の前に挿入
-mdcast --id my-notes --replace 10-12 --content "置換テキスト"   # 10〜12行目を置換
-mdcast --id my-notes --delete 3-5                              # 3〜5行目を削除
-
-# 開いているウィンドウの一覧
-mdcast --list
-```
+導入方法・使えるツールの一覧は [mcp-server/MCP-SERVER.md](mcp-server/MCP-SERVER.md) を参照してください。
 
 ## ライセンス
 
