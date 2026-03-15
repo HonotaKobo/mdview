@@ -58,13 +58,23 @@ pub fn check_update() -> Result<UpdateInfo, String> {
 
 pub fn perform_update() -> UpdateResult {
     match std::env::consts::OS {
-        "macos" => run_command("brew", &["upgrade", "mdcast"]),
-        "windows" => run_command("scoop", &["update", "mdcast"]),
+        "macos" => run_chained("brew", &["update"], &["upgrade", "--cask", "mdcast"]),
+        "windows" => run_chained("scoop", &["update"], &["update", "mdcast"]),
         _ => UpdateResult {
             success: false,
             message: "Automatic update is not supported on this platform.".to_string(),
         },
     }
+}
+
+fn run_chained(cmd: &str, pre_args: &[&str], args: &[&str]) -> UpdateResult {
+    if let Err(e) = std::process::Command::new(cmd).args(pre_args).output() {
+        return UpdateResult {
+            success: false,
+            message: format!("{}", e),
+        };
+    }
+    run_command(cmd, args)
 }
 
 fn run_command(cmd: &str, args: &[&str]) -> UpdateResult {
