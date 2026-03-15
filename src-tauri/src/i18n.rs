@@ -5,7 +5,6 @@ const EN: &str = include_str!("../locales/en.json");
 
 pub struct I18n {
     translations: serde_json::Value,
-    locale: String,
 }
 
 impl I18n {
@@ -14,7 +13,7 @@ impl I18n {
         let json = if locale.starts_with("ja") { JA } else { EN };
         let translations: serde_json::Value =
             serde_json::from_str(json).expect("failed to parse locale JSON");
-        Self { translations, locale }
+        Self { translations }
     }
 
     /// Get a translation by dot-separated key (e.g. "menu.file_open")
@@ -36,9 +35,6 @@ impl I18n {
         map
     }
 
-    pub fn locale(&self) -> &str {
-        &self.locale
-    }
 }
 
 fn flatten(value: &serde_json::Value, prefix: String, map: &mut HashMap<String, String>) {

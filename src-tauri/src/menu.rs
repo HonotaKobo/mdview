@@ -43,6 +43,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .build()?;
 
     // --- Edit menu ---
+    #[allow(unused_mut)]
     let mut edit_builder = SubmenuBuilder::new(app, i18n.t("menu.edit"));
 
     // macOS: add standard editing items so webview text operations work
@@ -251,7 +252,8 @@ fn open_tag_manager(app: &AppHandle) {
         let _ = window.set_focus();
         return;
     }
-    if let Ok(_window) = tauri::WebviewWindowBuilder::new(
+    #[allow(unused_variables)]
+    if let Ok(window) = tauri::WebviewWindowBuilder::new(
         app,
         "tag-manager",
         tauri::WebviewUrl::App("index.html".into()),

@@ -823,11 +823,39 @@ mark.find-highlight.active {
 
 /* Print styles */
 @media print {
+  @page {
+    margin: 10mm;
+  }
+
+  :root {
+    --bg-primary: #ffffff !important;
+    --bg-secondary: #f6f8fa !important;
+    --text-primary: #24292f !important;
+    --text-secondary: #57606a !important;
+    --border-color: #d0d7de !important;
+    --link-color: #0969da !important;
+    --code-bg: #f6f8fa !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #24292f !important;
+  }
+
+  body {
+    overflow: visible !important;
+  }
+
   #custom-titlebar,
   #find-bar,
   #status-bar,
   #tag-sidebar {
     display: none !important;
+  }
+
+  #main-area {
+    display: block;
   }
 
   #scroll-area {

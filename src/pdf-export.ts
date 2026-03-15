@@ -18,6 +18,15 @@ export async function exportAsPdf(title: string): Promise<void> {
   clone.style.width = '800px';
   clone.style.maxWidth = 'none';
   clone.style.padding = '24px 32px';
+  clone.style.background = '#ffffff';
+  clone.style.color = '#24292f';
+  clone.style.setProperty('--bg-primary', '#ffffff');
+  clone.style.setProperty('--bg-secondary', '#f6f8fa');
+  clone.style.setProperty('--text-primary', '#24292f');
+  clone.style.setProperty('--text-secondary', '#57606a');
+  clone.style.setProperty('--border-color', '#d0d7de');
+  clone.style.setProperty('--link-color', '#0969da');
+  clone.style.setProperty('--code-bg', '#f6f8fa');
 
   clone.querySelectorAll('pre').forEach(pre => {
     (pre as HTMLElement).style.overflowX = 'visible';

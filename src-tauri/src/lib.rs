@@ -9,7 +9,9 @@ mod tags;
 mod watcher;
 
 use clap::Parser;
-use tauri::{Emitter, Manager as _};
+#[cfg(target_os = "macos")]
+use tauri::Emitter;
+use tauri::Manager as _;
 use state::{AppState, AppStateInner};
 use tags::{TagState, TagStore};
 use watcher::FileWatcher;
@@ -201,7 +203,7 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(move |app_handle, event| {
+        .run(move |_app_handle, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
                 for url in urls {
@@ -214,7 +216,7 @@ pub fn run() {
                             let abs_path = path.to_string_lossy().to_string();
 
                             {
-                                let state = app_handle.state::<AppState>();
+                                let state = _app_handle.state::<AppState>();
                                 let mut state = state.lock().unwrap();
                                 state.current_content = content.clone();
                                 state.title = title.clone();
@@ -222,7 +224,7 @@ pub fn run() {
                                 state.dirty = false;
                             }
 
-                            let _ = app_handle.emit("content-update", serde_json::json!({
+                            let _ = _app_handle.emit("content-update", serde_json::json!({
                                 "body": content,
                                 "title": title,
                             }));
