@@ -69,7 +69,20 @@ pub fn run() {
     }
 
     // Daemonize: re-launch self in background so the terminal is freed immediately
-    if !args.foreground {
+    // On macOS, skip daemonization when launched from Finder (no terminal) without
+    // explicit content args, so we can receive RunEvent::Opened for file associations.
+    #[cfg(target_os = "macos")]
+    let should_daemonize = !args.foreground && {
+        use std::io::IsTerminal;
+        std::io::stdin().is_terminal()
+            || args.body.is_some()
+            || args.file.is_some()
+            || args.file_pos.is_some()
+    };
+    #[cfg(not(target_os = "macos"))]
+    let should_daemonize = !args.foreground;
+
+    if should_daemonize {
         let exe = std::env::current_exe().expect("failed to get executable path");
         let mut child_args: Vec<String> = std::env::args().skip(1).collect();
         child_args.push("--_foreground".to_string());
