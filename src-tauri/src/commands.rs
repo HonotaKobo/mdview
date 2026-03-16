@@ -109,8 +109,28 @@ pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
 }
 
 #[command]
-pub fn open_new_window(file: Option<String>, app: tauri::AppHandle) -> Result<String, String> {
-    crate::open_document_window(&app, file, None, None)
+pub async fn open_new_window(
+    file: Option<String>,
+    close_self: Option<bool>,
+    window: tauri::Window,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let close = close_self.unwrap_or(false);
+    let app_clone = app.clone();
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        crate::open_document_window(&app_clone, file, None, None)
+    })
+    .await
+    .map_err(|e| format!("spawn_blocking failed: {}", e))?;
+
+    result.map(|_| ())?;
+
+    if close {
+        let _ = window.destroy();
+    }
+
+    Ok(())
 }
 
 #[command]

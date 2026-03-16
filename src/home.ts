@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { t } from './i18n';
@@ -574,9 +573,8 @@ export class HomeScreen {
 
   // ===== Actions =====
 
-  private async newFile(): Promise<void> {
-    await invoke('open_new_window', { file: null });
-    await getCurrentWindow().close();
+  private newFile(): void {
+    invoke('open_new_window', { file: null, closeSelf: true });
   }
 
   private async openFile(): Promise<void> {
@@ -585,19 +583,16 @@ export class HomeScreen {
       filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }],
     });
     if (selected) {
-      await invoke('open_new_window', { file: selected as string });
-      await getCurrentWindow().close();
+      invoke('open_new_window', { file: selected as string, closeSelf: true });
     }
   }
 
-  private async openRecentFile(path: string): Promise<void> {
-    await invoke('open_new_window', { file: path });
-    await getCurrentWindow().close();
+  private openRecentFile(path: string): void {
+    invoke('open_new_window', { file: path, closeSelf: true });
   }
 
-  private async openFileFromTags(path: string): Promise<void> {
-    await invoke('open_new_window', { file: path });
-    await getCurrentWindow().close();
+  private openFileFromTags(path: string): void {
+    invoke('open_new_window', { file: path, closeSelf: true });
   }
 
   private async removeRecent(path: string): Promise<void> {

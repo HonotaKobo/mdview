@@ -86,22 +86,19 @@ pub(crate) fn open_document_window(
     }
 
     // Create the window
-    let _window = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         &label,
         tauri::WebviewUrl::App("index.html".into()),
     )
     .title(format!("{} — tsumugi", doc_title))
     .inner_size(900.0, 700.0)
-    .min_inner_size(400.0, 300.0)
-    .build()
-    .map_err(|e| e.to_string())?;
+    .min_inner_size(400.0, 300.0);
 
-    // On Windows, remove decorations for custom title bar
     #[cfg(target_os = "windows")]
-    {
-        let _ = _window.set_decorations(false);
-    }
+    let builder = builder.decorations(false);
+
+    let _window = builder.build().map_err(|e| e.to_string())?;
 
     // Start per-window IPC listener
     ipc::start_listener(instance_id.clone(), label.clone(), app.clone());
@@ -205,7 +202,10 @@ pub fn run() {
             || args.file_pos.is_some()
     };
     #[cfg(not(target_os = "macos"))]
-    let should_daemonize = !args.foreground;
+    let should_daemonize = !args.foreground && {
+        use std::io::IsTerminal;
+        std::io::stdin().is_terminal()
+    };
 
     if should_daemonize {
         let exe = std::env::current_exe().expect("failed to get executable path");
@@ -487,6 +487,20 @@ pub fn run() {
                             None,
                             None,
                         );
+                    }
+                }
+                {
+                    let states = _app_handle.state::<WindowStates>();
+                    let is_home = {
+                        let guard = states.lock().unwrap();
+                        guard.get("main").map_or(false, |s| {
+                            matches!(s.window_mode, WindowMode::Home)
+                        })
+                    };
+                    if is_home {
+                        if let Some(window) = _app_handle.get_webview_window("main") {
+                            let _ = window.destroy();
+                        }
                     }
                 }
             }
