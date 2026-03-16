@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 export class FindBar {
   private bar: HTMLElement;
   private input: HTMLInputElement;
@@ -49,6 +51,20 @@ export class FindBar {
         this.hide();
       }
     });
+  }
+
+  applyTranslations(): void {
+    this.input.placeholder = t('ui.find_placeholder');
+    this.replaceInput.placeholder = t('ui.replace_placeholder');
+    document.getElementById('find-prev')!.title = t('ui.find_prev_title');
+    document.getElementById('find-next')!.title = t('ui.find_next_title');
+    document.getElementById('find-close')!.title = t('ui.find_close_title');
+    const replaceOne = document.getElementById('replace-one')!;
+    replaceOne.textContent = t('ui.replace_btn');
+    replaceOne.title = t('ui.replace_title');
+    const replaceAll = document.getElementById('replace-all')!;
+    replaceAll.textContent = t('ui.replace_all_btn');
+    replaceAll.title = t('ui.replace_all_title');
   }
 
   setOnReplace(cb: (search: string, replace: string, all: boolean) => void): void {

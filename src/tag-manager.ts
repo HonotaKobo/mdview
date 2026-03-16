@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { t } from './i18n';
 
 interface TagEntry {
   path: string;
@@ -27,6 +28,10 @@ export class TagManager {
     for (const [path, exists] of validation) {
       this.pathStatus.set(path, exists);
     }
+    this.render();
+  }
+
+  applyTranslations(): void {
     this.render();
   }
 
@@ -60,7 +65,7 @@ export class TagManager {
 
     const search = document.createElement('input');
     search.type = 'text';
-    search.placeholder = 'ファイルパスまたはタグ名で検索…';
+    search.placeholder = t('ui.tm_search_placeholder');
     search.className = 'tm-search';
     search.value = this.searchQuery;
     search.addEventListener('input', () => {
@@ -71,7 +76,7 @@ export class TagManager {
 
     const searchCount = document.createElement('span');
     searchCount.className = 'tm-search-count';
-    searchCount.textContent = filtered.length + ' 件';
+    searchCount.textContent = t('ui.tm_count').replace('{count}', String(filtered.length));
     searchBar.appendChild(searchCount);
 
     wrapper.appendChild(searchBar);
@@ -79,7 +84,7 @@ export class TagManager {
     if (filtered.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tm-empty';
-      empty.textContent = this.searchQuery ? '一致する結果がありません' : 'タグ付きファイルがありません';
+      empty.textContent = this.searchQuery ? t('ui.tm_no_results') : t('ui.tm_no_files');
       wrapper.appendChild(empty);
       this.container.appendChild(wrapper);
       return;
@@ -103,7 +108,7 @@ export class TagManager {
         const warn = document.createElement('span');
         warn.className = 'tm-warn';
         warn.textContent = '!';
-        warn.title = 'ファイルが見つかりません';
+        warn.title = t('ui.tm_file_not_found');
         pathRow.appendChild(warn);
       }
 
@@ -131,21 +136,21 @@ export class TagManager {
       if (!exists) {
         const relinkBtn = document.createElement('button');
         relinkBtn.className = 'tm-btn';
-        relinkBtn.textContent = 'Relink';
+        relinkBtn.textContent = t('ui.tm_relink');
         relinkBtn.addEventListener('click', () => this.relinkEntry(entry.path));
         actions.appendChild(relinkBtn);
       }
 
       const openBtn = document.createElement('button');
       openBtn.className = 'tm-btn';
-      openBtn.textContent = '開く';
+      openBtn.textContent = t('ui.tm_open');
       openBtn.addEventListener('click', () => this.openFile(entry.path));
       if (!exists) openBtn.disabled = true;
       actions.appendChild(openBtn);
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'tm-btn tm-btn-danger';
-      deleteBtn.textContent = '削除';
+      deleteBtn.textContent = t('ui.tm_delete');
       deleteBtn.addEventListener('click', () => this.deleteEntry(entry.path));
       actions.appendChild(deleteBtn);
 

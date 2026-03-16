@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { t } from './i18n';
 
 export class TagAddModal {
   private overlay: HTMLElement;
@@ -11,7 +12,7 @@ export class TagAddModal {
     this.overlay.style.display = 'none';
     this.overlay.innerHTML = `
       <div id="tag-add-modal">
-        <input id="tag-add-modal-input" type="text" placeholder="タグ名を入力..." />
+        <input id="tag-add-modal-input" type="text" placeholder="" />
       </div>
     `;
     document.body.appendChild(this.overlay);
@@ -34,7 +35,7 @@ export class TagAddModal {
   async show(): Promise<void> {
     this.currentPath = await invoke<string | null>('get_saved_path');
     if (!this.currentPath) {
-      alert('ファイルを保存してからタグを追加してください。');
+      alert(t('ui.tag_save_first_add'));
       return;
     }
     this.input.value = '';
@@ -44,6 +45,10 @@ export class TagAddModal {
 
   hide(): void {
     this.overlay.style.display = 'none';
+  }
+
+  applyTranslations(): void {
+    this.input.placeholder = t('ui.tag_modal_placeholder');
   }
 
   private async submit(): Promise<void> {

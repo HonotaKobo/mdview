@@ -271,6 +271,8 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                 let mut guard = i18n_state.lock().unwrap();
                 *guard = new_i18n;
             }
+
+            let _ = app.emit("menu-action", serde_json::json!({ "action": "locale_changed" }));
         }
 
         // All other actions — emit to frontend
@@ -309,6 +311,11 @@ fn open_tag_manager(app: &AppHandle) {
         let _ = window.set_focus();
         return;
     }
+    let title = {
+        let i18n = app.state::<I18nState>();
+        let guard = i18n.lock().unwrap();
+        guard.t("ui.tm_title")
+    };
     let app = app.clone();
     std::thread::spawn(move || {
         #[allow(unused_variables)]
@@ -317,7 +324,7 @@ fn open_tag_manager(app: &AppHandle) {
             "tag-manager",
             tauri::WebviewUrl::App("index.html".into()),
         )
-        .title("タグ管理 — tsumugi")
+        .title(title)
         .inner_size(700.0, 500.0)
         .min_inner_size(400.0, 300.0)
         .build()

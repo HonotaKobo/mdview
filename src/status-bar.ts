@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { t } from './i18n';
 
 export class StatusBar {
   private bar: HTMLElement;
@@ -50,9 +51,25 @@ export class StatusBar {
     const words = countWords(text);
     const minutes = estimateReadTime(text, words);
 
-    this.charCountEl.textContent = `${chars.toLocaleString()} chars`;
-    this.wordCountEl.textContent = `${words.toLocaleString()} words`;
-    this.readTimeEl.textContent = minutes < 1 ? '< 1 min read' : `${Math.ceil(minutes)} min read`;
+    this.charCountEl.textContent = t('ui.status_chars').replace('{count}', chars.toLocaleString());
+    this.wordCountEl.textContent = t('ui.status_words').replace('{count}', words.toLocaleString());
+    this.readTimeEl.textContent = minutes < 1
+      ? t('ui.status_read_time_short')
+      : t('ui.status_read_time').replace('{count}', String(Math.ceil(minutes)));
+  }
+
+  applyTranslations(): void {
+    const addEl = document.getElementById('status-tag-add')!;
+    addEl.textContent = t('ui.status_tag_add');
+    addEl.title = t('menu.tag_add');
+
+    const editEl = document.getElementById('status-tag-edit')!;
+    editEl.textContent = t('ui.status_tag_edit');
+    editEl.title = t('menu.tag_edit');
+
+    const manageEl = document.getElementById('status-tag-manage')!;
+    manageEl.textContent = t('ui.status_tag_manage');
+    manageEl.title = t('menu.tag_manage');
   }
 }
 

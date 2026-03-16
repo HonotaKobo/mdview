@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { t } from './i18n';
 
 export class TagSidebar {
   private sidebar: HTMLElement;
@@ -33,7 +34,7 @@ export class TagSidebar {
   async show(): Promise<void> {
     this.currentPath = await invoke<string | null>('get_saved_path');
     if (!this.currentPath) {
-      alert('ファイルを保存してからタグを編集してください。');
+      alert(t('ui.tag_save_first_edit'));
       return;
     }
     this.sidebar.style.display = 'flex';
@@ -63,6 +64,13 @@ export class TagSidebar {
     }
   }
 
+  applyTranslations(): void {
+    document.getElementById('tag-sidebar-title')!.textContent = t('ui.tag_sidebar_title');
+    (this.input as HTMLInputElement).placeholder = t('ui.tag_input_placeholder');
+    this.addBtn.textContent = t('ui.tag_add_action');
+    if (this.isVisible()) this.loadTags();
+  }
+
   private async loadTags(): Promise<void> {
     if (!this.currentPath) return;
     const tags = await invoke<string[]>('tag_get', { path: this.currentPath });
@@ -74,7 +82,7 @@ export class TagSidebar {
     if (tags.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tag-empty';
-      empty.textContent = 'タグがありません';
+      empty.textContent = t('ui.tag_empty');
       this.tagList.appendChild(empty);
       this.tagCount.textContent = '';
       return;
@@ -82,7 +90,7 @@ export class TagSidebar {
 
     const label = document.createElement('div');
     label.className = 'tag-list-label';
-    label.textContent = 'タグ一覧';
+    label.textContent = t('ui.tag_list_label');
     this.tagList.appendChild(label);
 
     for (const tag of tags) {
@@ -97,14 +105,14 @@ export class TagSidebar {
       const del = document.createElement('button');
       del.className = 'tag-item-remove';
       del.textContent = '\u00d7';
-      del.title = '削除';
+      del.title = t('ui.tag_delete');
       del.addEventListener('click', () => this.removeTag(tag));
       item.appendChild(del);
 
       this.tagList.appendChild(item);
     }
 
-    this.tagCount.textContent = tags.length + ' 個のタグ';
+    this.tagCount.textContent = t('ui.tag_count').replace('{count}', String(tags.length));
   }
 
   private async addTagFromInput(): Promise<void> {

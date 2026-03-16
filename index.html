@@ -11,16 +11,16 @@
   <body>
     <div id="find-bar" style="display: none">
       <div id="find-row">
-        <input id="find-input" type="text" placeholder="Find..." />
+        <input id="find-input" type="text" placeholder="" />
         <span id="find-count"></span>
-        <button id="find-prev" title="Previous">&#9650;</button>
-        <button id="find-next" title="Next">&#9660;</button>
-        <button id="find-close" title="Close">&times;</button>
+        <button id="find-prev">&#9650;</button>
+        <button id="find-next">&#9660;</button>
+        <button id="find-close">&times;</button>
       </div>
       <div id="replace-row" style="display: none">
-        <input id="replace-input" type="text" placeholder="Replace..." />
-        <button id="replace-one" title="Replace">Replace</button>
-        <button id="replace-all" title="Replace All">All</button>
+        <input id="replace-input" type="text" placeholder="" />
+        <button id="replace-one"></button>
+        <button id="replace-all"></button>
       </div>
     </div>
     <div id="main-area">
@@ -29,13 +29,13 @@
       </div>
       <div id="tag-sidebar" style="display: none">
         <div id="tag-sidebar-header">
-          <h2>タグ</h2>
+          <h2 id="tag-sidebar-title"></h2>
           <div id="tag-sidebar-file-label"></div>
           <button id="tag-sidebar-close">&times;</button>
         </div>
         <div id="tag-add-row">
-          <input id="tag-input" type="text" placeholder="新しいタグ…" />
-          <button id="tag-add-btn">追加</button>
+          <input id="tag-input" type="text" placeholder="" />
+          <button id="tag-add-btn"></button>
         </div>
         <div id="tag-sidebar-divider"></div>
         <div id="tag-list"></div>
@@ -49,11 +49,11 @@
       <span class="status-sep">|</span>
       <span id="status-read-time"></span>
       <span class="status-spacer"></span>
-      <span id="status-tag-add" class="status-action" title="タグを追加">タグ追加</span>
+      <span id="status-tag-add" class="status-action"></span>
       <span class="status-sep">|</span>
-      <span id="status-tag-edit" class="status-action" title="タグを編集">タグ編集</span>
+      <span id="status-tag-edit" class="status-action"></span>
       <span class="status-sep">|</span>
-      <span id="status-tag-manage" class="status-action" title="タグ管理">タグ管理</span>
+      <span id="status-tag-manage" class="status-action"></span>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>

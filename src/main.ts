@@ -16,6 +16,7 @@ import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
 import { TagManager } from './tag-manager';
 import { UpdateModal } from './update-modal';
+import { loadTranslations, t } from './i18n';
 
 interface ContentUpdate {
   body?: string;
@@ -43,8 +44,9 @@ let tagAddModal: TagAddModal;
 let tagSidebar: TagSidebar;
 let updateModal: UpdateModal;
 
+themeManager = new ThemeManager();
+
 if (!isTagManager) {
-  themeManager = new ThemeManager();
   findBar = new FindBar();
   fontSizeManager = new FontSizeManager();
   editorController = new EditorController(document.getElementById('content')!);
@@ -165,10 +167,27 @@ function debounced(action: string, fn: () => void) {
   fn();
 }
 
+let tagManagerInstance: TagManager | null = null;
+
+function applyTranslations(): void {
+  if (!isTagManager) {
+    statusBar.applyTranslations();
+    findBar.applyTranslations();
+    tagAddModal.applyTranslations();
+    tagSidebar.applyTranslations();
+  }
+  if (tagManagerInstance) {
+    tagManagerInstance.applyTranslations();
+  }
+}
+
 async function loadInitialContent() {
+  await loadTranslations();
+  applyTranslations();
+
   if (isTagManager) {
-    const tm = new TagManager();
-    await tm.init();
+    tagManagerInstance = new TagManager();
+    await tagManagerInstance.init();
     return;
   }
   const [body, title, _contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
@@ -180,6 +199,15 @@ async function loadInitialContent() {
 }
 loadInitialContent();
 
+if (isTagManager) {
+  listen('menu-action', async (event) => {
+    const { action } = event.payload as MenuAction;
+    if (action === 'locale_changed') {
+      await loadTranslations();
+      applyTranslations();
+    }
+  });
+}
 
 if (!isTagManager) {
   listen('content-update', async (event) => {
@@ -297,6 +325,13 @@ if (!isTagManager) {
         break;
       case 'help_check_updates':
         debounced('help_check_updates', () => updateModal.checkForUpdates(false));
+        break;
+      case 'locale_changed':
+        (async () => {
+          await loadTranslations();
+          applyTranslations();
+          statusBar.update(currentContent);
+        })();
         break;
     }
   });
@@ -450,7 +485,7 @@ if (!isTagManager) {
   getCurrentWindow().onCloseRequested(async (event) => {
     if (isDirty) {
       event.preventDefault();
-      const confirmed = confirm('未保存の変更があります。閉じますか？');
+      const confirmed = confirm(t('ui.unsaved_confirm'));
       if (confirmed) {
         await getCurrentWindow().destroy();
       }
