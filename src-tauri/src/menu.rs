@@ -5,7 +5,7 @@ use tauri::{
 #[cfg(target_os = "macos")]
 use tauri::menu::PredefinedMenuItem;
 
-use crate::i18n::I18n;
+use crate::i18n::{I18n, I18nState, Locale, save_locale_setting};
 
 pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Menu<Wry>> {
     // --- File menu ---
@@ -115,9 +115,22 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
+    let lang_submenu = SubmenuBuilder::new(app, i18n.t("menu.view_language"))
+        .item(&CheckMenuItemBuilder::with_id("locale_en", i18n.t("menu.view_language_en"))
+            .checked(matches!(i18n.locale(), Locale::En))
+            .build(app)?)
+        .item(&CheckMenuItemBuilder::with_id("locale_ja", i18n.t("menu.view_language_ja"))
+            .checked(matches!(i18n.locale(), Locale::Ja))
+            .build(app)?)
+        .item(&CheckMenuItemBuilder::with_id("locale_custom", i18n.t("menu.view_language_custom"))
+            .checked(matches!(i18n.locale(), Locale::Custom))
+            .build(app)?)
+        .build()?;
+
     let view_menu = SubmenuBuilder::new(app, i18n.t("menu.view"))
         .item(&theme_submenu)
         .item(&font_submenu)
+        .item(&lang_submenu)
         .separator()
         .item(&CheckMenuItemBuilder::with_id("view_status_bar", i18n.t("menu.view_status_bar"))
             .checked(true)
@@ -223,6 +236,43 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             let _ = app.emit("menu-action", serde_json::json!({ "action": "theme_change", "value": theme }));
         }
 
+        // Language — save setting, rebuild menu, update state
+        "locale_en" | "locale_ja" | "locale_custom" => {
+            let locale = match id {
+                "locale_en" => Locale::En,
+                "locale_ja" => Locale::Ja,
+                _ => Locale::Custom,
+            };
+            save_locale_setting(&locale);
+
+            // Save current menu check states before rebuild
+            let current_theme = ["theme_dark", "theme_light", "theme_auto"]
+                .iter()
+                .find(|tid| get_check_state(app, tid))
+                .unwrap_or(&"theme_auto")
+                .to_string();
+            let status_bar = get_check_state(app, "view_status_bar");
+            let always_on_top = get_check_state(app, "view_always_on_top");
+
+            // Rebuild menu with new locale
+            let new_i18n = I18n::with_locale(locale);
+            if let Ok(menu) = build_menu(app, &new_i18n) {
+                let _ = app.set_menu(menu);
+            }
+
+            // Restore check states
+            update_theme_checks(app, &current_theme);
+            set_check_state(app, "view_status_bar", status_bar);
+            set_check_state(app, "view_always_on_top", always_on_top);
+
+            // Update I18n state
+            let i18n_state = app.state::<I18nState>();
+            {
+                let mut guard = i18n_state.lock().unwrap();
+                *guard = new_i18n;
+            }
+        }
+
         // All other actions — emit to frontend
         _ => {
             let _ = app.emit("menu-action", serde_json::json!({ "action": id }));
@@ -284,6 +334,23 @@ fn update_theme_checks(app: &AppHandle, selected_id: &str) {
             if let Some(check) = item.as_check_menuitem() {
                 let _ = check.set_checked(*id == selected_id);
             }
+        }
+    }
+}
+
+fn get_check_state(app: &AppHandle, id: &str) -> bool {
+    if let Some(item) = app.menu().and_then(|m| m.get(id)) {
+        if let Some(check) = item.as_check_menuitem() {
+            return check.is_checked().unwrap_or(false);
+        }
+    }
+    false
+}
+
+fn set_check_state(app: &AppHandle, id: &str, checked: bool) {
+    if let Some(item) = app.menu().and_then(|m| m.get(id)) {
+        if let Some(check) = item.as_check_menuitem() {
+            let _ = check.set_checked(checked);
         }
     }
 }

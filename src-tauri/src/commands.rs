@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use tauri::command;
 
-use crate::i18n::I18n;
+use crate::i18n::I18nState;
 use crate::state::AppState;
 use crate::tags::{TagEntry, TagState};
 use crate::update_checker::{UpdateInfo, UpdateResult};
@@ -65,8 +65,14 @@ pub fn save_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
 }
 
 #[command]
-pub fn get_translations(i18n: tauri::State<'_, I18n>) -> HashMap<String, String> {
+pub fn get_translations(i18n: tauri::State<'_, I18nState>) -> HashMap<String, String> {
+    let i18n = i18n.lock().unwrap();
     i18n.flat_map()
+}
+
+#[command]
+pub fn get_custom_locale_path() -> String {
+    crate::i18n::custom_locale_path().to_string_lossy().to_string()
 }
 
 #[command]

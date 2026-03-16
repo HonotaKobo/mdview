@@ -18,6 +18,10 @@ use tags::{TagState, TagStore};
 use watcher::FileWatcher;
 
 pub fn run() {
+    // Set AppUserModelID so all instances share one taskbar button
+    #[cfg(target_os = "windows")]
+    set_app_user_model_id();
+
     let mut args = cli::CliArgs::parse();
 
     // --body - : read from stdin (must happen before daemonize)
@@ -92,24 +96,49 @@ pub fn run() {
             child_args.push(id.clone());
         }
         use std::process::{Command, Stdio};
-        let mut cmd = Command::new(exe);
-        cmd.args(&child_args)
-            .stdout(Stdio::null())
-            .stderr(Stdio::inherit());
 
-        if stdin_read {
-            // Pipe the stdin content to the child process (which will read it via --body -)
-            cmd.stdin(Stdio::piped());
-            let mut child = cmd.spawn().expect("failed to launch tsumugi");
-            if let Some(mut child_stdin) = child.stdin.take() {
-                use std::io::Write as _;
-                child_stdin
-                    .write_all(args.body.as_deref().unwrap_or("").as_bytes())
-                    .ok();
+        // On macOS, launch through the .app bundle via `open` so that
+        // the Dock groups all instances under a single icon.
+        #[cfg(target_os = "macos")]
+        let use_open = !stdin_read && find_app_bundle(&exe).is_some();
+        #[cfg(not(target_os = "macos"))]
+        let use_open = false;
+
+        if use_open {
+            #[cfg(target_os = "macos")]
+            {
+                let bundle = find_app_bundle(&exe).unwrap();
+                let mut cmd = Command::new("open");
+                cmd.arg("-n")
+                    .arg("-a")
+                    .arg(&bundle)
+                    .arg("--args");
+                cmd.args(&child_args);
+                cmd.stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .stdin(Stdio::null());
+                cmd.spawn().expect("failed to launch tsumugi via open");
             }
         } else {
-            cmd.stdin(Stdio::null());
-            cmd.spawn().expect("failed to launch tsumugi");
+            let mut cmd = Command::new(&exe);
+            cmd.args(&child_args)
+                .stdout(Stdio::null())
+                .stderr(Stdio::inherit());
+
+            if stdin_read {
+                // Pipe the stdin content to the child process (which will read it via --body -)
+                cmd.stdin(Stdio::piped());
+                let mut child = cmd.spawn().expect("failed to launch tsumugi");
+                if let Some(mut child_stdin) = child.stdin.take() {
+                    use std::io::Write as _;
+                    child_stdin
+                        .write_all(args.body.as_deref().unwrap_or("").as_bytes())
+                        .ok();
+                }
+            } else {
+                cmd.stdin(Stdio::null());
+                cmd.spawn().expect("failed to launch tsumugi");
+            }
         }
         return;
     }
@@ -181,6 +210,7 @@ pub fn run() {
             commands::tag_delete_entry,
             commands::tag_relink,
             commands::tag_validate_paths,
+            commands::get_custom_locale_path,
             commands::check_for_updates,
             commands::perform_update,
             commands::restart_app,
@@ -197,7 +227,7 @@ pub fn run() {
                 }
             }
 
-            app.manage(i18n);
+            app.manage(i18n::I18nState::new(i18n));
 
             ipc::start_listener(id_for_setup.clone(), app.handle().clone());
             let http_port = http_api::start_http_server(id_for_setup.clone(), app.handle().clone());
@@ -289,4 +319,38 @@ fn rand_u16() -> u16 {
     buf[0] = (t & 0xFF) as u8;
     buf[1] = ((t >> 8) & 0xFF) as u8;
     u16::from_le_bytes(buf)
+}
+
+/// Walk up from the executable path to find the enclosing .app bundle.
+#[cfg(target_os = "macos")]
+fn find_app_bundle(exe: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut path = exe.to_path_buf();
+    loop {
+        if path.extension().map_or(false, |ext| ext == "app") {
+            return Some(path);
+        }
+        if !path.pop() {
+            return None;
+        }
+    }
+}
+
+/// Set the AppUserModelID so that all tsumugi instances share a single taskbar button.
+#[cfg(target_os = "windows")]
+fn set_app_user_model_id() {
+    use std::os::windows::ffi::OsStrExt;
+
+    #[link(name = "shell32")]
+    extern "system" {
+        fn SetCurrentProcessExplicitAppUserModelID(app_id: *const u16) -> i32;
+    }
+
+    let id: Vec<u16> = std::ffi::OsStr::new("com.tsumugi.app")
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+
+    unsafe {
+        SetCurrentProcessExplicitAppUserModelID(id.as_ptr());
+    }
 }

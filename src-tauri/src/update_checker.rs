@@ -59,7 +59,13 @@ pub fn check_update() -> Result<UpdateInfo, String> {
 pub fn perform_update() -> UpdateResult {
     match std::env::consts::OS {
         "macos" => run_chained("brew", &["update"], &["upgrade", "--cask", "tsumugi"]),
-        "windows" => run_chained("scoop", &["update"], &["update", "tsumugi"]),
+        "windows" => {
+            // Ensure the scoop bucket is registered (no-op if already added)
+            let _ = std::process::Command::new("scoop")
+                .args(["bucket", "add", "tsumugi", "https://github.com/HonotaKobo/scoop-tsumugi"])
+                .output();
+            run_chained("scoop", &["update"], &["update", "tsumugi"])
+        }
         _ => UpdateResult {
             success: false,
             message: "Automatic update is not supported on this platform.".to_string(),

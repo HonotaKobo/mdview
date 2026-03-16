@@ -17,7 +17,7 @@ export class TagManager {
   }
 
   async init(): Promise<void> {
-    document.getElementById('scroll-area')!.style.overflow = 'auto';
+    document.getElementById('scroll-area')!.style.overflow = 'hidden';
     document.getElementById('status-bar')!.style.display = 'none';
     document.getElementById('tag-sidebar')!.style.display = 'none';
     this.entries = await invoke<TagEntry[]>('tag_get_all');
@@ -50,31 +50,17 @@ export class TagManager {
     this.container.innerHTML = '';
     this.container.style.padding = '0';
     this.container.style.maxWidth = '100%';
+    this.container.style.height = '100%';
 
     const wrapper = document.createElement('div');
     wrapper.className = 'tm-container';
 
-    const title = document.createElement('h1');
-    title.className = 'tm-title';
-    title.textContent = 'タグ管理';
-    wrapper.appendChild(title);
-
-    const subtitle = document.createElement('p');
-    subtitle.className = 'tm-subtitle';
-    subtitle.textContent = 'ファイルに紐づけたタグを一覧・検索・管理できます';
-    wrapper.appendChild(subtitle);
-
     const searchBar = document.createElement('div');
     searchBar.className = 'tm-search-bar';
 
-    const searchIcon = document.createElement('div');
-    searchIcon.className = 'tm-search-icon';
-    searchIcon.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-    searchBar.appendChild(searchIcon);
-
     const search = document.createElement('input');
     search.type = 'text';
-    search.placeholder = 'ファイル名やタグで検索…';
+    search.placeholder = 'ファイルパスまたはタグ名で検索…';
     search.className = 'tm-search';
     search.value = this.searchQuery;
     search.addEventListener('input', () => {
@@ -82,12 +68,13 @@ export class TagManager {
       this.render();
     });
     searchBar.appendChild(search);
-    wrapper.appendChild(searchBar);
 
-    const resultsCount = document.createElement('div');
-    resultsCount.className = 'tm-results-count';
-    resultsCount.textContent = filtered.length + ' 件';
-    wrapper.appendChild(resultsCount);
+    const searchCount = document.createElement('span');
+    searchCount.className = 'tm-search-count';
+    searchCount.textContent = filtered.length + ' 件';
+    searchBar.appendChild(searchCount);
+
+    wrapper.appendChild(searchBar);
 
     if (filtered.length === 0) {
       const empty = document.createElement('div');
