@@ -49,10 +49,14 @@ export class CustomTitleBar {
 
     // Initialize check states from localStorage
     const savedTheme = localStorage.getItem('tsumugi-theme') || 'auto';
+    const savedLocale = localStorage.getItem('tsumugi-locale') || 'auto';
     this.checkStates = {
       theme_dark: savedTheme === 'dark',
       theme_light: savedTheme === 'light',
       theme_auto: savedTheme === 'auto',
+      locale_en: savedLocale === 'en',
+      locale_ja: savedLocale === 'ja',
+      locale_custom: savedLocale === 'custom',
       view_status_bar: true,
       view_always_on_top: false,
     };
@@ -138,6 +142,15 @@ export class CustomTitleBar {
             items: [
               { type: 'normal', id: 'font_increase', label: this.t('menu.view_font_size_increase'), accelerator: 'Ctrl+=' },
               { type: 'normal', id: 'font_decrease', label: this.t('menu.view_font_size_decrease'), accelerator: 'Ctrl+-' },
+            ],
+          },
+          {
+            type: 'submenu',
+            label: this.t('menu.view_language'),
+            items: [
+              { type: 'check', id: 'locale_en', label: this.t('menu.view_language_en') },
+              { type: 'check', id: 'locale_ja', label: this.t('menu.view_language_ja') },
+              { type: 'check', id: 'locale_custom', label: this.t('menu.view_language_custom') },
             ],
           },
           { type: 'separator' },
@@ -337,26 +350,7 @@ export class CustomTitleBar {
   // --- Event handling ---
 
   private setupEvents(): void {
-    // Click on top-level menu labels
-    this.el.querySelectorAll('.menu-top-label').forEach(label => {
-      label.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        const menuId = (label.parentElement as HTMLElement).dataset.menu!;
-        this.toggleMenu(menuId);
-      });
-    });
-
-    // Hover switches menu when one is already open
-    this.el.querySelectorAll('.menu-top-item').forEach(item => {
-      item.addEventListener('mouseenter', () => {
-        if (this.openMenuId) {
-          const menuId = (item as HTMLElement).dataset.menu!;
-          if (menuId !== this.openMenuId) {
-            this.openMenu(menuId);
-          }
-        }
-      });
-    });
+    this.setupMenuItemEvents();
 
     // Click outside menus to close
     document.addEventListener('mousedown', (e) => {
@@ -368,7 +362,7 @@ export class CustomTitleBar {
       }
     });
 
-    // Click on action items
+    // Click on action items (event delegation — works with rebuilt DOM)
     this.el.addEventListener('click', (e) => {
       const entry = (e.target as HTMLElement).closest('.menu-entry[data-action]') as HTMLElement | null;
       if (entry && !entry.classList.contains('has-submenu')) {
@@ -420,6 +414,29 @@ export class CustomTitleBar {
     });
   }
 
+  private setupMenuItemEvents(): void {
+    // Click on top-level menu labels
+    this.el.querySelectorAll('.menu-top-label').forEach(label => {
+      label.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const menuId = (label.parentElement as HTMLElement).dataset.menu!;
+        this.toggleMenu(menuId);
+      });
+    });
+
+    // Hover switches menu when one is already open
+    this.el.querySelectorAll('.menu-top-item').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        if (this.openMenuId) {
+          const menuId = (item as HTMLElement).dataset.menu!;
+          if (menuId !== this.openMenuId) {
+            this.openMenu(menuId);
+          }
+        }
+      });
+    });
+  }
+
   private listenForStateChanges(): void {
     listen('menu-action', (event) => {
       const { action, value } = event.payload as { action: string; value?: unknown };
@@ -457,6 +474,16 @@ export class CustomTitleBar {
 
   private async executeAction(id: string): Promise<void> {
     await invoke('execute_menu_action', { id });
+    // Locale change — re-fetch translations and rebuild menu
+    if (id === 'locale_en' || id === 'locale_ja' || id === 'locale_custom') {
+      const locale = id.replace('locale_', '');
+      localStorage.setItem('tsumugi-locale', locale);
+      this.checkStates['locale_en'] = id === 'locale_en';
+      this.checkStates['locale_ja'] = id === 'locale_ja';
+      this.checkStates['locale_custom'] = id === 'locale_custom';
+      this.translations = await invoke<Record<string, string>>('get_translations');
+      this.rebuildMenuBar();
+    }
   }
 
   private setThemeCheck(theme: string): void {
@@ -472,6 +499,29 @@ export class CustomTitleBar {
     this.checkStates[id] = checked;
     const check = this.el.querySelector(`.menu-entry[data-action="${id}"] .entry-check`);
     if (check) check.textContent = checked ? '\u2713' : '';
+  }
+
+  private rebuildMenuBar(): void {
+    const menuBar = this.el.querySelector('.titlebar-menu');
+    if (!menuBar) return;
+    menuBar.innerHTML = '';
+    for (const menu of this.getMenus()) {
+      const topItem = document.createElement('div');
+      topItem.className = 'menu-top-item';
+      topItem.dataset.menu = menu.id;
+
+      const label = document.createElement('span');
+      label.className = 'menu-top-label';
+      label.textContent = menu.label;
+      topItem.appendChild(label);
+
+      const dropdown = this.buildDropdown(menu.items);
+      topItem.appendChild(dropdown);
+
+      menuBar.appendChild(topItem);
+    }
+    // Re-attach menu-specific events
+    this.setupMenuItemEvents();
   }
 
   private updateMaximizeIcon(maximized: boolean): void {
