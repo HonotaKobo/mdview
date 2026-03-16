@@ -596,7 +596,8 @@ export class HomeScreen {
   }
 
   private async openFileFromTags(path: string): Promise<void> {
-    invoke('open_new_window', { file: path });
+    await invoke('open_new_window', { file: path });
+    await getCurrentWindow().close();
   }
 
   private async removeRecent(path: string): Promise<void> {
