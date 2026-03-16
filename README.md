@@ -68,7 +68,6 @@ scoop install tsumugi
 | プラットフォーム | フォーマット |
 |----------|--------|
 | macOS | `.dmg` |
-| Linux | `.deb`, `.AppImage` |
 | Windows | `.msi`, `.exe` |
 
 ## 使い方
