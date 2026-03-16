@@ -79,7 +79,20 @@
     "tm_file_not_found": "ファイルが見つかりません",
     "tm_relink": "Relink",
     "tm_open": "開く",
+    "tm_folder": "フォルダ",
     "tm_delete": "削除",
+    "tm_add_tag": "タグを追加…",
+    "tm_remove_tag": "タグを削除",
+    "tm_batch_placeholder": "タグ名…",
+    "tm_batch_add_btn": "追加",
+    "tm_select_all": "すべて選択",
+    "tm_selected_count": "{count} 件選択中",
+    "tm_rename_tag": "名前変更",
+    "tm_rename_tag_prompt": "新しいタグ名:",
+    "tm_delete_tag_confirm": "タグ「{tag}」をすべてのファイルから削除しますか？",
+    "tm_all_tags": "すべてのタグ",
+    "tm_sort_name": "名前順",
+    "tm_sort_count": "件数順",
     "tm_title": "タグ管理 — tsumugi"
   }
 }

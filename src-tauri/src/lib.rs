@@ -18,6 +18,17 @@ use state::{LastFocusedDoc, WindowState, WindowStates};
 use tags::{TagState, TagStore};
 use watcher::{FileWatcher, FileWatchers};
 
+/// Strip Windows extended-length path prefix (`\\?\`) from canonicalized paths.
+pub(crate) fn normalize_path(path: &str) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(stripped) = path.strip_prefix(r"\\?\") {
+            return stripped.to_string();
+        }
+    }
+    path.to_string()
+}
+
 /// Create a new document window in the current process.
 /// Returns the instance_id of the new window.
 pub(crate) fn open_document_window(
@@ -42,7 +53,7 @@ pub(crate) fn open_document_window(
     let (content, doc_title, file_path) = if let Some(ref f) = file {
         let abs_path = std::fs::canonicalize(f)
             .unwrap_or_else(|_| std::path::PathBuf::from(f));
-        let abs_str = abs_path.to_string_lossy().to_string();
+        let abs_str = normalize_path(&abs_path.to_string_lossy());
         match std::fs::read_to_string(&abs_path) {
             Ok(c) => {
                 let t = abs_path
@@ -256,7 +267,7 @@ pub fn run() {
     } else if let Some(ref file_path) = initial_file {
         let abs_path = std::fs::canonicalize(file_path)
             .unwrap_or_else(|_| std::path::PathBuf::from(file_path));
-        let abs_path_str = abs_path.to_string_lossy().to_string();
+        let abs_path_str = normalize_path(&abs_path.to_string_lossy());
         match std::fs::read_to_string(&abs_path) {
             Ok(content) => {
                 let title = abs_path
@@ -319,6 +330,11 @@ pub fn run() {
             commands::tag_delete_entry,
             commands::tag_relink,
             commands::tag_validate_paths,
+            commands::tag_get_all_unique_tags,
+            commands::tag_batch_add,
+            commands::tag_rename_all,
+            commands::tag_remove_all,
+            commands::tag_get_counts,
             commands::get_custom_locale_path,
             commands::check_for_updates,
             commands::perform_update,

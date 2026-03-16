@@ -79,7 +79,20 @@
     "tm_file_not_found": "File not found",
     "tm_relink": "Relink",
     "tm_open": "Open",
+    "tm_folder": "Folder",
     "tm_delete": "Delete",
+    "tm_add_tag": "Add tag...",
+    "tm_remove_tag": "Remove tag",
+    "tm_batch_placeholder": "Tag name...",
+    "tm_batch_add_btn": "Add",
+    "tm_select_all": "Select All",
+    "tm_selected_count": "{count} selected",
+    "tm_rename_tag": "Rename",
+    "tm_rename_tag_prompt": "New tag name:",
+    "tm_delete_tag_confirm": "Delete tag \"{tag}\" from all files?",
+    "tm_all_tags": "All Tags",
+    "tm_sort_name": "Name",
+    "tm_sort_count": "Count",
     "tm_title": "Tag Manager — tsumugi"
   }
 }

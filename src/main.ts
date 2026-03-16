@@ -318,7 +318,13 @@ if (!isTagManager) {
         debounced('font_decrease', () => fontSizeManager.decrease());
         break;
       case 'tag_add':
-        debounced('tag_add', () => tagAddModal.show());
+        debounced('tag_add', () => {
+          if (tagSidebar.isVisible()) {
+            tagSidebar.focusInput();
+          } else {
+            tagAddModal.show();
+          }
+        });
         break;
       case 'tag_edit':
         debounced('tag_edit', () => tagSidebar.toggle());
@@ -468,7 +474,13 @@ if (!isTagManager) {
       case 't':
         if (!inTextarea) {
           e.preventDefault();
-          debounced('tag_add', () => tagAddModal.show());
+          debounced('tag_add', () => {
+            if (tagSidebar.isVisible()) {
+              tagSidebar.focusInput();
+            } else {
+              tagAddModal.show();
+            }
+          });
         }
         break;
       case '=':

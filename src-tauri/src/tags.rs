@@ -151,4 +151,61 @@ impl TagStore {
             .map(|e| (e.path.clone(), std::path::Path::new(&e.path).exists()))
             .collect()
     }
+
+    pub fn get_all_unique_tags(&self) -> Vec<String> {
+        let mut tags = std::collections::BTreeSet::new();
+        for entry in &self.data.entries {
+            for tag in &entry.tags {
+                tags.insert(tag.clone());
+            }
+        }
+        tags.into_iter().collect()
+    }
+
+    pub fn batch_add(&mut self, paths: &[String], tag: &str) {
+        for path in paths {
+            if let Some(entry) = self.data.entries.iter_mut().find(|e| e.path == *path) {
+                if !entry.tags.contains(&tag.to_string()) {
+                    entry.tags.push(tag.to_string());
+                }
+            } else {
+                self.data.entries.push(TagEntry {
+                    path: path.clone(),
+                    tags: vec![tag.to_string()],
+                });
+            }
+        }
+        self.save();
+    }
+
+    pub fn rename_all(&mut self, old_name: &str, new_name: &str) {
+        for entry in &mut self.data.entries {
+            for tag in &mut entry.tags {
+                if tag == old_name {
+                    *tag = new_name.to_string();
+                }
+            }
+        }
+        self.save();
+    }
+
+    pub fn remove_all(&mut self, tag_name: &str) {
+        for entry in &mut self.data.entries {
+            entry.tags.retain(|t| t != tag_name);
+        }
+        self.data.entries.retain(|e| !e.tags.is_empty());
+        self.save();
+    }
+
+    pub fn get_counts(&self) -> Vec<(String, usize)> {
+        let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for entry in &self.data.entries {
+            for tag in &entry.tags {
+                *counts.entry(tag.clone()).or_insert(0) += 1;
+            }
+        }
+        let mut result: Vec<(String, usize)> = counts.into_iter().collect();
+        result.sort_by(|a, b| a.0.cmp(&b.0));
+        result
+    }
 }

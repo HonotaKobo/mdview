@@ -56,7 +56,7 @@ pub fn rename_file(old_path: String, new_path: String, window: tauri::Window, st
         .map_err(|e| format!("Failed to rename: {}", e))?;
     let abs_path = std::fs::canonicalize(&new_path)
         .unwrap_or_else(|_| std::path::PathBuf::from(&new_path));
-    let abs_path_str = abs_path.to_string_lossy().to_string();
+    let abs_path_str = crate::normalize_path(&abs_path.to_string_lossy());
     let mut states = states.lock().unwrap();
     if let Some(state) = states.get_mut(window.label()) {
         state.saved_path = Some(abs_path_str.clone());
@@ -185,4 +185,36 @@ pub fn tag_validate_paths(state: tauri::State<'_, TagState>) -> Vec<(String, boo
     let mut store = state.lock().unwrap();
     store.reload();
     store.validate_paths()
+}
+
+#[command]
+pub fn tag_get_all_unique_tags(state: tauri::State<'_, TagState>) -> Vec<String> {
+    let mut store = state.lock().unwrap();
+    store.reload();
+    store.get_all_unique_tags()
+}
+
+#[command]
+pub fn tag_batch_add(paths: Vec<String>, tag: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.batch_add(&paths, &tag);
+}
+
+#[command]
+pub fn tag_rename_all(old_name: String, new_name: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.rename_all(&old_name, &new_name);
+}
+
+#[command]
+pub fn tag_remove_all(tag_name: String, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.remove_all(&tag_name);
+}
+
+#[command]
+pub fn tag_get_counts(state: tauri::State<'_, TagState>) -> Vec<(String, usize)> {
+    let mut store = state.lock().unwrap();
+    store.reload();
+    store.get_counts()
 }

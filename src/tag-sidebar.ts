@@ -11,6 +11,11 @@ export class TagSidebar {
   private tagCount: HTMLElement;
   private currentPath: string | null = null;
 
+  // F6: Autocomplete state
+  private autocompleteEl: HTMLElement;
+  private allTags: string[] = [];
+  private autocompleteIndex = -1;
+
   constructor() {
     this.sidebar = document.getElementById('tag-sidebar')!;
     this.input = document.getElementById('tag-input')!;
@@ -21,14 +26,53 @@ export class TagSidebar {
     this.tagCount = document.getElementById('tag-count')!;
 
     this.addBtn.addEventListener('click', () => this.addTagFromInput());
+
+    // Modified keydown handler with autocomplete support (F6)
     (this.input as HTMLInputElement).addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.addTagFromInput();
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.moveAutocomplete(1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.moveAutocomplete(-1);
+      } else if (e.key === 'Enter') {
+        if (this.autocompleteIndex >= 0) {
+          e.preventDefault();
+          this.selectAutocomplete();
+        } else {
+          this.addTagFromInput();
+        }
+      } else if (e.key === 'Escape') {
+        this.hideAutocomplete();
+      }
     });
+
     this.closeBtn.addEventListener('click', () => this.hide());
+
+    // F6: Setup autocomplete
+    this.autocompleteEl = document.createElement('div');
+    this.autocompleteEl.className = 'tag-autocomplete';
+    this.autocompleteEl.style.display = 'none';
+    const addRow = document.getElementById('tag-add-row')!;
+    addRow.style.position = 'relative';
+    addRow.appendChild(this.autocompleteEl);
+
+    (this.input as HTMLInputElement).addEventListener('input', () => this.updateAutocomplete());
+
+    document.addEventListener('click', (e) => {
+      if (!this.autocompleteEl.contains(e.target as Node) && e.target !== this.input) {
+        this.hideAutocomplete();
+      }
+    });
   }
 
   isVisible(): boolean {
     return this.sidebar.style.display !== 'none';
+  }
+
+  // U2: Focus the tag input
+  focusInput(): void {
+    (this.input as HTMLInputElement).focus();
   }
 
   async show(): Promise<void> {
@@ -45,6 +89,7 @@ export class TagSidebar {
 
   hide(): void {
     this.sidebar.style.display = 'none';
+    this.hideAutocomplete();
   }
 
   toggle(): void {
@@ -121,12 +166,83 @@ export class TagSidebar {
     if (!tag || !this.currentPath) return;
     await invoke('tag_add', { path: this.currentPath, tag });
     input.value = '';
+    this.allTags = []; // Clear autocomplete cache
+    this.hideAutocomplete();
     await this.loadTags();
   }
 
   private async removeTag(tag: string): Promise<void> {
     if (!this.currentPath) return;
     await invoke('tag_remove', { path: this.currentPath, tag });
+    this.allTags = []; // Clear autocomplete cache
     await this.loadTags();
+  }
+
+  // F6: Autocomplete methods
+  private async updateAutocomplete(): Promise<void> {
+    const input = this.input as HTMLInputElement;
+    const value = input.value.trim().toLowerCase();
+    if (!value) {
+      this.hideAutocomplete();
+      return;
+    }
+
+    if (this.allTags.length === 0) {
+      this.allTags = await invoke<string[]>('tag_get_all_unique_tags');
+    }
+
+    const matches = this.allTags
+      .filter(tag => tag.toLowerCase().includes(value) && tag.toLowerCase() !== value)
+      .slice(0, 8);
+
+    if (matches.length === 0) {
+      this.hideAutocomplete();
+      return;
+    }
+
+    this.autocompleteEl.innerHTML = '';
+    this.autocompleteIndex = -1;
+
+    for (const match of matches) {
+      const item = document.createElement('div');
+      item.className = 'tag-autocomplete-item';
+      item.textContent = match;
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        input.value = match;
+        this.hideAutocomplete();
+      });
+      this.autocompleteEl.appendChild(item);
+    }
+
+    this.autocompleteEl.style.display = 'block';
+  }
+
+  private moveAutocomplete(delta: number): void {
+    const items = this.autocompleteEl.querySelectorAll('.tag-autocomplete-item');
+    if (items.length === 0) return;
+
+    if (this.autocompleteIndex >= 0 && this.autocompleteIndex < items.length) {
+      items[this.autocompleteIndex].classList.remove('active');
+    }
+
+    this.autocompleteIndex += delta;
+    if (this.autocompleteIndex < 0) this.autocompleteIndex = items.length - 1;
+    if (this.autocompleteIndex >= items.length) this.autocompleteIndex = 0;
+
+    items[this.autocompleteIndex].classList.add('active');
+  }
+
+  private selectAutocomplete(): void {
+    const items = this.autocompleteEl.querySelectorAll('.tag-autocomplete-item');
+    if (this.autocompleteIndex >= 0 && this.autocompleteIndex < items.length) {
+      (this.input as HTMLInputElement).value = items[this.autocompleteIndex].textContent || '';
+      this.hideAutocomplete();
+    }
+  }
+
+  private hideAutocomplete(): void {
+    this.autocompleteEl.style.display = 'none';
+    this.autocompleteIndex = -1;
   }
 }
