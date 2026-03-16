@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -5,12 +6,15 @@ use std::time::Duration;
 use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::state::AppState;
+use crate::state::WindowStates;
 
 pub struct FileWatcher {
     _debouncer: Option<notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>>,
     watched_path: Mutex<Option<String>>,
 }
+
+/// Window label → FileWatcher
+pub type FileWatchers = Mutex<HashMap<String, FileWatcher>>;
 
 impl FileWatcher {
     pub fn new() -> Self {
@@ -20,12 +24,13 @@ impl FileWatcher {
         }
     }
 
-    pub fn watch(&mut self, app: AppHandle, path: String) {
+    pub fn watch(&mut self, app: AppHandle, window_label: String, path: String) {
         // Stop previous watcher
         self._debouncer = None;
 
         let watch_path = path.clone();
         let app_handle = app.clone();
+        let label = window_label.clone();
 
         let mut debouncer = new_debouncer(Duration::from_millis(100), move |res: Result<Vec<notify_debouncer_mini::DebouncedEvent>, _>| {
             if let Ok(events) = res {
@@ -34,11 +39,14 @@ impl FileWatcher {
                         // Re-read file and update state + frontend
                         if let Ok(content) = std::fs::read_to_string(&watch_path) {
                             {
-                                let state = app_handle.state::<AppState>();
-                                let mut state = state.lock().unwrap();
-                                state.current_content = content.clone();
+                                let states = app_handle.state::<WindowStates>();
+                                let mut states = states.lock().unwrap();
+                                if let Some(state) = states.get_mut(&label) {
+                                    state.current_content = content.clone();
+                                }
                             }
-                            let _ = app_handle.emit(
+                            let _ = app_handle.emit_to(
+                                &label as &str,
                                 "content-update",
                                 serde_json::json!({ "body": content }),
                             );

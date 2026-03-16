@@ -4,8 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::cli::CliArgs;
-use crate::state::AppState;
+use crate::state::WindowStates;
 
 // --- Platform-specific transport ---
 
@@ -109,6 +108,7 @@ pub(crate) enum IpcRequest {
     Delete { ranges: Vec<(usize, usize)> },
     Insert { line: usize, content: String },
     Replace { start: usize, end: usize, content: String },
+    CreateWindow { file: Option<String>, body: Option<String>, title: Option<String> },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -134,7 +134,7 @@ fn parse_ranges(s: &str) -> Result<Vec<(usize, usize)>, String> {
     s.split(',').map(|part| parse_single_range(part.trim())).collect()
 }
 
-pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
+pub fn send_to_existing(id: &str, args: &crate::cli::CliArgs) -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = transport::connect(id)?;
 
     let request = if !args.query.is_empty() {
@@ -193,36 +193,119 @@ pub fn send_to_existing(id: &str, args: &CliArgs) -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-pub fn start_listener(id: String, app: AppHandle) {
+/// Send a CreateWindow request to the primary process.
+/// Returns Ok(()) if the primary handled it, Err if no primary exists.
+pub fn send_create_window(
+    file: Option<String>,
+    body: Option<String>,
+    title: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut stream = transport::connect("tsumugi-primary")?;
+
+    let request = serde_json::json!({
+        "type": "CreateWindow",
+        "file": file,
+        "body": body,
+        "title": title,
+    });
+
+    stream.write_all(request.to_string().as_bytes())?;
+    stream.shutdown(std::net::Shutdown::Write)?;
+
+    let mut response_buf = String::new();
+    stream.read_to_string(&mut response_buf)?;
+
+    let resp = serde_json::from_str::<IpcResponse>(&response_buf)?;
+    if resp.ok {
+        if let Some(instance_id) = resp.value {
+            println!("{}", instance_id);
+        }
+    } else {
+        if let Some(value) = resp.value {
+            eprintln!("tsumugi: {}", value);
+        }
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+/// Per-window IPC listener
+pub fn start_listener(instance_id: String, window_label: String, app: AppHandle) {
     std::thread::spawn(move || {
-        let listener = match transport::bind(&id) {
+        let listener = match transport::bind(&instance_id) {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("tsumugi: Failed to start IPC listener: {}", e);
+                eprintln!("tsumugi: Failed to start IPC listener for {}: {}", instance_id, e);
                 return;
             }
         };
 
         for stream in listener.incoming() {
             if let Ok(mut stream) = stream {
-                handle_stream(&app, &mut stream);
+                handle_stream(&app, &window_label, &mut stream);
             }
         }
     });
 }
 
-fn handle_stream(app: &AppHandle, stream: &mut (impl Read + Write)) {
+/// Primary socket listener — only handles CreateWindow requests
+pub fn start_primary_listener(app: AppHandle) {
+    std::thread::spawn(move || {
+        let listener = match transport::bind("tsumugi-primary") {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("tsumugi: Failed to start primary listener: {}", e);
+                return;
+            }
+        };
+
+        for stream in listener.incoming() {
+            if let Ok(mut stream) = stream {
+                handle_primary_stream(&app, &mut stream);
+            }
+        }
+    });
+}
+
+fn handle_stream(app: &AppHandle, window_label: &str, stream: &mut (impl Read + Write)) {
     let mut buf = String::new();
     if stream.read_to_string(&mut buf).is_ok() {
         if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
             let response = match req {
-                IpcRequest::Update { body, title } => handle_update(app, body, title),
-                IpcRequest::Query { properties } => handle_query(app, &properties),
-                IpcRequest::Grep { pattern } => handle_grep(app, &pattern),
-                IpcRequest::Lines { start, end } => handle_lines(app, start, end),
-                IpcRequest::Delete { ranges } => handle_delete(app, ranges),
-                IpcRequest::Insert { line, content } => handle_insert(app, line, &content),
-                IpcRequest::Replace { start, end, content } => handle_replace(app, start, end, &content),
+                IpcRequest::Update { body, title } => handle_update(app, window_label, body, title),
+                IpcRequest::Query { properties } => handle_query(app, window_label, &properties),
+                IpcRequest::Grep { pattern } => handle_grep(app, window_label, &pattern),
+                IpcRequest::Lines { start, end } => handle_lines(app, window_label, start, end),
+                IpcRequest::Delete { ranges } => handle_delete(app, window_label, ranges),
+                IpcRequest::Insert { line, content } => handle_insert(app, window_label, line, &content),
+                IpcRequest::Replace { start, end, content } => handle_replace(app, window_label, start, end, &content),
+                IpcRequest::CreateWindow { file, body, title } => {
+                    match crate::open_document_window(app, file, body, title) {
+                        Ok(id) => IpcResponse { ok: true, value: Some(id) },
+                        Err(e) => IpcResponse { ok: false, value: Some(e) },
+                    }
+                }
+            };
+
+            let resp_json = serde_json::to_string(&response).unwrap_or_default();
+            stream.write_all(resp_json.as_bytes()).ok();
+        }
+    }
+}
+
+fn handle_primary_stream(app: &AppHandle, stream: &mut (impl Read + Write)) {
+    let mut buf = String::new();
+    if stream.read_to_string(&mut buf).is_ok() {
+        if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
+            let response = match req {
+                IpcRequest::CreateWindow { file, body, title } => {
+                    match crate::open_document_window(app, file, body, title) {
+                        Ok(id) => IpcResponse { ok: true, value: Some(id) },
+                        Err(e) => IpcResponse { ok: false, value: Some(e) },
+                    }
+                }
+                _ => IpcResponse { ok: false, value: Some("Primary socket only accepts CreateWindow".to_string()) },
             };
 
             let resp_json = serde_json::to_string(&response).unwrap_or_default();
@@ -249,6 +332,10 @@ pub fn list_instances() {
         let path = entry.path();
         if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
             if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
+                // Skip the primary socket
+                if id == "tsumugi-primary" {
+                    continue;
+                }
                 if let Ok(mut stream) = transport::connect(id) {
                     let req = r#"{"type":"Query","properties":["title"]}"#;
                     if stream.write_all(req.as_bytes()).is_ok()
@@ -295,6 +382,10 @@ pub(crate) fn get_instances() -> Vec<(String, String)> {
         let path = entry.path();
         if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
             if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
+                // Skip the primary socket
+                if id == "tsumugi-primary" {
+                    continue;
+                }
                 if let Ok(mut stream) = transport::connect(id) {
                     let req = r#"{"type":"Query","properties":["title"]}"#;
                     if stream.write_all(req.as_bytes()).is_ok()
@@ -321,23 +412,25 @@ pub(crate) fn get_instances() -> Vec<(String, String)> {
 
 // --- Handler functions ---
 
-pub(crate) fn handle_update(app: &AppHandle, body: Option<String>, title: Option<String>) -> IpcResponse {
-    let _ = app.emit("content-update", serde_json::json!({ "body": body, "title": title }));
+pub(crate) fn handle_update(app: &AppHandle, window_label: &str, body: Option<String>, title: Option<String>) -> IpcResponse {
+    let _ = app.emit_to(window_label, "content-update", serde_json::json!({ "body": body, "title": title }));
     {
-        let state = app.state::<AppState>();
-        let mut state = state.lock().unwrap();
-        if let Some(ref b) = body {
-            state.current_content = b.clone();
-            state.dirty = true;
-        }
-        if let Some(ref t) = title {
-            state.title = t.clone();
+        let states = app.state::<WindowStates>();
+        let mut states = states.lock().unwrap();
+        if let Some(state) = states.get_mut(window_label) {
+            if let Some(ref b) = body {
+                state.current_content = b.clone();
+                state.dirty = true;
+            }
+            if let Some(ref t) = title {
+                state.title = t.clone();
+            }
         }
     }
     IpcResponse { ok: true, value: None }
 }
 
-fn query_single(state: &crate::state::AppStateInner, property: &str) -> Option<serde_json::Value> {
+fn query_single(state: &crate::state::WindowState, property: &str) -> Option<serde_json::Value> {
     match property {
         "path" => {
             if !state.path_disclosure {
@@ -367,9 +460,14 @@ fn query_single(state: &crate::state::AppStateInner, property: &str) -> Option<s
 
 const ALL_PROPERTIES: &[&str] = &["path", "body", "title", "linecount"];
 
-pub(crate) fn handle_query(app: &AppHandle, properties: &[String]) -> IpcResponse {
-    let state = app.state::<AppState>();
-    let state = state.lock().unwrap();
+pub(crate) fn handle_query(app: &AppHandle, window_label: &str, properties: &[String]) -> IpcResponse {
+    let states = app.state::<WindowStates>();
+    let states = states.lock().unwrap();
+
+    let state = match states.get(window_label) {
+        Some(s) => s,
+        None => return IpcResponse { ok: false, value: Some(format!("Window not found: {}", window_label)) },
+    };
 
     // Expand "all" into all properties
     let expanded: Vec<&str> = if properties.iter().any(|p| p == "all") {
@@ -383,12 +481,12 @@ pub(crate) fn handle_query(app: &AppHandle, properties: &[String]) -> IpcRespons
         let prop = expanded[0];
         // "status" is already JSON, keep its original behavior
         if prop == "status" {
-            if let Some(val) = query_single(&state, prop) {
+            if let Some(val) = query_single(state, prop) {
                 return IpcResponse { ok: true, value: Some(val.to_string()) };
             }
             return IpcResponse { ok: false, value: None };
         }
-        return match query_single(&state, prop) {
+        return match query_single(state, prop) {
             Some(serde_json::Value::String(s)) => IpcResponse { ok: true, value: Some(s) },
             Some(val) => IpcResponse { ok: true, value: Some(val.to_string()) },
             None => IpcResponse { ok: false, value: None },
@@ -398,7 +496,7 @@ pub(crate) fn handle_query(app: &AppHandle, properties: &[String]) -> IpcRespons
     // Multiple properties: return JSON object
     let mut map = serde_json::Map::new();
     for prop in &expanded {
-        if let Some(val) = query_single(&state, prop) {
+        if let Some(val) = query_single(state, prop) {
             map.insert(prop.to_string(), val);
         } else {
             map.insert(prop.to_string(), serde_json::Value::Null);
@@ -407,9 +505,14 @@ pub(crate) fn handle_query(app: &AppHandle, properties: &[String]) -> IpcRespons
     IpcResponse { ok: true, value: Some(serde_json::Value::Object(map).to_string()) }
 }
 
-pub(crate) fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
-    let state = app.state::<AppState>();
-    let state = state.lock().unwrap();
+pub(crate) fn handle_grep(app: &AppHandle, window_label: &str, pattern: &str) -> IpcResponse {
+    let states = app.state::<WindowStates>();
+    let states = states.lock().unwrap();
+
+    let state = match states.get(window_label) {
+        Some(s) => s,
+        None => return IpcResponse { ok: false, value: Some(format!("Window not found: {}", window_label)) },
+    };
 
     let regex = match regex::Regex::new(pattern) {
         Ok(r) => r,
@@ -430,9 +533,14 @@ pub(crate) fn handle_grep(app: &AppHandle, pattern: &str) -> IpcResponse {
     }
 }
 
-pub(crate) fn handle_lines(app: &AppHandle, start: usize, end: usize) -> IpcResponse {
-    let state = app.state::<AppState>();
-    let state = state.lock().unwrap();
+pub(crate) fn handle_lines(app: &AppHandle, window_label: &str, start: usize, end: usize) -> IpcResponse {
+    let states = app.state::<WindowStates>();
+    let states = states.lock().unwrap();
+
+    let state = match states.get(window_label) {
+        Some(s) => s,
+        None => return IpcResponse { ok: false, value: Some(format!("Window not found: {}", window_label)) },
+    };
 
     let lines: Vec<&str> = state.current_content.split('\n').collect();
     let total = lines.len();
@@ -453,9 +561,14 @@ pub(crate) fn handle_lines(app: &AppHandle, start: usize, end: usize) -> IpcResp
 }
 
 /// Apply an edit to current_content and notify frontend
-fn apply_edit(app: &AppHandle, editor: impl FnOnce(&mut Vec<String>) -> Result<(), String>) -> IpcResponse {
-    let state = app.state::<AppState>();
-    let mut state = state.lock().unwrap();
+fn apply_edit(app: &AppHandle, window_label: &str, editor: impl FnOnce(&mut Vec<String>) -> Result<(), String>) -> IpcResponse {
+    let states = app.state::<WindowStates>();
+    let mut states = states.lock().unwrap();
+
+    let state = match states.get_mut(window_label) {
+        Some(s) => s,
+        None => return IpcResponse { ok: false, value: Some(format!("Window not found: {}", window_label)) },
+    };
 
     let mut lines: Vec<String> = state.current_content.split('\n').map(String::from).collect();
 
@@ -467,15 +580,15 @@ fn apply_edit(app: &AppHandle, editor: impl FnOnce(&mut Vec<String>) -> Result<(
     state.current_content = new_content.clone();
     state.dirty = true;
 
-    let _ = app.emit("content-update", serde_json::json!({ "body": new_content }));
+    let _ = app.emit_to(window_label, "content-update", serde_json::json!({ "body": new_content }));
 
     IpcResponse { ok: true, value: None }
 }
 
-pub(crate) fn handle_delete(app: &AppHandle, mut ranges: Vec<(usize, usize)>) -> IpcResponse {
+pub(crate) fn handle_delete(app: &AppHandle, window_label: &str, mut ranges: Vec<(usize, usize)>) -> IpcResponse {
     ranges.sort_by(|a, b| b.0.cmp(&a.0));
 
-    apply_edit(app, |lines| {
+    apply_edit(app, window_label, |lines| {
         for (start, end) in &ranges {
             if *start < 1 || *end > lines.len() || *start > *end {
                 return Err(format!("Range {}-{} out of bounds (1-{})", start, end, lines.len()));
@@ -486,10 +599,10 @@ pub(crate) fn handle_delete(app: &AppHandle, mut ranges: Vec<(usize, usize)>) ->
     })
 }
 
-pub(crate) fn handle_insert(app: &AppHandle, line: usize, content: &str) -> IpcResponse {
+pub(crate) fn handle_insert(app: &AppHandle, window_label: &str, line: usize, content: &str) -> IpcResponse {
     let new_lines: Vec<String> = content.split('\n').map(String::from).collect();
 
-    apply_edit(app, |lines| {
+    apply_edit(app, window_label, |lines| {
         if line < 1 || line > lines.len() + 1 {
             return Err(format!("Line {} out of bounds (1-{})", line, lines.len() + 1));
         }
@@ -501,14 +614,14 @@ pub(crate) fn handle_insert(app: &AppHandle, line: usize, content: &str) -> IpcR
     })
 }
 
-pub(crate) fn handle_replace(app: &AppHandle, start: usize, end: usize, content: &str) -> IpcResponse {
+pub(crate) fn handle_replace(app: &AppHandle, window_label: &str, start: usize, end: usize, content: &str) -> IpcResponse {
     let new_lines: Vec<String> = if content.is_empty() {
         Vec::new()
     } else {
         content.split('\n').map(String::from).collect()
     };
 
-    apply_edit(app, |lines| {
+    apply_edit(app, window_label, |lines| {
         if start < 1 || end > lines.len() || start > end {
             return Err(format!("Range {}-{} out of bounds (1-{})", start, end, lines.len()));
         }

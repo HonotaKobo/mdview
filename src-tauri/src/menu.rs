@@ -6,6 +6,7 @@ use tauri::{
 use tauri::menu::PredefinedMenuItem;
 
 use crate::i18n::{I18n, I18nState, Locale, save_locale_setting};
+use crate::state::LastFocusedDoc;
 
 pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Menu<Wry>> {
     // --- File menu ---
@@ -184,17 +185,24 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
     }
 }
 
+/// Get the last focused document window label
+fn get_focused_label(app: &AppHandle) -> String {
+    let focused = app.state::<LastFocusedDoc>();
+    let label = focused.lock().unwrap().clone();
+    label
+}
+
 /// Execute a menu action by ID. Shared by native menu events and the frontend command.
 pub fn execute_action(app: &AppHandle, id: &str) {
+    let focused_label = get_focused_label(app);
+
     match id {
-        // Window operations — handle directly in Rust
+        // Quit: exit the app (close all windows)
         "file_quit" => {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.close();
-            }
+            app.exit(0);
         }
         "view_always_on_top" => {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app.get_webview_window(&focused_label) {
                 let current = window.is_always_on_top().unwrap_or(false);
                 let new_state = !current;
                 let _ = window.set_always_on_top(new_state);
@@ -203,7 +211,7 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                         let _ = check.set_checked(new_state);
                     }
                 }
-                let _ = app.emit("menu-action", serde_json::json!({ "action": "always_on_top_changed", "value": new_state }));
+                let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": "always_on_top_changed", "value": new_state }));
             }
         }
 
@@ -214,7 +222,7 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                     let _ = check.set_checked(new_state);
                 }
             }
-            let _ = app.emit("menu-action", serde_json::json!({ "action": "view_status_bar" }));
+            let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": "view_status_bar" }));
         }
 
         "tag_manage" => {
@@ -222,21 +230,21 @@ pub fn execute_action(app: &AppHandle, id: &str) {
         }
 
         "help_check_updates" => {
-            let _ = app.emit("menu-action", serde_json::json!({ "action": "help_check_updates" }));
+            let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": "help_check_updates" }));
         }
 
         "help_about" | "app_about" => {
-            open_about_window();
+            open_about_window(app);
         }
 
-        // Theme — update check marks and emit to frontend
+        // Theme — update check marks and emit to ALL windows (global setting)
         "theme_dark" | "theme_light" | "theme_auto" => {
             update_theme_checks(app, id);
             let theme = id.strip_prefix("theme_").unwrap_or("auto");
             let _ = app.emit("menu-action", serde_json::json!({ "action": "theme_change", "value": theme }));
         }
 
-        // Language — save setting, rebuild menu, update state
+        // Language — save setting, rebuild menu, update state, emit to ALL windows
         "locale_en" | "locale_ja" | "locale_custom" => {
             let locale = match id {
                 "locale_en" => Locale::En,
@@ -272,12 +280,13 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                 *guard = new_i18n;
             }
 
+            // Broadcast locale change to ALL windows
             let _ = app.emit("menu-action", serde_json::json!({ "action": "locale_changed" }));
         }
 
-        // All other actions — emit to frontend
+        // All other actions — emit to focused document window
         _ => {
-            let _ = app.emit("menu-action", serde_json::json!({ "action": id }));
+            let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": id }));
         }
     }
 }
@@ -286,7 +295,13 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     execute_action(app, event.id().as_ref());
 }
 
-fn open_about_window() {
+fn open_about_window(app: &AppHandle) {
+    // If about window already exists, focus it
+    if let Some(window) = app.get_webview_window("about") {
+        let _ = window.set_focus();
+        return;
+    }
+
     let version = env!("CARGO_PKG_VERSION");
     let body = format!(
         "# tsumugi\n\n\
@@ -296,14 +311,38 @@ fn open_about_window() {
          - GitHub: https://github.com/HonotaKobo/tsumugi\n\
          - License: MIT\n"
     );
-    if let Ok(exe) = std::env::current_exe() {
-        let _ = std::process::Command::new(exe)
-            .args(["--body", &body, "--title", "About tsumugi"])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::inherit())
-            .spawn();
+
+    // Create about window state
+    {
+        let states = app.state::<crate::state::WindowStates>();
+        let mut states = states.lock().unwrap();
+        let mut ws = crate::state::WindowState::new(
+            "about".to_string(),
+            "About tsumugi".to_string(),
+            body,
+        );
+        ws.content_explicitly_set = true;
+        states.insert("about".to_string(), ws);
     }
+
+    let app = app.clone();
+    std::thread::spawn(move || {
+        #[allow(unused_variables)]
+        if let Ok(window) = tauri::WebviewWindowBuilder::new(
+            &app,
+            "about",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("About tsumugi")
+        .inner_size(500.0, 400.0)
+        .min_inner_size(300.0, 200.0)
+        .resizable(true)
+        .build()
+        {
+            #[cfg(not(target_os = "macos"))]
+            let _ = window.remove_menu();
+        }
+    });
 }
 
 fn open_tag_manager(app: &AppHandle) {

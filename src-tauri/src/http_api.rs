@@ -1,8 +1,15 @@
 use serde::Deserialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tiny_http::{Header, Method, Response, Server};
 
 use crate::ipc;
+use crate::state::{LastFocusedDoc, WindowStates};
+
+/// HTTP server info (shared across all windows)
+pub struct HttpServerInfo {
+    pub port: u16,
+    pub token: String,
+}
 
 /// Generate a random hex token for API authentication.
 fn generate_token() -> String {
@@ -19,15 +26,11 @@ fn generate_token() -> String {
 }
 
 /// Start HTTP API server on a random localhost port.
-/// Returns the port number. The port and token are written to a file for client discovery.
-pub fn start_http_server(id: String, app: AppHandle) -> u16 {
+/// Returns (port, token). The caller writes port files per window.
+pub fn start_http_server(app: AppHandle) -> (u16, String) {
     let server = Server::http("127.0.0.1:0").expect("failed to start HTTP API server");
     let port = server.server_addr().to_ip().unwrap().port();
     let token = generate_token();
-
-    // Write port file for discovery: "port:token"
-    let port_path = ipc::instance_file(&id).with_extension("http");
-    std::fs::write(&port_path, format!("{}:{}", port, token)).ok();
 
     let expected_token = token.clone();
 
@@ -61,7 +64,7 @@ pub fn start_http_server(id: String, app: AppHandle) -> u16 {
         }
     });
 
-    port
+    (port, token)
 }
 
 /// Verify the Bearer token from the Authorization header.
@@ -189,6 +192,27 @@ fn parse_json_lenient<T: serde::de::DeserializeOwned>(body: &str) -> Result<T, S
     }
 }
 
+/// Resolve the window label from the request URL's `?id=` parameter.
+/// If `id` matches an instance_id in WindowStates, returns the corresponding window label.
+/// Otherwise falls back to the last focused document window.
+fn resolve_window_label(app: &AppHandle, url: &str) -> String {
+    if let Some(id) = parse_query_param(url, "id") {
+        let states = app.state::<WindowStates>();
+        let states = states.lock().unwrap();
+        if let Some((label, _)) = states.iter().find(|(_, s)| s.instance_id == id) {
+            return label.clone();
+        }
+        // Try using id as a window label directly
+        if states.contains_key(&id) {
+            return id;
+        }
+    }
+    // Default to last focused document
+    let focused = app.state::<LastFocusedDoc>();
+    let label = focused.lock().unwrap().clone();
+    label
+}
+
 fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::IpcResponse {
     let url = request.url().to_string();
     let method = request.method().clone();
@@ -196,12 +220,15 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
     // Strip query string for routing
     let path = url.split('?').next().unwrap_or(&url);
 
+    // Resolve target window
+    let window_label = resolve_window_label(app, &url);
+
     match (method, path) {
         // Pass-through: accept IpcRequest JSON directly
         (Method::Post, "/") => {
             let body = read_body(request);
             match parse_json_lenient::<ipc::IpcRequest>(&body) {
-                Ok(req) => dispatch_ipc_request(app, req),
+                Ok(req) => dispatch_ipc_request(app, &window_label, req),
                 Err(e) => error_response(&e),
             }
         }
@@ -214,11 +241,11 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             if content_type == "text/markdown" || content_type == "text/plain" {
                 // Raw body mode: body is markdown text, title from query param
                 let title = parse_query_param(&url, "title");
-                ipc::handle_update(app, Some(body), title)
+                ipc::handle_update(app, &window_label, Some(body), title)
             } else {
                 // JSON mode (default, backward compatible)
                 match parse_json_lenient::<UpdateRequest>(&body) {
-                    Ok(r) => ipc::handle_update(app, r.body, r.title),
+                    Ok(r) => ipc::handle_update(app, &window_label, r.body, r.title),
                     Err(e) => error_response(&e),
                 }
             }
@@ -226,7 +253,7 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         (Method::Post, "/query") => {
             let body = read_body(request);
             match parse_json_lenient::<QueryRequest>(&body) {
-                Ok(r) => ipc::handle_query(app, &r.properties),
+                Ok(r) => ipc::handle_query(app, &window_label, &r.properties),
                 Err(e) => error_response(&e),
             }
         }
@@ -236,10 +263,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
 
             if content_type == "text/plain" {
                 // Raw body mode: body is the regex pattern
-                ipc::handle_grep(app, &body)
+                ipc::handle_grep(app, &window_label, &body)
             } else {
                 match parse_json_lenient::<GrepRequest>(&body) {
-                    Ok(r) => ipc::handle_grep(app, &r.pattern),
+                    Ok(r) => ipc::handle_grep(app, &window_label, &r.pattern),
                     Err(e) => error_response(&e),
                 }
             }
@@ -247,14 +274,14 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         (Method::Post, "/lines") => {
             let body = read_body(request);
             match parse_json_lenient::<LinesRequest>(&body) {
-                Ok(r) => ipc::handle_lines(app, r.start, r.end),
+                Ok(r) => ipc::handle_lines(app, &window_label, r.start, r.end),
                 Err(e) => error_response(&e),
             }
         }
         (Method::Post, "/edit/delete") => {
             let body = read_body(request);
             match parse_json_lenient::<DeleteRequest>(&body) {
-                Ok(r) => ipc::handle_delete(app, r.ranges),
+                Ok(r) => ipc::handle_delete(app, &window_label, r.ranges),
                 Err(e) => error_response(&e),
             }
         }
@@ -265,12 +292,12 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             if content_type == "text/markdown" || content_type == "text/plain" {
                 // Raw body mode: body is the content, line from query param
                 match parse_query_param(&url, "line").and_then(|v| v.parse::<usize>().ok()) {
-                    Some(line) => ipc::handle_insert(app, line, &body),
+                    Some(line) => ipc::handle_insert(app, &window_label, line, &body),
                     None => error_response("Missing or invalid query parameter: line"),
                 }
             } else {
                 match parse_json_lenient::<InsertRequest>(&body) {
-                    Ok(r) => ipc::handle_insert(app, r.line, &r.content),
+                    Ok(r) => ipc::handle_insert(app, &window_label, r.line, &r.content),
                     Err(e) => error_response(&e),
                 }
             }
@@ -284,12 +311,12 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
                 let start = parse_query_param(&url, "start").and_then(|v| v.parse::<usize>().ok());
                 let end = parse_query_param(&url, "end").and_then(|v| v.parse::<usize>().ok());
                 match (start, end) {
-                    (Some(s), Some(e)) => ipc::handle_replace(app, s, e, &body),
+                    (Some(s), Some(e)) => ipc::handle_replace(app, &window_label, s, e, &body),
                     _ => error_response("Missing or invalid query parameters: start, end"),
                 }
             } else {
                 match parse_json_lenient::<ReplaceRequest>(&body) {
-                    Ok(r) => ipc::handle_replace(app, r.start, r.end, &r.content),
+                    Ok(r) => ipc::handle_replace(app, &window_label, r.start, r.end, &r.content),
                     Err(e) => error_response(&e),
                 }
             }
@@ -317,16 +344,22 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
     }
 }
 
-fn dispatch_ipc_request(app: &AppHandle, req: ipc::IpcRequest) -> ipc::IpcResponse {
+fn dispatch_ipc_request(app: &AppHandle, window_label: &str, req: ipc::IpcRequest) -> ipc::IpcResponse {
     match req {
-        ipc::IpcRequest::Update { body, title } => ipc::handle_update(app, body, title),
-        ipc::IpcRequest::Query { properties } => ipc::handle_query(app, &properties),
-        ipc::IpcRequest::Grep { pattern } => ipc::handle_grep(app, &pattern),
-        ipc::IpcRequest::Lines { start, end } => ipc::handle_lines(app, start, end),
-        ipc::IpcRequest::Delete { ranges } => ipc::handle_delete(app, ranges),
-        ipc::IpcRequest::Insert { line, content } => ipc::handle_insert(app, line, &content),
+        ipc::IpcRequest::Update { body, title } => ipc::handle_update(app, window_label, body, title),
+        ipc::IpcRequest::Query { properties } => ipc::handle_query(app, window_label, &properties),
+        ipc::IpcRequest::Grep { pattern } => ipc::handle_grep(app, window_label, &pattern),
+        ipc::IpcRequest::Lines { start, end } => ipc::handle_lines(app, window_label, start, end),
+        ipc::IpcRequest::Delete { ranges } => ipc::handle_delete(app, window_label, ranges),
+        ipc::IpcRequest::Insert { line, content } => ipc::handle_insert(app, window_label, line, &content),
         ipc::IpcRequest::Replace { start, end, content } => {
-            ipc::handle_replace(app, start, end, &content)
+            ipc::handle_replace(app, window_label, start, end, &content)
+        }
+        ipc::IpcRequest::CreateWindow { file, body, title } => {
+            match crate::open_document_window(app, file, body, title) {
+                Ok(id) => ipc::IpcResponse { ok: true, value: Some(id) },
+                Err(e) => ipc::IpcResponse { ok: false, value: Some(e) },
+            }
         }
     }
 }

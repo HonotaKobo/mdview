@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
 
-pub type AppState = Mutex<AppStateInner>;
-
-pub struct AppStateInner {
+pub struct WindowState {
+    /// IPC instance ID for this window
+    pub instance_id: String,
     /// Current markdown source
     pub current_content: String,
     /// Document title
@@ -17,9 +18,10 @@ pub struct AppStateInner {
     pub content_explicitly_set: bool,
 }
 
-impl AppStateInner {
-    pub fn new(title: String, content: String) -> Self {
+impl WindowState {
+    pub fn new(instance_id: String, title: String, content: String) -> Self {
         Self {
+            instance_id,
             current_content: content,
             title,
             saved_path: None,
@@ -29,3 +31,9 @@ impl AppStateInner {
         }
     }
 }
+
+/// Window label → WindowState
+pub type WindowStates = Mutex<HashMap<String, WindowState>>;
+
+/// Tracks the last focused document window label
+pub type LastFocusedDoc = Mutex<String>;

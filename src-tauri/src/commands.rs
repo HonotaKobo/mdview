@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tauri::command;
 
 use crate::i18n::I18nState;
-use crate::state::AppState;
+use crate::state::WindowStates;
 use crate::tags::{TagEntry, TagState};
 use crate::update_checker::{UpdateInfo, UpdateResult};
 
@@ -17,45 +17,55 @@ pub fn save_file(path: String, content: String) -> Result<(), String> {
 }
 
 #[command]
-pub fn notify_saved(path: String, state: tauri::State<'_, AppState>) {
-    let mut state = state.lock().unwrap();
-    state.saved_path = Some(path);
-    state.dirty = false;
+pub fn notify_saved(path: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) {
+    let mut states = states.lock().unwrap();
+    if let Some(state) = states.get_mut(window.label()) {
+        state.saved_path = Some(path);
+        state.dirty = false;
+    }
 }
 
 #[command]
-pub fn get_saved_path(state: tauri::State<'_, AppState>) -> Option<String> {
-    let state = state.lock().unwrap();
-    state.saved_path.clone()
+pub fn get_saved_path(window: tauri::Window, states: tauri::State<'_, WindowStates>) -> Option<String> {
+    let states = states.lock().unwrap();
+    states.get(window.label()).and_then(|s| s.saved_path.clone())
 }
 
 #[command]
-pub fn sync_content(content: String, state: tauri::State<'_, AppState>) {
-    let mut state = state.lock().unwrap();
-    state.current_content = content;
-    state.dirty = true;
+pub fn sync_content(content: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) {
+    let mut states = states.lock().unwrap();
+    if let Some(state) = states.get_mut(window.label()) {
+        state.current_content = content;
+        state.dirty = true;
+    }
 }
 
 #[command]
-pub fn get_initial_content(state: tauri::State<'_, AppState>) -> (String, String, bool) {
-    let state = state.lock().unwrap();
-    (state.current_content.clone(), state.title.clone(), state.content_explicitly_set)
+pub fn get_initial_content(window: tauri::Window, states: tauri::State<'_, WindowStates>) -> (String, String, bool) {
+    let states = states.lock().unwrap();
+    if let Some(state) = states.get(window.label()) {
+        (state.current_content.clone(), state.title.clone(), state.content_explicitly_set)
+    } else {
+        (String::new(), "Untitled".to_string(), false)
+    }
 }
 
 #[command]
-pub fn rename_file(old_path: String, new_path: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
+pub fn rename_file(old_path: String, new_path: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) -> Result<String, String> {
     std::fs::rename(&old_path, &new_path)
         .map_err(|e| format!("Failed to rename: {}", e))?;
     let abs_path = std::fs::canonicalize(&new_path)
         .unwrap_or_else(|_| std::path::PathBuf::from(&new_path));
     let abs_path_str = abs_path.to_string_lossy().to_string();
-    let mut state = state.lock().unwrap();
-    state.saved_path = Some(abs_path_str.clone());
-    let title = abs_path
-        .file_name()
-        .map(|f| f.to_string_lossy().to_string())
-        .unwrap_or_else(|| "Untitled".to_string());
-    state.title = title;
+    let mut states = states.lock().unwrap();
+    if let Some(state) = states.get_mut(window.label()) {
+        state.saved_path = Some(abs_path_str.clone());
+        let title = abs_path
+            .file_name()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_else(|| "Untitled".to_string());
+        state.title = title;
+    }
     Ok(abs_path_str)
 }
 
@@ -86,24 +96,8 @@ pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
 }
 
 #[command]
-pub fn open_new_window(file: Option<String>) -> Result<(), String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let mut args: Vec<String> = vec![];
-    if let Some(ref f) = file {
-        args.push(f.clone());
-    } else {
-        // Pass empty body so the new window shows an empty editable view
-        args.push("--body".to_string());
-        args.push(String::new());
-    }
-    std::process::Command::new(exe)
-        .args(&args)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::inherit())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+pub fn open_new_window(file: Option<String>, app: tauri::AppHandle) -> Result<String, String> {
+    crate::open_document_window(&app, file, None, None)
 }
 
 #[command]
@@ -160,7 +154,21 @@ pub fn perform_update() -> UpdateResult {
 }
 
 #[command]
-pub fn restart_app() {
+pub fn restart_app(app: tauri::AppHandle, states: tauri::State<'_, WindowStates>) {
+    // Clean up primary socket
+    let primary_path = crate::ipc::instance_file("tsumugi-primary");
+    std::fs::remove_file(&primary_path).ok();
+
+    // Clean up per-window sockets and HTTP port files
+    {
+        let states = states.lock().unwrap();
+        for (_, state) in states.iter() {
+            let path = crate::ipc::instance_file(&state.instance_id);
+            std::fs::remove_file(&path).ok();
+            std::fs::remove_file(path.with_extension("http")).ok();
+        }
+    }
+
     let exe = std::env::current_exe().ok();
     if let Some(exe) = exe {
         let _ = std::process::Command::new(exe)
@@ -169,7 +177,7 @@ pub fn restart_app() {
             .stderr(std::process::Stdio::inherit())
             .spawn();
     }
-    std::process::exit(0);
+    app.exit(0);
 }
 
 #[command]
