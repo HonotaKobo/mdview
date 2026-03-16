@@ -93,6 +93,25 @@
     "tm_all_tags": "すべてのタグ",
     "tm_sort_name": "名前順",
     "tm_sort_count": "件数順",
-    "tm_title": "タグ管理 — tsumugi"
+    "tm_title": "タグ管理 — tsumugi",
+    "home_tab": "ホーム",
+    "home_tags_tab": "タグ",
+    "home_greeting": "ようこそ",
+    "home_greeting_sub": "新しいドキュメントを作成するか、最近のファイルから選択してください。",
+    "home_new_file": "新規作成",
+    "home_new_file_desc": "空のMarkdownファイルを作成",
+    "home_open_file": "ファイルを開く",
+    "home_open_file_desc": "既存の .md ファイルを選択",
+    "home_recent_files": "最近のファイル",
+    "home_no_recent": "最近のファイルはありません",
+    "home_remove_recent": "履歴から削除",
+    "home_clear_recent": "履歴をクリア",
+    "home_time_now": "たった今",
+    "home_time_minutes": "{count}分前",
+    "home_time_hours": "{count}時間前",
+    "home_time_yesterday": "昨日",
+    "home_time_days": "{count}日前",
+    "home_time_weeks": "{count}週間前",
+    "home_time_older": "1ヶ月以上前"
   }
 }

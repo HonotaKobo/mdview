@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use tauri::command;
 
 use crate::i18n::I18nState;
-use crate::state::WindowStates;
+use crate::recent::{RecentEntry, RecentState};
+use crate::state::{WindowMode, WindowStates};
 use crate::tags::{TagEntry, TagState};
 use crate::update_checker::{UpdateInfo, UpdateResult};
 
@@ -17,12 +18,24 @@ pub fn save_file(path: String, content: String) -> Result<(), String> {
 }
 
 #[command]
-pub fn notify_saved(path: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) {
+pub fn notify_saved(
+    path: String,
+    window: tauri::Window,
+    states: tauri::State<'_, WindowStates>,
+    recent: tauri::State<'_, RecentState>,
+) {
     let mut states = states.lock().unwrap();
     if let Some(state) = states.get_mut(window.label()) {
-        state.saved_path = Some(path);
+        state.saved_path = Some(path.clone());
         state.dirty = false;
     }
+    // Track in recent files
+    let title = std::path::Path::new(&path)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Untitled".to_string());
+    let mut store = recent.lock().unwrap();
+    store.add(&path, &title);
 }
 
 #[command]
@@ -217,4 +230,45 @@ pub fn tag_get_counts(state: tauri::State<'_, TagState>) -> Vec<(String, usize)>
     let mut store = state.lock().unwrap();
     store.reload();
     store.get_counts()
+}
+
+// --- Recent files ---
+
+#[command]
+pub fn recent_get_all(state: tauri::State<'_, RecentState>) -> Vec<RecentEntry> {
+    let store = state.lock().unwrap();
+    store.get_all()
+}
+
+#[command]
+pub fn recent_add(path: String, title: String, state: tauri::State<'_, RecentState>) {
+    let mut store = state.lock().unwrap();
+    store.add(&path, &title);
+}
+
+#[command]
+pub fn recent_remove(path: String, state: tauri::State<'_, RecentState>) {
+    let mut store = state.lock().unwrap();
+    store.remove(&path);
+}
+
+#[command]
+pub fn recent_clear(state: tauri::State<'_, RecentState>) {
+    let mut store = state.lock().unwrap();
+    store.clear();
+}
+
+// --- Window mode ---
+
+#[command]
+pub fn get_window_mode(window: tauri::Window, states: tauri::State<'_, WindowStates>) -> String {
+    let states = states.lock().unwrap();
+    if let Some(state) = states.get(window.label()) {
+        match state.window_mode {
+            WindowMode::Home => "home".to_string(),
+            WindowMode::Editor => "editor".to_string(),
+        }
+    } else {
+        "editor".to_string()
+    }
 }

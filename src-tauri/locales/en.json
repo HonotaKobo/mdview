@@ -93,6 +93,25 @@
     "tm_all_tags": "All Tags",
     "tm_sort_name": "Name",
     "tm_sort_count": "Count",
-    "tm_title": "Tag Manager — tsumugi"
+    "tm_title": "Tag Manager — tsumugi",
+    "home_tab": "Home",
+    "home_tags_tab": "Tags",
+    "home_greeting": "Welcome",
+    "home_greeting_sub": "Create a new document or select from recent files.",
+    "home_new_file": "New File",
+    "home_new_file_desc": "Create an empty Markdown file",
+    "home_open_file": "Open File",
+    "home_open_file_desc": "Select an existing .md file",
+    "home_recent_files": "Recent Files",
+    "home_no_recent": "No recent files",
+    "home_remove_recent": "Remove from history",
+    "home_clear_recent": "Clear history",
+    "home_time_now": "Just now",
+    "home_time_minutes": "{count}m ago",
+    "home_time_hours": "{count}h ago",
+    "home_time_yesterday": "Yesterday",
+    "home_time_days": "{count}d ago",
+    "home_time_weeks": "{count}w ago",
+    "home_time_older": "Over a month ago"
   }
 }

@@ -346,32 +346,63 @@ fn open_about_window(app: &AppHandle) {
 }
 
 fn open_tag_manager(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("tag-manager") {
-        let _ = window.set_focus();
-        return;
-    }
-    let title = {
-        let i18n = app.state::<I18nState>();
-        let guard = i18n.lock().unwrap();
-        guard.t("ui.tm_title")
+    // Check if a home window exists (main window with Home mode)
+    let home_label = {
+        let states = app.state::<crate::state::WindowStates>();
+        let states = states.lock().unwrap();
+        states.iter().find_map(|(label, s)| {
+            if s.window_mode == crate::state::WindowMode::Home {
+                Some(label.clone())
+            } else {
+                None
+            }
+        })
     };
-    let app = app.clone();
-    std::thread::spawn(move || {
-        #[allow(unused_variables)]
-        if let Ok(window) = tauri::WebviewWindowBuilder::new(
-            &app,
-            "tag-manager",
-            tauri::WebviewUrl::App("index.html".into()),
-        )
-        .title(title)
-        .inner_size(700.0, 500.0)
-        .min_inner_size(400.0, 300.0)
-        .build()
-        {
-            #[cfg(not(target_os = "macos"))]
-            let _ = window.remove_menu();
+
+    if let Some(label) = home_label {
+        // Focus existing home window and switch to tags tab
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.set_focus();
+            let _ = app.emit_to(&label, "switch-to-tags-tab", ());
         }
-    });
+    } else {
+        // Create a new home window
+        let home_id = format!("home-{:04x}", crate::rand_u16());
+        let mut ws = crate::state::WindowState::new(
+            home_id.clone(),
+            "tsumugi".to_string(),
+            String::new(),
+        );
+        ws.window_mode = crate::state::WindowMode::Home;
+
+        let label = "main-home".to_string();
+        {
+            let states = app.state::<crate::state::WindowStates>();
+            states.lock().unwrap().insert(label.clone(), ws);
+        }
+
+        let app = app.clone();
+        std::thread::spawn(move || {
+            #[allow(unused_variables)]
+            if let Ok(window) = tauri::WebviewWindowBuilder::new(
+                &app,
+                &label,
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("tsumugi")
+            .inner_size(900.0, 700.0)
+            .min_inner_size(400.0, 300.0)
+            .build()
+            {
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = window.set_decorations(false);
+                }
+                // Switch to tags tab after window is ready
+                let _ = app.emit_to(&label as &str, "switch-to-tags-tab", ());
+            }
+        });
+    }
 }
 
 fn update_theme_checks(app: &AppHandle, selected_id: &str) {

@@ -14,7 +14,7 @@ import { exportAsPdf } from './pdf-export';
 import { exportAsHtml } from './html-export';
 import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
-import { TagManager } from './tag-manager';
+import { HomeScreen } from './home';
 import { UpdateModal } from './update-modal';
 import { loadTranslations, t } from './i18n';
 
@@ -33,7 +33,8 @@ let currentTitle = 'Untitled';
 let isDirty = false;
 let customTitleBar: CustomTitleBar | null = null;
 
-const isTagManager = getCurrentWindow().label === 'tag-manager';
+let isHome = false;
+let isEditor = true;
 
 let themeManager: ThemeManager;
 let findBar: FindBar;
@@ -43,10 +44,17 @@ let statusBar: StatusBar;
 let tagAddModal: TagAddModal;
 let tagSidebar: TagSidebar;
 let updateModal: UpdateModal;
+let homeScreen: HomeScreen | null = null;
+
+// Determine window mode and initialize
+(async () => {
+const windowMode = await invoke<string>('get_window_mode');
+isHome = windowMode === 'home';
+isEditor = !isHome;
 
 themeManager = new ThemeManager();
 
-if (!isTagManager) {
+if (isEditor) {
   findBar = new FindBar();
   fontSizeManager = new FontSizeManager();
   editorController = new EditorController(document.getElementById('content')!);
@@ -91,12 +99,13 @@ function updateWindowTitle(title: string) {
 
 // Initialize custom title bar on Windows
 async function initPlatformUI() {
-  if (isTagManager) return;
   const platform = await invoke<string>('get_platform');
   if (platform === 'windows') {
     customTitleBar = new CustomTitleBar();
     await customTitleBar.init();
-    if (currentTitle !== 'Untitled') {
+    if (isHome) {
+      customTitleBar.setTitle('');
+    } else if (currentTitle !== 'Untitled') {
       customTitleBar.setTitle(currentTitle);
     }
   }
@@ -167,17 +176,15 @@ function debounced(action: string, fn: () => void) {
   fn();
 }
 
-let tagManagerInstance: TagManager | null = null;
-
 function applyTranslations(): void {
-  if (!isTagManager) {
+  if (isEditor) {
     statusBar.applyTranslations();
     findBar.applyTranslations();
     tagAddModal.applyTranslations();
     tagSidebar.applyTranslations();
   }
-  if (tagManagerInstance) {
-    tagManagerInstance.applyTranslations();
+  if (homeScreen) {
+    homeScreen.applyTranslations();
   }
 }
 
@@ -185,9 +192,9 @@ async function loadInitialContent() {
   await loadTranslations();
   applyTranslations();
 
-  if (isTagManager) {
-    tagManagerInstance = new TagManager();
-    await tagManagerInstance.init();
+  if (isHome) {
+    homeScreen = new HomeScreen();
+    await homeScreen.init();
     return;
   }
   const [body, title, _contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
@@ -199,17 +206,28 @@ async function loadInitialContent() {
 }
 loadInitialContent();
 
-if (isTagManager) {
+if (isHome) {
   listen('menu-action', async (event) => {
     const { action } = event.payload as MenuAction;
     if (action === 'locale_changed') {
       await loadTranslations();
       applyTranslations();
+    } else if (action === 'theme_change') {
+      const { value } = event.payload as MenuAction;
+      if (value === 'dark' || value === 'light' || value === 'auto') {
+        themeManager.setTheme(value);
+      }
+    }
+  });
+
+  listen('switch-to-tags-tab', () => {
+    if (homeScreen) {
+      homeScreen.switchToTagsTab();
     }
   });
 }
 
-if (!isTagManager) {
+if (isEditor) {
   listen('content-update', async (event) => {
     const update = event.payload as ContentUpdate;
     if (update.body !== undefined) {
@@ -504,3 +522,5 @@ if (!isTagManager) {
     }
   });
 }
+
+})();

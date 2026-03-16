@@ -4,6 +4,7 @@ mod http_api;
 mod i18n;
 mod ipc;
 mod menu;
+pub(crate) mod recent;
 mod state;
 mod tags;
 mod update_checker;
@@ -14,7 +15,8 @@ use std::sync::Mutex;
 
 use clap::Parser;
 use tauri::Manager as _;
-use state::{LastFocusedDoc, WindowState, WindowStates};
+use recent::{RecentState, RecentStore};
+use state::{LastFocusedDoc, WindowMode, WindowState, WindowStates};
 use tags::{TagState, TagStore};
 use watcher::{FileWatcher, FileWatchers};
 
@@ -117,6 +119,11 @@ pub(crate) fn open_document_window(
         fw.watch(app.clone(), label.clone(), fp.clone());
         let watchers = app.state::<FileWatchers>();
         watchers.lock().unwrap().insert(label.clone(), fw);
+
+        // Track in recent files
+        let recent = app.state::<RecentState>();
+        let mut store = recent.lock().unwrap();
+        store.add(fp, &doc_title);
     }
 
     eprintln!("tsumugi: new window {} (instance: {})", label, instance_id);
@@ -286,8 +293,12 @@ pub fn run() {
     };
 
     let content_explicitly_set = args.body.is_some() || initial_file.is_some();
+    let is_home_mode = initial_file.is_none() && args.body.is_none();
     let mut app_state = WindowState::new(id.clone(), resolved_title, resolved_content);
     app_state.content_explicitly_set = content_explicitly_set;
+    if is_home_mode {
+        app_state.window_mode = WindowMode::Home;
+    }
     if let Some(ref fp) = resolved_file_path {
         app_state.saved_path = Some(fp.clone());
     }
@@ -309,6 +320,7 @@ pub fn run() {
         .manage(Mutex::new(HashMap::<String, FileWatcher>::new()) as FileWatchers)
         .manage(Mutex::new("main".to_string()) as LastFocusedDoc)
         .manage(TagState::new(TagStore::load()))
+        .manage(RecentState::new(RecentStore::load()))
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::save_file,
@@ -339,6 +351,11 @@ pub fn run() {
             commands::check_for_updates,
             commands::perform_update,
             commands::restart_app,
+            commands::recent_get_all,
+            commands::recent_add,
+            commands::recent_remove,
+            commands::recent_clear,
+            commands::get_window_mode,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
@@ -387,9 +404,9 @@ pub fn run() {
             let label = window.label().to_string();
 
             match event {
-                // Track focus for document windows
+                // Track focus for document windows and home window
                 tauri::WindowEvent::Focused(true) => {
-                    if label == "main" || label.starts_with("doc-") {
+                    if label == "main" || label.starts_with("doc-") || label.starts_with("main-home") {
                         let app = window.app_handle();
                         let last_focused = app.state::<LastFocusedDoc>();
                         *last_focused.lock().unwrap() = label;
@@ -397,8 +414,8 @@ pub fn run() {
                 }
                 // Clean up on window destroy
                 tauri::WindowEvent::Destroyed => {
-                    // Skip non-document windows (about, tag-manager)
-                    if label != "main" && !label.starts_with("doc-") {
+                    // Skip non-document windows (about only)
+                    if label != "main" && !label.starts_with("doc-") && !label.starts_with("main-home") {
                         // But clean up about window state if it exists
                         if label == "about" {
                             let app = window.app_handle();
