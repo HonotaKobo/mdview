@@ -10,6 +10,10 @@
   --titlebar-border: #d0d7de;
   --find-highlight: #fff176;
   --find-highlight-active: #f9a825;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --danger-color: #d1242f;
+  --danger-color-subtle: #d1242f15;
 }
 
 :root[data-theme='dark'] {
@@ -24,6 +28,10 @@
   --titlebar-border: #30363d;
   --find-highlight: #564800;
   --find-highlight-active: #7a6400;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --danger-color: #f85149;
+  --danger-color-subtle: #f8514920;
 }
 
 * {
@@ -263,7 +271,8 @@ body {
   gap: 6px;
 }
 
-#find-input {
+#find-input,
+#replace-input {
   flex: 1;
   max-width: 300px;
   padding: 3px 8px;
@@ -278,18 +287,6 @@ body {
 #find-input:focus,
 #replace-input:focus {
   border-color: var(--link-color);
-}
-
-#replace-input {
-  flex: 1;
-  max-width: 300px;
-  padding: 3px 8px;
-  font-size: 13px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  outline: none;
 }
 
 #find-count {
@@ -377,7 +374,7 @@ mark.find-highlight.active {
   font-size: 11px;
   color: var(--text-secondary);
   margin-top: 2px;
-  font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -428,7 +425,7 @@ mark.find-highlight.active {
 }
 
 #tag-input:focus {
-  border-color: var(--text-primary);
+  border-color: var(--link-color);
 }
 
 #tag-add-btn {
@@ -515,13 +512,8 @@ mark.find-highlight.active {
 }
 
 .tag-item-remove:hover {
-  background: #d1242f15;
-  color: #d1242f;
-}
-
-:root[data-theme='dark'] .tag-item-remove:hover {
-  background: #f8514930;
-  color: #f85149;
+  background: var(--danger-color-subtle);
+  color: var(--danger-color);
 }
 
 .tag-empty {
@@ -674,7 +666,7 @@ mark.find-highlight.active {
 }
 
 .tm-search:focus {
-  border-color: var(--text-primary);
+  border-color: var(--link-color);
 }
 
 .tm-results-count {
@@ -717,7 +709,7 @@ mark.find-highlight.active {
 }
 
 .tm-row.tm-invalid {
-  border-color: #d1242f;
+  border-color: var(--danger-color);
 }
 
 .tm-body {
@@ -737,7 +729,7 @@ mark.find-highlight.active {
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: #d1242f;
+  background: var(--danger-color);
   color: #fff;
   border-radius: 50%;
   font-size: 11px;
@@ -751,7 +743,7 @@ mark.find-highlight.active {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .tm-tags {
@@ -803,22 +795,13 @@ mark.find-highlight.active {
 }
 
 .tm-btn-danger {
-  color: #d1242f;
+  color: var(--danger-color);
   border-color: var(--border-color);
 }
 
 .tm-btn-danger:hover {
-  background: #d1242f10;
-  border-color: #d1242f;
-}
-
-:root[data-theme='dark'] .tm-btn-danger {
-  color: #f85149;
-}
-
-:root[data-theme='dark'] .tm-btn-danger:hover {
-  background: #f8514920;
-  border-color: #f85149;
+  background: var(--danger-color-subtle);
+  border-color: var(--danger-color);
 }
 
 /* Print styles */

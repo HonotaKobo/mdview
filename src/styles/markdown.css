@@ -90,8 +90,7 @@
   font-size: 85%;
   background: var(--code-bg);
   border-radius: 3px;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 #content table {
@@ -270,8 +269,8 @@
 }
 
 .mermaid-error {
-  color: #d73a49;
-  border-color: #d73a49;
+  color: var(--danger-color);
+  border-color: var(--danger-color);
 }
 
 /* Footnotes */

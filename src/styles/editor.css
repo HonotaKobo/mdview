@@ -67,8 +67,7 @@
   border-radius: 4px;
   background: var(--bg-secondary);
   color: var(--text-color);
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.5;
   resize: none;
@@ -84,8 +83,7 @@
 /* Delimiter labels (```, $$) */
 .source-label {
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   padding: 2px 0;
   opacity: 0.6;
