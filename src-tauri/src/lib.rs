@@ -393,6 +393,15 @@ pub fn run() {
                 fw.watch(app.handle().clone(), "main".to_string(), fp.clone());
                 let watchers = app.state::<FileWatchers>();
                 watchers.lock().unwrap().insert("main".to_string(), fw);
+
+                // Track in recent files
+                let title = std::path::Path::new(fp)
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Untitled".to_string());
+                let recent = app.state::<RecentState>();
+                let mut store = recent.lock().unwrap();
+                store.add(fp, &title);
             }
 
             Ok(())
