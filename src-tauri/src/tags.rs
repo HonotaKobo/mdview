@@ -74,7 +74,7 @@ impl TagStore {
         } else {
             dirs::config_dir().unwrap_or_else(|| PathBuf::from("."))
         };
-        base.join("mdcast").join("tags.json")
+        base.join("tsumugi").join("tags.json")
     }
 
     fn find_entry_mut(&mut self, path: &str) -> Option<&mut TagEntry> {

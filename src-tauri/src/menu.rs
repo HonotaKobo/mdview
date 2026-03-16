@@ -138,7 +138,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
     // macOS: add app menu with standard items
     #[cfg(target_os = "macos")]
     {
-        let app_menu = SubmenuBuilder::new(app, "mdcast")
+        let app_menu = SubmenuBuilder::new(app, "tsumugi")
             .item(&MenuItemBuilder::with_id("app_about", i18n.t("menu.help_about"))
                 .build(app)?)
             .separator()
@@ -237,16 +237,16 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
 fn open_about_window() {
     let version = env!("CARGO_PKG_VERSION");
     let body = format!(
-        "# mdcast\n\n\
+        "# tsumugi\n\n\
          **Version {version}**\n\n\
          Markdown viewer for the AI age.\n\n\
          ---\n\n\
-         - GitHub: https://github.com/honokamori/mdcast\n\
+         - GitHub: https://github.com/HonotaKobo/tsumugi\n\
          - License: MIT\n"
     );
     if let Ok(exe) = std::env::current_exe() {
         let _ = std::process::Command::new(exe)
-            .args(["--body", &body, "--title", "About mdcast"])
+            .args(["--body", &body, "--title", "About tsumugi"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::inherit())
@@ -267,7 +267,7 @@ fn open_tag_manager(app: &AppHandle) {
             "tag-manager",
             tauri::WebviewUrl::App("index.html".into()),
         )
-        .title("タグ管理 — mdcast")
+        .title("タグ管理 — tsumugi")
         .inner_size(700.0, 500.0)
         .min_inner_size(400.0, 300.0)
         .build()

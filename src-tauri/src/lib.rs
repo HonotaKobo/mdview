@@ -26,7 +26,7 @@ pub fn run() {
         let mut input = String::new();
         std::io::stdin()
             .read_to_string(&mut input)
-            .expect("mdcast: failed to read stdin");
+            .expect("tsumugi: failed to read stdin");
         args.body = Some(input);
         true
     } else {
@@ -60,7 +60,7 @@ pub fn run() {
     if !args.query.is_empty() || args.grep.is_some() || args.lines.is_some()
         || args.delete.is_some() || args.insert.is_some() || args.replace.is_some()
     {
-        eprintln!("mdcast: No instance found with id: {}", id);
+        eprintln!("tsumugi: No instance found with id: {}", id);
         std::process::exit(2);
     }
     if args.list {
@@ -100,7 +100,7 @@ pub fn run() {
         if stdin_read {
             // Pipe the stdin content to the child process (which will read it via --body -)
             cmd.stdin(Stdio::piped());
-            let mut child = cmd.spawn().expect("failed to launch mdcast");
+            let mut child = cmd.spawn().expect("failed to launch tsumugi");
             if let Some(mut child_stdin) = child.stdin.take() {
                 use std::io::Write as _;
                 child_stdin
@@ -109,7 +109,7 @@ pub fn run() {
             }
         } else {
             cmd.stdin(Stdio::null());
-            cmd.spawn().expect("failed to launch mdcast");
+            cmd.spawn().expect("failed to launch tsumugi");
         }
         return;
     }
@@ -134,7 +134,7 @@ pub fn run() {
                 (content, title, Some(abs_path_str))
             }
             Err(e) => {
-                eprintln!("mdcast: Failed to read file: {}", e);
+                eprintln!("tsumugi: Failed to read file: {}", e);
                 (String::new(), initial_title.clone(), None)
             }
         }
@@ -202,8 +202,8 @@ pub fn run() {
             ipc::start_listener(id_for_setup.clone(), app.handle().clone());
             let http_port = http_api::start_http_server(id_for_setup.clone(), app.handle().clone());
             let port_path = ipc::instance_file(&id_for_setup).with_extension("http");
-            eprintln!("mdcast: HTTP API listening on http://127.0.0.1:{}", http_port);
-            eprintln!("mdcast: port file: {}", port_path.display());
+            eprintln!("tsumugi: HTTP API listening on http://127.0.0.1:{}", http_port);
+            eprintln!("tsumugi: port file: {}", port_path.display());
 
             // Start file watcher for file mode
             if let Some(ref fp) = resolved_file_path {

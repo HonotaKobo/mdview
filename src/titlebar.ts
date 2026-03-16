@@ -48,7 +48,7 @@ export class CustomTitleBar {
     this.translations = await invoke<Record<string, string>>('get_translations');
 
     // Initialize check states from localStorage
-    const savedTheme = localStorage.getItem('mdcast-theme') || 'auto';
+    const savedTheme = localStorage.getItem('tsumugi-theme') || 'auto';
     this.checkStates = {
       theme_dark: savedTheme === 'dark',
       theme_light: savedTheme === 'light',
@@ -66,7 +66,7 @@ export class CustomTitleBar {
   /** Update the displayed title (called from main.ts) */
   setTitle(title: string): void {
     if (this.titleEl) {
-      this.titleEl.textContent = title ? `${title} \u2014 mdcast` : 'mdcast';
+      this.titleEl.textContent = title ? `${title} \u2014 tsumugi` : 'tsumugi';
     }
   }
 
@@ -170,7 +170,7 @@ export class CustomTitleBar {
     const icon = document.createElement('img');
     icon.className = 'titlebar-icon';
     icon.src = '/app-icon.png';
-    icon.alt = 'mdcast';
+    icon.alt = 'tsumugi';
     titleRow.appendChild(icon);
 
     const titleDrag = document.createElement('div');
@@ -179,7 +179,7 @@ export class CustomTitleBar {
 
     this.titleEl = document.createElement('span');
     this.titleEl.className = 'titlebar-title-text';
-    this.titleEl.textContent = 'mdcast';
+    this.titleEl.textContent = 'tsumugi';
     this.titleEl.setAttribute('data-tauri-drag-region', '');
     titleDrag.appendChild(this.titleEl);
 

@@ -4,7 +4,7 @@ export class FontSizeManager {
 
   constructor() {
     this.container = document.getElementById('content')!;
-    this.currentSize = parseInt(localStorage.getItem('mdcast-font-size') || '100', 10);
+    this.currentSize = parseInt(localStorage.getItem('tsumugi-font-size') || '100', 10);
     this.apply();
   }
 
@@ -20,6 +20,6 @@ export class FontSizeManager {
 
   private apply(): void {
     this.container.style.fontSize = `${this.currentSize}%`;
-    localStorage.setItem('mdcast-font-size', String(this.currentSize));
+    localStorage.setItem('tsumugi-font-size', String(this.currentSize));
   }
 }

@@ -12,7 +12,7 @@ export class StatusBar {
     this.wordCountEl = document.getElementById('status-words')!;
     this.readTimeEl = document.getElementById('status-read-time')!;
 
-    const saved = localStorage.getItem('mdcast-status-bar');
+    const saved = localStorage.getItem('tsumugi-status-bar');
     if (saved === 'hidden') {
       this.bar.style.display = 'none';
     } else {
@@ -37,10 +37,10 @@ export class StatusBar {
   toggle(): void {
     if (this.isVisible()) {
       this.bar.style.display = 'none';
-      localStorage.setItem('mdcast-status-bar', 'hidden');
+      localStorage.setItem('tsumugi-status-bar', 'hidden');
     } else {
       this.bar.style.display = 'flex';
-      localStorage.setItem('mdcast-status-bar', 'visible');
+      localStorage.setItem('tsumugi-status-bar', 'visible');
     }
   }
 

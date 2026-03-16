@@ -118,7 +118,7 @@ if (!isTagManager) {
 }
 
 function updateWindowTitle(title: string) {
-  getCurrentWindow().setTitle(`${title} — mdcast`);
+  getCurrentWindow().setTitle(`${title} — tsumugi`);
   customTitleBar?.setTitle(title);
 }
 

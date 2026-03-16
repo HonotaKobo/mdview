@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-const GITHUB_REPO: &str = "HonotaKobo/mdcast";
+const GITHUB_REPO: &str = "HonotaKobo/tsumugi";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize)]
@@ -24,7 +24,7 @@ pub fn check_update() -> Result<UpdateInfo, String> {
     );
 
     let response = ureq::get(&url)
-        .set("User-Agent", "mdcast")
+        .set("User-Agent", "tsumugi")
         .set("Accept", "application/vnd.github.v3+json")
         .call()
         .map_err(|e| format!("{}", e))?;
@@ -58,8 +58,8 @@ pub fn check_update() -> Result<UpdateInfo, String> {
 
 pub fn perform_update() -> UpdateResult {
     match std::env::consts::OS {
-        "macos" => run_chained("brew", &["update"], &["upgrade", "--cask", "mdcast"]),
-        "windows" => run_chained("scoop", &["update"], &["update", "mdcast"]),
+        "macos" => run_chained("brew", &["update"], &["upgrade", "--cask", "tsumugi"]),
+        "windows" => run_chained("scoop", &["update"], &["update", "tsumugi"]),
         _ => UpdateResult {
             success: false,
             message: "Automatic update is not supported on this platform.".to_string(),

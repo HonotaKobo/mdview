@@ -18,7 +18,7 @@ jobs:
       - name: Download exe and compute hash
         id: hash
         run: |
-          URL="https://github.com/HonotaKobo/mdcast/releases/download/${{ steps.release.outputs.tag }}/mdcast_${{ steps.release.outputs.version }}_x64-setup.exe"
+          URL="https://github.com/HonotaKobo/tsumugi/releases/download/${{ steps.release.outputs.tag }}/tsumugi_${{ steps.release.outputs.version }}_x64-setup.exe"
           echo "Downloading $URL"
           curl -fSL -o setup.exe "$URL"
           HASH=$(sha256sum setup.exe | awk '{print $1}')
@@ -28,7 +28,7 @@ jobs:
       - name: Checkout scoop bucket
         uses: actions/checkout@v5
         with:
-          repository: HonotaKobo/scoop-mdcast
+          repository: HonotaKobo/scoop-tsumugi
           token: ${{ secrets.PACKAGE_PAT }}
 
       - name: Update manifest
@@ -44,33 +44,33 @@ jobs:
             const manifest = {
               version: VERSION,
               description: "Markdown viewer for the AI age",
-              homepage: "https://github.com/HonotaKobo/mdcast",
+              homepage: "https://github.com/HonotaKobo/tsumugi",
               license: "MIT",
               architecture: {
                 "64bit": {
-                  url: `https://github.com/HonotaKobo/mdcast/releases/download/${TAG}/mdcast_${VERSION}_x64-setup.exe#/setup.exe`,
+                  url: `https://github.com/HonotaKobo/tsumugi/releases/download/${TAG}/tsumugi_${VERSION}_x64-setup.exe#/setup.exe`,
                   hash: HASH
                 }
               },
               installer: {
                 script: [
                   "Start-Process \"$dir\\setup.exe\" -ArgumentList '/S' -Wait",
-                  "Copy-Item \"$env:LOCALAPPDATA\\mdcast\\mdcast.exe\" \"$dir\\mdcast.exe\""
+                  "Copy-Item \"$env:LOCALAPPDATA\\tsumugi\\tsumugi.exe\" \"$dir\\tsumugi.exe\""
                 ]
               },
               uninstaller: {
                 script: "Start-Process \"$dir\\setup.exe\" -ArgumentList '/UNINSTALL','/S' -Wait"
               },
-              bin: "mdcast.exe"
+              bin: "tsumugi.exe"
             };
-            fs.writeFileSync('bucket/mdcast.json', JSON.stringify(manifest, null, 4) + '\n');
+            fs.writeFileSync('bucket/tsumugi.json', JSON.stringify(manifest, null, 4) + '\n');
 
       - name: Push scoop update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add bucket/mdcast.json
-          git commit -m "Update mdcast to ${{ steps.release.outputs.tag }}"
+          git add bucket/tsumugi.json
+          git commit -m "Update tsumugi to ${{ steps.release.outputs.tag }}"
           git push
 
   update-homebrew:
@@ -86,14 +86,14 @@ jobs:
       - name: Download dmgs and compute hashes
         id: hash
         run: |
-          BASE="https://github.com/HonotaKobo/mdcast/releases/download/${{ steps.release.outputs.tag }}"
+          BASE="https://github.com/HonotaKobo/tsumugi/releases/download/${{ steps.release.outputs.tag }}"
           VERSION="${{ steps.release.outputs.version }}"
 
-          curl -fSL -o arm.dmg "$BASE/mdcast_${VERSION}_aarch64.dmg"
+          curl -fSL -o arm.dmg "$BASE/tsumugi_${VERSION}_aarch64.dmg"
           ARM_HASH=$(sha256sum arm.dmg | awk '{print $1}')
           echo "arm=$ARM_HASH" >> "$GITHUB_OUTPUT"
 
-          curl -fSL -o intel.dmg "$BASE/mdcast_${VERSION}_x64.dmg"
+          curl -fSL -o intel.dmg "$BASE/tsumugi_${VERSION}_x64.dmg"
           INTEL_HASH=$(sha256sum intel.dmg | awk '{print $1}')
           echo "intel=$INTEL_HASH" >> "$GITHUB_OUTPUT"
 
@@ -103,7 +103,7 @@ jobs:
       - name: Checkout homebrew tap
         uses: actions/checkout@v5
         with:
-          repository: HonotaKobo/homebrew-mdcast
+          repository: HonotaKobo/homebrew-tsumugi
           token: ${{ secrets.PACKAGE_PAT }}
 
       - name: Update cask
@@ -112,37 +112,37 @@ jobs:
           ARM_HASH: ${{ steps.hash.outputs.arm }}
           INTEL_HASH: ${{ steps.hash.outputs.intel }}
         run: |
-          cat > Casks/mdcast.rb << 'TEMPLATE'
-          cask "mdcast" do
+          cat > Casks/tsumugi.rb << 'TEMPLATE'
+          cask "tsumugi" do
             arch arm: "aarch64", intel: "x64"
 
             version "VERSION_PLACEHOLDER"
             sha256 arm: "ARM_HASH_PLACEHOLDER",
                    intel: "INTEL_HASH_PLACEHOLDER"
 
-            url "https://github.com/HonotaKobo/mdcast/releases/download/v#{version}/mdcast_#{version}_#{arch}.dmg"
-            name "mdcast"
+            url "https://github.com/HonotaKobo/tsumugi/releases/download/v#{version}/tsumugi_#{version}_#{arch}.dmg"
+            name "tsumugi"
             desc "Markdown viewer for the AI age"
-            homepage "https://github.com/HonotaKobo/mdcast"
+            homepage "https://github.com/HonotaKobo/tsumugi"
 
-            app "mdcast.app"
-            binary "#{appdir}/mdcast.app/Contents/MacOS/mdcast"
+            app "tsumugi.app"
+            binary "#{appdir}/tsumugi.app/Contents/MacOS/tsumugi"
 
             postflight do
               system_command "/usr/bin/xattr",
-                             args: ["-cr", "#{appdir}/mdcast.app"]
+                             args: ["-cr", "#{appdir}/tsumugi.app"]
             end
           end
           TEMPLATE
 
-          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Casks/mdcast.rb
-          sed -i "s/ARM_HASH_PLACEHOLDER/$ARM_HASH/g" Casks/mdcast.rb
-          sed -i "s/INTEL_HASH_PLACEHOLDER/$INTEL_HASH/g" Casks/mdcast.rb
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" Casks/tsumugi.rb
+          sed -i "s/ARM_HASH_PLACEHOLDER/$ARM_HASH/g" Casks/tsumugi.rb
+          sed -i "s/INTEL_HASH_PLACEHOLDER/$INTEL_HASH/g" Casks/tsumugi.rb
 
       - name: Push homebrew update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/mdcast.rb
-          git commit -m "Update mdcast to ${{ steps.release.outputs.tag }}"
+          git add Casks/tsumugi.rb
+          git commit -m "Update tsumugi to ${{ steps.release.outputs.tag }}"
           git push

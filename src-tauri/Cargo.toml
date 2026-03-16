@@ -1,14 +1,14 @@
 [package]
-name = "mdcast"
+name = "tsumugi"
 version = "0.2.21"
 edition = "2021"
 
 [lib]
-name = "mdcast_lib"
+name = "tsumugi_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [[bin]]
-name = "mdcast"
+name = "tsumugi"
 path = "src/main.rs"
 
 [dependencies]

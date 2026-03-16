@@ -5,7 +5,7 @@ export class ThemeManager {
   private mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
   constructor() {
-    const saved = localStorage.getItem('mdcast-theme') as Theme | null;
+    const saved = localStorage.getItem('tsumugi-theme') as Theme | null;
     this.currentTheme = saved || 'auto';
     this.applyTheme();
 
@@ -17,7 +17,7 @@ export class ThemeManager {
   setTheme(theme: Theme): void {
     this.currentTheme = theme;
     this.applyTheme();
-    localStorage.setItem('mdcast-theme', theme);
+    localStorage.setItem('tsumugi-theme', theme);
   }
 
   getTheme(): Theme {

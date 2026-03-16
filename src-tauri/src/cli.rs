@@ -23,7 +23,7 @@ fn unescape(s: &str) -> Result<String, String> {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "mdcast", about = "Markdown viewer for the AI age")]
+#[command(name = "tsumugi", about = "Markdown viewer for the AI age")]
 pub struct CliArgs {
     /// Markdown file path (positional argument)
     #[arg(value_name = "FILE")]

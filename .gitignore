@@ -19,8 +19,8 @@ docs/
 
 
 # Package manager repos
-homebrew-mdcast/
-scoop-mdcast/
+homebrew-tsumugi/
+scoop-tsumugi/
 
 # Environment
 .env

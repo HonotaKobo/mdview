@@ -35,7 +35,7 @@
     "tag_manage": "Manage Tags...",
     "help": "Help",
     "help_check_updates": "Check for Updates...",
-    "help_about": "About mdcast"
+    "help_about": "About tsumugi"
   },
   "ui": {
     "unsaved_confirm": "You have unsaved changes. Close anyway?",

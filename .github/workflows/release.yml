@@ -20,7 +20,7 @@ jobs:
         run: |
           release_id=$(gh api repos/${{ github.repository }}/releases \
             -f tag_name=${{ github.ref_name }} \
-            -f name="mdcast ${{ github.ref_name }}" \
+            -f name="tsumugi ${{ github.ref_name }}" \
             -f body="See the assets to download and install this version." \
             -F draft=true \
             -F prerelease=false \

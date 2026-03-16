@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mdcast MCP Server — Claude Code / Claude Desktop から mdcast を操作する."""
+"""tsumugi MCP Server — Claude Code / Claude Desktop から tsumugi を操作する."""
 
 import logging
 import os
@@ -17,26 +17,26 @@ logging.basicConfig(
     format="%(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stderr)],
 )
-logger = logging.getLogger("mdcast-mcp")
+logger = logging.getLogger("tsumugi-mcp")
 
-mcp = FastMCP(name="mdcast")
+mcp = FastMCP(name="tsumugi")
 
 
 def _instance_dir() -> Path:
     """プラットフォームに応じたインスタンスディレクトリを返す."""
     if sys.platform == "win32":
         username = os.environ.get("USERNAME", "default")
-        return Path(os.environ.get("TEMP", "/tmp")) / f"mdcast-{username}"
+        return Path(os.environ.get("TEMP", "/tmp")) / f"tsumugi-{username}"
     else:
         uid = os.getuid()
-        return Path(f"/tmp/mdcast-{uid}")
+        return Path(f"/tmp/tsumugi-{uid}")
 
 
 def _read_connection(instance_id: str) -> tuple[str, str]:
     """ポートファイルからURL・トークンを読み取る."""
     port_file = _instance_dir() / f"{instance_id}.http"
     if not port_file.exists():
-        raise FileNotFoundError(f"mdcast instance '{instance_id}' not found: {port_file}")
+        raise FileNotFoundError(f"tsumugi instance '{instance_id}' not found: {port_file}")
     info = port_file.read_text().strip()
     port, token = info.split(":", 1)
     return f"http://127.0.0.1:{port}", token
@@ -68,29 +68,29 @@ def _resolve_instance(instance_id: str | None) -> str:
     if len(instances) == 1:
         return instances[0]
     if len(instances) == 0:
-        raise RuntimeError("mdcast instance not found. Launch mdcast first.")
+        raise RuntimeError("tsumugi instance not found. Launch tsumugi first.")
     raise RuntimeError(
-        f"Multiple mdcast instances running: {instances}. Specify instance_id."
+        f"Multiple tsumugi instances running: {instances}. Specify instance_id."
     )
 
 
-def _find_mdcast_bin() -> str:
-    """mdcast バイナリのパスを探す."""
+def _find_tsumugi_bin() -> str:
+    """tsumugi バイナリのパスを探す."""
     # PATH から探す
-    found = shutil.which("mdcast")
+    found = shutil.which("tsumugi")
     if found:
         return found
     # macOS: よくあるインストール先
     candidates = [
-        Path.home() / ".cargo" / "bin" / "mdcast",
-        Path("/usr/local/bin/mdcast"),
-        Path("/opt/homebrew/bin/mdcast"),
+        Path.home() / ".cargo" / "bin" / "tsumugi",
+        Path("/usr/local/bin/tsumugi"),
+        Path("/opt/homebrew/bin/tsumugi"),
     ]
     for p in candidates:
         if p.exists():
             return str(p)
     raise FileNotFoundError(
-        "mdcast binary not found. Install mdcast or add it to PATH."
+        "tsumugi binary not found. Install tsumugi or add it to PATH."
     )
 
 
@@ -99,7 +99,7 @@ def _find_mdcast_bin() -> str:
 
 @mcp.tool()
 def launch(body: str = "", title: str | None = None) -> str:
-    """新しい mdcast ウィンドウを開いてコンテンツを表示する.
+    """新しい tsumugi ウィンドウを開いてコンテンツを表示する.
 
     新規ウィンドウを開き、自動生成されたインスタンスIDを返す。
     返されたIDを使って update / query 等で操作できる。
@@ -108,7 +108,7 @@ def launch(body: str = "", title: str | None = None) -> str:
         body: 表示する Markdown 本文（省略時は空のウィンドウ）
         title: ドキュメントタイトル（省略時は "Untitled"）
     """
-    bin_path = _find_mdcast_bin()
+    bin_path = _find_tsumugi_bin()
     cmd: list[str] = [bin_path]
     if body:
         cmd += ["--body", body]
@@ -123,7 +123,7 @@ def launch(body: str = "", title: str | None = None) -> str:
     if not auto_id:
         proc.wait(timeout=10)
         raise RuntimeError(
-            f"Failed to launch mdcast (exit code {proc.returncode})"
+            f"Failed to launch tsumugi (exit code {proc.returncode})"
         )
 
     # ポートファイルが生成されるまで待機
@@ -138,7 +138,7 @@ def launch(body: str = "", title: str | None = None) -> str:
 
 @mcp.tool()
 def update(body: str, title: str | None = None, instance_id: str | None = None) -> str:
-    """mdcast ウィンドウの表示内容を更新する.
+    """tsumugi ウィンドウの表示内容を更新する.
 
     Args:
         body: 表示する Markdown 本文
@@ -160,7 +160,7 @@ def update(body: str, title: str | None = None, instance_id: str | None = None) 
 def query(
     properties: list[str] | None = None, instance_id: str | None = None
 ) -> str:
-    """mdcast ウィンドウのプロパティを取得する.
+    """tsumugi ウィンドウのプロパティを取得する.
 
     Args:
         properties: 取得するプロパティ (body, title, path, status, linecount, all)
@@ -175,7 +175,7 @@ def query(
 
 @mcp.tool()
 def grep(pattern: str, instance_id: str | None = None) -> str:
-    """mdcast ウィンドウの本文を正規表現で検索する.
+    """tsumugi ウィンドウの本文を正規表現で検索する.
 
     Args:
         pattern: 検索する正規表現パターン
@@ -193,7 +193,7 @@ def grep(pattern: str, instance_id: str | None = None) -> str:
 
 @mcp.tool()
 def get_lines(start: int, end: int, instance_id: str | None = None) -> str:
-    """mdcast ウィンドウの指定行範囲を取得する.
+    """tsumugi ウィンドウの指定行範囲を取得する.
 
     Args:
         start: 開始行番号（1始まり）
@@ -208,7 +208,7 @@ def get_lines(start: int, end: int, instance_id: str | None = None) -> str:
 
 @mcp.tool()
 def edit_insert(line: int, content: str, instance_id: str | None = None) -> str:
-    """mdcast ウィンドウの指定行の前にコンテンツを挿入する.
+    """tsumugi ウィンドウの指定行の前にコンテンツを挿入する.
 
     Args:
         line: 挿入位置の行番号（1始まり、この行の前に挿入）
@@ -230,7 +230,7 @@ def edit_insert(line: int, content: str, instance_id: str | None = None) -> str:
 def edit_replace(
     start: int, end: int, content: str, instance_id: str | None = None
 ) -> str:
-    """mdcast ウィンドウの指定行範囲を新しいコンテンツで置換する.
+    """tsumugi ウィンドウの指定行範囲を新しいコンテンツで置換する.
 
     Args:
         start: 開始行番号（1始まり）
@@ -251,7 +251,7 @@ def edit_replace(
 
 @mcp.tool()
 def edit_delete(ranges: list[list[int]], instance_id: str | None = None) -> str:
-    """mdcast ウィンドウの指定行を削除する.
+    """tsumugi ウィンドウの指定行を削除する.
 
     Args:
         ranges: 削除する行範囲のリスト（例: [[5, 8], [12, 12]]）
@@ -265,10 +265,10 @@ def edit_delete(ranges: list[list[int]], instance_id: str | None = None) -> str:
 
 @mcp.tool()
 def list_instances() -> str:
-    """起動中の mdcast インスタンスの一覧を取得する."""
+    """起動中の tsumugi インスタンスの一覧を取得する."""
     instances = _list_instances()
     if not instances:
-        return "No mdcast instances running."
+        return "No tsumugi instances running."
     results = []
     for iid in instances:
         try:
@@ -282,7 +282,7 @@ def list_instances() -> str:
 
 @mcp.tool()
 def health(instance_id: str | None = None) -> str:
-    """mdcast インスタンスのヘルスチェック.
+    """tsumugi インスタンスのヘルスチェック.
 
     Args:
         instance_id: 対象インスタンスID（省略時は自動選択）

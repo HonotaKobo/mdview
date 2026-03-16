@@ -35,7 +35,7 @@
     "tag_manage": "タグ管理...",
     "help": "ヘルプ",
     "help_check_updates": "アップデートを確認...",
-    "help_about": "mdcastについて"
+    "help_about": "tsumugiについて"
   },
   "ui": {
     "unsaved_confirm": "未保存の変更があります。閉じますか？",
