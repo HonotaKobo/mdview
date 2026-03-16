@@ -215,9 +215,6 @@ async function loadInitialContent() {
 }
 loadInitialContent();
 
-if (!isTagManager) {
-  setTimeout(() => checkForUpdates(true), 3000);
-}
 
 if (!isTagManager) {
   listen('content-update', async (event) => {
