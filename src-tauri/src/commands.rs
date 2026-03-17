@@ -111,6 +111,7 @@ pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
 #[command]
 pub async fn open_new_window(
     file: Option<String>,
+    body: Option<String>,
     close_self: Option<bool>,
     window: tauri::Window,
     app: tauri::AppHandle,
@@ -119,7 +120,7 @@ pub async fn open_new_window(
     let app_clone = app.clone();
 
     let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::open_document_window(&app_clone, file, None, None)
+        crate::open_document_window(&app_clone, file, body, None)
     })
     .await
     .map_err(|e| format!("spawn_blocking failed: {}", e))?;

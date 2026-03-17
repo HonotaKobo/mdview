@@ -1,7 +1,8 @@
 {
   "menu": {
     "file": "ファイル",
-    "file_new_window": "新しいウィンドウ",
+    "file_new_window": "新規作成",
+    "file_home": "ホーム",
     "file_open": "ファイルを開く",
     "file_save": "保存",
     "file_save_as": "名前を付けて保存",

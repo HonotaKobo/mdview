@@ -86,6 +86,7 @@ export class CustomTitleBar {
         items: [
           { type: 'normal', id: 'file_new_window', label: this.t('menu.file_new_window'), accelerator: 'Ctrl+N' },
           { type: 'normal', id: 'file_open', label: this.t('menu.file_open'), accelerator: 'Ctrl+O' },
+          { type: 'normal', id: 'file_home', label: this.t('menu.file_home') },
           { type: 'separator' },
           { type: 'normal', id: 'file_save', label: this.t('menu.file_save'), accelerator: 'Ctrl+S' },
           { type: 'normal', id: 'file_save_as', label: this.t('menu.file_save_as'), accelerator: 'Ctrl+Shift+S' },

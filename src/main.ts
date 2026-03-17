@@ -263,7 +263,7 @@ if (isEditor) {
 
     switch (action) {
       case 'file_new_window':
-        debounced('file_new_window', () => invoke('open_new_window', { file: null }));
+        debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
         break;
       case 'file_open':
         debounced('file_open', () => openFileInNewWindow());
@@ -422,7 +422,7 @@ if (isEditor) {
         break;
       case 'n':
         e.preventDefault();
-        debounced('file_new_window', () => invoke('open_new_window', { file: null }));
+        debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
         break;
       case 'o':
         e.preventDefault();

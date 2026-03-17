@@ -578,7 +578,7 @@ export class HomeScreen {
   // ===== Actions =====
 
   private newFile(): void {
-    invoke('open_new_window', { file: null, closeSelf: true });
+    invoke('open_new_window', { file: null, body: '', closeSelf: true });
   }
 
   private async openFile(): Promise<void> {

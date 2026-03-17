@@ -17,6 +17,8 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .item(&MenuItemBuilder::with_id("file_open", i18n.t("menu.file_open"))
             .accelerator("CmdOrCtrl+O")
             .build(app)?)
+        .item(&MenuItemBuilder::with_id("file_home", i18n.t("menu.file_home"))
+            .build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("file_save", i18n.t("menu.file_save"))
             .accelerator("CmdOrCtrl+S")
@@ -225,6 +227,10 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": "view_status_bar" }));
         }
 
+        "file_home" => {
+            open_home_window(app);
+        }
+
         "tag_manage" => {
             open_tag_manager(app);
         }
@@ -343,6 +349,30 @@ fn open_about_window(app: &AppHandle) {
             let _ = window.remove_menu();
         }
     });
+}
+
+fn open_home_window(app: &AppHandle) {
+    // Check if a home window already exists
+    let home_label = {
+        let states = app.state::<crate::state::WindowStates>();
+        let states = states.lock().unwrap();
+        states.iter().find_map(|(label, s)| {
+            if s.window_mode == crate::state::WindowMode::Home {
+                Some(label.clone())
+            } else {
+                None
+            }
+        })
+    };
+
+    if let Some(label) = home_label {
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.set_focus();
+        }
+    } else {
+        // Create a new home window via open_document_window (file=None, body=None → Home mode)
+        let _ = crate::open_document_window(app, None, None, None);
+    }
 }
 
 fn open_tag_manager(app: &AppHandle) {

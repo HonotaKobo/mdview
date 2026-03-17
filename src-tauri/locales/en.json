@@ -1,7 +1,8 @@
 {
   "menu": {
     "file": "File",
-    "file_new_window": "New Window",
+    "file_new_window": "New File",
+    "file_home": "Home",
     "file_open": "Open File",
     "file_save": "Save",
     "file_save_as": "Save As...",
