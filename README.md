@@ -72,7 +72,7 @@ scoop install tsumugi
 
 | プラットフォーム | フォーマット |
 |----------|--------|
-| macOS | `.dmg` |
+| macOS | `.app` (tar.gz) |
 | Windows | `.msi`, `.exe` |
 
 ## 使い方
