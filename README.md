@@ -75,7 +75,9 @@ Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
 
 ### その他
 
-[GitHub Releases](../../releases) から最新版をダウンロードしてください。
+GitHub Releases から最新版をダウンロードしてください。
+
+[![GitHub Release](https://img.shields.io/github/v/release/HonotaKobo/mdcast?style=flat-square)](../../releases)
 
 | プラットフォーム | フォーマット |
 |----------|--------|
