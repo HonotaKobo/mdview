@@ -32,7 +32,7 @@ impl FileWatcher {
         let app_handle = app.clone();
         let label = window_label.clone();
 
-        let mut debouncer = new_debouncer(Duration::from_millis(100), move |res: Result<Vec<notify_debouncer_mini::DebouncedEvent>, _>| {
+        let mut debouncer = match new_debouncer(Duration::from_millis(100), move |res: Result<Vec<notify_debouncer_mini::DebouncedEvent>, _>| {
             if let Ok(events) = res {
                 for event in events {
                     if event.kind == DebouncedEventKind::Any {
@@ -55,12 +55,21 @@ impl FileWatcher {
                     }
                 }
             }
-        }).expect("Failed to create debouncer");
+        }) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("tsumugi: Failed to create debouncer for {}: {}", path, e);
+                return;
+            }
+        };
 
-        debouncer
+        if let Err(e) = debouncer
             .watcher()
             .watch(Path::new(&path), notify::RecursiveMode::NonRecursive)
-            .expect("Failed to watch file");
+        {
+            eprintln!("tsumugi: Failed to watch file {}: {}", path, e);
+            return;
+        }
 
         *self.watched_path.lock().unwrap() = Some(path);
         self._debouncer = Some(debouncer);

@@ -75,6 +75,9 @@ pub(crate) fn open_document_window(
     // Create window state
     let mut ws = WindowState::new(instance_id.clone(), doc_title.clone(), content);
     ws.content_explicitly_set = file.is_some() || body.is_some();
+    if file.is_none() && body.is_none() {
+        ws.window_mode = WindowMode::Home;
+    }
     if let Some(ref fp) = file_path {
         ws.saved_path = Some(fp.clone());
     }
