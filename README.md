@@ -1,5 +1,10 @@
 # tsumugi
 
+[![GitHub Release](https://img.shields.io/github/v/release/HonotaKobo/mdcast?style=flat-square)](https://github.com/HonotaKobo/mdcast/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square)](https://github.com/HonotaKobo/mdcast/releases)
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-FFC131?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
+
 AIエージェントが作り、人が確認する。そのための Markdown エディタ。
 
 ## どのようなエディタか
