@@ -58,19 +58,76 @@ pub fn check_update() -> Result<UpdateInfo, String> {
 
 pub fn perform_update() -> UpdateResult {
     match std::env::consts::OS {
-        "macos" => run_chained("brew", &["update"], &["upgrade", "--cask", "tsumugi"]),
+        "macos" => {
+            match find_brew() {
+                Some(brew) => run_chained(&brew, &["update"], &["upgrade", "--cask", "tsumugi"]),
+                None => UpdateResult {
+                    success: false,
+                    message: "Homebrew が見つかりません。\nhttps://brew.sh からインストールしてください。".to_string(),
+                },
+            }
+        }
         "windows" => {
-            // Ensure the scoop bucket is registered (no-op if already added)
-            let _ = std::process::Command::new("scoop")
-                .args(["bucket", "add", "tsumugi", "https://github.com/HonotaKobo/scoop-tsumugi"])
-                .output();
-            run_chained("scoop", &["update"], &["update", "tsumugi"])
+            match find_scoop() {
+                Some(scoop) => {
+                    // Ensure the scoop bucket is registered (no-op if already added)
+                    let _ = std::process::Command::new("cmd.exe")
+                        .args(["/C", scoop.as_str(), "bucket", "add", "tsumugi",
+                               "https://github.com/HonotaKobo/scoop-tsumugi"])
+                        .output();
+                    run_chained("cmd.exe",
+                        &["/C", scoop.as_str(), "update"],
+                        &["/C", scoop.as_str(), "update", "tsumugi"])
+                }
+                None => UpdateResult {
+                    success: false,
+                    message: "Scoop が見つかりません。\nhttps://scoop.sh からインストールしてください。".to_string(),
+                },
+            }
         }
         _ => UpdateResult {
             success: false,
             message: "Automatic update is not supported on this platform.".to_string(),
         },
     }
+}
+
+/// Locate the `brew` executable.
+/// GUI apps on macOS do not inherit the user's shell PATH, so we check
+/// well-known installation directories first.
+fn find_brew() -> Option<String> {
+    // Apple Silicon
+    let apple_silicon = "/opt/homebrew/bin/brew";
+    if std::path::Path::new(apple_silicon).exists() {
+        return Some(apple_silicon.to_string());
+    }
+    // Intel Mac
+    let intel = "/usr/local/bin/brew";
+    if std::path::Path::new(intel).exists() {
+        return Some(intel.to_string());
+    }
+    None
+}
+
+/// Locate the `scoop.cmd` shim on Windows.
+/// GUI apps do not inherit the user's shell PATH, so we check
+/// well-known installation directories.
+fn find_scoop() -> Option<String> {
+    // Custom install location via SCOOP env var
+    if let Ok(scoop_dir) = std::env::var("SCOOP") {
+        let path = std::path::PathBuf::from(&scoop_dir).join("shims").join("scoop.cmd");
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    // Default: %USERPROFILE%\scoop
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let path = std::path::PathBuf::from(&home).join("scoop").join("shims").join("scoop.cmd");
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 fn run_chained(cmd: &str, pre_args: &[&str], args: &[&str]) -> UpdateResult {

@@ -54,6 +54,8 @@ isEditor = !isHome;
 
 themeManager = new ThemeManager();
 
+updateModal = new UpdateModal();
+
 if (isEditor) {
   findBar = new FindBar();
   fontSizeManager = new FontSizeManager();
@@ -61,7 +63,6 @@ if (isEditor) {
   statusBar = new StatusBar();
   tagAddModal = new TagAddModal();
   tagSidebar = new TagSidebar();
-  updateModal = new UpdateModal();
 
   tagAddModal.onTagAdded(() => {
     tagSidebar.refresh();
@@ -217,6 +218,8 @@ if (isHome) {
       if (value === 'dark' || value === 'light' || value === 'auto') {
         themeManager.setTheme(value);
       }
+    } else if (action === 'help_check_updates') {
+      debounced('help_check_updates', () => updateModal.checkForUpdates(false));
     }
   });
 

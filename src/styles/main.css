@@ -609,9 +609,8 @@ mark.find-highlight.active {
   bottom: 0;
   background: rgba(0, 0, 0, 0.3);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 20vh;
   z-index: 2000;
 }
 
@@ -639,27 +638,29 @@ mark.find-highlight.active {
 }
 
 .update-modal-btn {
-  padding: 6px 16px;
-  font-size: 13px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: inherit;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-primary);
+  border-radius: 4px;
+  background: transparent;
   color: var(--text-primary);
   cursor: pointer;
+  transition: 0.15s;
 }
 
 .update-modal-btn:hover {
-  background: var(--bg-secondary);
+  background: rgba(128, 128, 128, 0.15);
 }
 
 .update-modal-btn-primary {
-  background: var(--accent-color, #0078d4);
-  color: #fff;
-  border-color: transparent;
+  color: var(--link-color);
+  border-color: var(--link-color);
 }
 
 .update-modal-btn-primary:hover {
-  opacity: 0.9;
+  background: var(--link-color);
+  color: #ffffff;
 }
 
 :root[data-theme='dark'] #update-overlay {

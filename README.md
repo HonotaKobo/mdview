@@ -81,7 +81,6 @@ scoop install tsumugi
 
 ```bash
 tsumugi README.md                    # ファイルを開く
-tsumugi --title "メモ" notes.md      # タイトルを指定して開く
 tsumugi                              # GUIファイル選択ダイアログから開く
 ```
 
