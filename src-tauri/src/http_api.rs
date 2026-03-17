@@ -1,3 +1,5 @@
+use std::io::Read as _;
+
 use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 use tiny_http::{Header, Method, Response, Server};
@@ -11,18 +13,11 @@ pub struct HttpServerInfo {
     pub token: String,
 }
 
-/// Generate a random hex token for API authentication.
+/// Generate a random hex token for API authentication using CSPRNG.
 fn generate_token() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let seed = t.as_nanos();
-    // Mix bits for better randomness from time-based seed
-    let hash = seed
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407);
-    format!("{:016x}", hash)
+    let mut buf = [0u8; 16];
+    getrandom::getrandom(&mut buf).expect("failed to generate random token");
+    buf.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 /// Start HTTP API server on a random localhost port.
@@ -80,10 +75,13 @@ fn verify_token(request: &tiny_http::Request, expected: &str) -> bool {
     false
 }
 
-fn read_body(request: &mut tiny_http::Request) -> String {
+const MAX_BODY_SIZE: u64 = 50 * 1024 * 1024;
+
+fn read_body(request: &mut tiny_http::Request) -> Result<String, String> {
     let mut body = String::new();
-    request.as_reader().read_to_string(&mut body).ok();
-    body
+    request.as_reader().take(MAX_BODY_SIZE).read_to_string(&mut body)
+        .map_err(|e| format!("Failed to read body: {}", e))?;
+    Ok(body)
 }
 
 fn error_response(msg: &str) -> ipc::IpcResponse {
@@ -226,7 +224,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
     match (method, path) {
         // Pass-through: accept IpcRequest JSON directly
         (Method::Post, "/") => {
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
             match parse_json_lenient::<ipc::IpcRequest>(&body) {
                 Ok(req) => dispatch_ipc_request(app, &window_label, req),
                 Err(e) => error_response(&e),
@@ -236,7 +237,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         // REST-style endpoints
         (Method::Post, "/update") => {
             let content_type = get_content_type(request);
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
 
             if content_type == "text/markdown" || content_type == "text/plain" {
                 // Raw body mode: body is markdown text, title from query param
@@ -251,7 +255,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             }
         }
         (Method::Post, "/query") => {
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
             match parse_json_lenient::<QueryRequest>(&body) {
                 Ok(r) => ipc::handle_query(app, &window_label, &r.properties),
                 Err(e) => error_response(&e),
@@ -259,7 +266,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         }
         (Method::Post, "/grep") => {
             let content_type = get_content_type(request);
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
 
             if content_type == "text/plain" {
                 // Raw body mode: body is the regex pattern
@@ -272,14 +282,20 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             }
         }
         (Method::Post, "/lines") => {
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
             match parse_json_lenient::<LinesRequest>(&body) {
                 Ok(r) => ipc::handle_lines(app, &window_label, r.start, r.end),
                 Err(e) => error_response(&e),
             }
         }
         (Method::Post, "/edit/delete") => {
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
             match parse_json_lenient::<DeleteRequest>(&body) {
                 Ok(r) => ipc::handle_delete(app, &window_label, r.ranges),
                 Err(e) => error_response(&e),
@@ -287,7 +303,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         }
         (Method::Post, "/edit/insert") => {
             let content_type = get_content_type(request);
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
 
             if content_type == "text/markdown" || content_type == "text/plain" {
                 // Raw body mode: body is the content, line from query param
@@ -304,7 +323,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
         }
         (Method::Post, "/edit/replace") => {
             let content_type = get_content_type(request);
-            let body = read_body(request);
+            let body = match read_body(request) {
+                Ok(b) => b,
+                Err(e) => return error_response(&e),
+            };
 
             if content_type == "text/markdown" || content_type == "text/plain" {
                 // Raw body mode: body is the content, start/end from query params

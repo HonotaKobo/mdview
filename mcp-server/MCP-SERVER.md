@@ -129,7 +129,9 @@ Claude Code / Claude Desktop / Codex CLI → MCP(stdio) → Python → HTTP API 
 ```
 
 - Claude が MCP ツールを呼び出す
-- `launch` の場合: Python スクリプトが tsumugi バイナリを実行し、新ウィンドウを起動
+- `launch` の場合:
+  - 既存インスタンスがあれば HTTP API の CreateWindow で新ウィンドウを開く
+  - なければ tsumugi バイナリを起動し、HTTP API 経由で本文を送信する
 - `update` 等の場合: Python スクリプトが tsumugi の HTTP API にリクエストを送る
 - tsumugi がウィンドウを表示・更新する
 

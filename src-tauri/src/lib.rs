@@ -110,7 +110,7 @@ pub(crate) fn open_document_window(
     {
         let http_info = app.state::<http_api::HttpServerInfo>();
         let port_path = ipc::instance_file(&instance_id).with_extension("http");
-        std::fs::write(&port_path, format!("{}:{}", http_info.port, http_info.token)).ok();
+        write_port_file(&port_path, &format!("{}:{}", http_info.port, http_info.token));
     }
 
     // Start file watcher if needed
@@ -380,7 +380,7 @@ pub fn run() {
 
             // Write HTTP port file for the initial window
             let port_path = ipc::instance_file(&id_for_setup).with_extension("http");
-            std::fs::write(&port_path, format!("{}:{}", http_port, http_token)).ok();
+            write_port_file(&port_path, &format!("{}:{}", http_port, http_token));
             eprintln!("tsumugi: HTTP API listening on http://127.0.0.1:{}", http_port);
             eprintln!("tsumugi: port file: {}", port_path.display());
 
@@ -518,6 +518,15 @@ pub fn run() {
         });
 }
 
+fn write_port_file(path: &std::path::Path, content: &str) {
+    std::fs::write(path, content).ok();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).ok();
+    }
+}
+
 fn file_to_id(file: &str) -> String {
     let canonical = std::fs::canonicalize(file)
         .unwrap_or_else(|_| std::path::PathBuf::from(file));
@@ -537,13 +546,7 @@ fn file_to_id(file: &str) -> String {
 
 fn rand_u16() -> u16 {
     let mut buf = [0u8; 2];
-    // Simple random using time
-    let t = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    buf[0] = (t & 0xFF) as u8;
-    buf[1] = ((t >> 8) & 0xFF) as u8;
+    getrandom::getrandom(&mut buf).expect("failed to generate random bytes");
     u16::from_le_bytes(buf)
 }
 

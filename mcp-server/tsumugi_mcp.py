@@ -97,21 +97,10 @@ def _find_tsumugi_bin() -> str:
 # --- Tools ---
 
 
-@mcp.tool()
-def launch(body: str = "", title: str | None = None) -> str:
-    """新しい tsumugi ウィンドウを開いてコンテンツを表示する.
-
-    新規ウィンドウを開き、自動生成されたインスタンスIDを返す。
-    返されたIDを使って update / query 等で操作できる。
-
-    Args:
-        body: 表示する Markdown 本文（省略時は空のウィンドウ）
-        title: ドキュメントタイトル（省略時は "Untitled"）
-    """
+def _launch_process(title: str | None = None) -> str:
+    """tsumugiプロセスを起動してインスタンスIDを返す（ポートファイル待機含む）."""
     bin_path = _find_tsumugi_bin()
     cmd: list[str] = [bin_path]
-    if body:
-        cmd += ["--body", body]
     if title:
         cmd += ["--title", title]
 
@@ -130,8 +119,56 @@ def launch(body: str = "", title: str | None = None) -> str:
     port_file = _instance_dir() / f"{auto_id}.http"
     for _ in range(20):
         if port_file.exists():
-            return auto_id
+            break
         time.sleep(0.25)
+
+    return auto_id
+
+
+@mcp.tool()
+def launch(body: str = "", title: str | None = None) -> str:
+    """新しい tsumugi ウィンドウを開いてコンテンツを表示する.
+
+    新規ウィンドウを開き、自動生成されたインスタンスIDを返す。
+    返されたIDを使って update / query 等で操作できる。
+
+    Args:
+        body: 表示する Markdown 本文（省略時は空のウィンドウ）
+        title: ドキュメントタイトル（省略時は "Untitled"）
+    """
+    # bodyが空の場合はコマンドライン漏洩リスクなし — 従来通り起動
+    if not body:
+        return _launch_process(title=title)
+
+    # 既存インスタンスがあれば CreateWindow API で新ウィンドウを開く
+    instances = _list_instances()
+    if instances:
+        for iid in instances:
+            try:
+                with _client(iid) as c:
+                    r = c.post("/", json={
+                        "type": "CreateWindow",
+                        "body": body,
+                        "title": title,
+                    })
+                    data = r.json()
+                    if data.get("ok"):
+                        return data.get("value", "")
+            except Exception:
+                continue
+
+    # 既存インスタンスなし — bodyなしで起動し、API経由でbodyを送信
+    auto_id = _launch_process(title=title)
+    try:
+        with _client(auto_id) as c:
+            c.post(
+                "/update",
+                content=body.encode("utf-8"),
+                headers={"Content-Type": "text/markdown"},
+                params={"title": title} if title else None,
+            )
+    except Exception:
+        logger.warning("Failed to send body via API, window may be empty")
 
     return auto_id
 

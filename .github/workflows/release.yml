@@ -82,9 +82,10 @@ jobs:
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-14' && secrets.APPLE_CERTIFICATE || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-14' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
           APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-14' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_API_ISSUER: ${{ matrix.platform == 'macos-14' && secrets.APPLE_API_ISSUER || '' }}
-          APPLE_API_KEY: ${{ matrix.platform == 'macos-14' && secrets.APPLE_API_KEY || '' }}
-          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos-14' && '~/private_keys/AuthKey.p8' || '' }}
+          # 公証サービス障害のため一時的に無効化
+          # APPLE_API_ISSUER: ${{ matrix.platform == 'macos-14' && secrets.APPLE_API_ISSUER || '' }}
+          # APPLE_API_KEY: ${{ matrix.platform == 'macos-14' && secrets.APPLE_API_KEY || '' }}
+          # APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos-14' && '~/private_keys/AuthKey.p8' || '' }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}

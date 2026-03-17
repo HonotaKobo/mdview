@@ -32,18 +32,18 @@ mod transport {
         instance_dir().join(format!("{}.{}", id, INSTANCE_EXT))
     }
 
-    pub fn connect(id: &str) -> std::io::Result<Stream> {
+    pub fn connect(id: &str) -> std::io::Result<(Stream, Option<String>)> {
         let path = instance_file(id);
         let stream = UnixStream::connect(&path)?;
         stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
         stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
-        Ok(stream)
+        Ok((stream, None))
     }
 
-    pub fn bind(id: &str) -> std::io::Result<Listener> {
+    pub fn bind(id: &str) -> std::io::Result<(Listener, Option<String>)> {
         let path = instance_file(id);
         std::fs::remove_file(&path).ok();
-        UnixListener::bind(&path)
+        Ok((UnixListener::bind(&path)?, None))
     }
 }
 
@@ -69,26 +69,30 @@ mod transport {
         instance_dir().join(format!("{}.{}", id, INSTANCE_EXT))
     }
 
-    pub fn connect(id: &str) -> std::io::Result<Stream> {
+    pub fn connect(id: &str) -> std::io::Result<(Stream, Option<String>)> {
         let port_path = instance_file(id);
-        let port_str = std::fs::read_to_string(&port_path)
+        let content = std::fs::read_to_string(&port_path)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::NotFound, e))?;
+        let (port_str, token) = content.trim().split_once(':')
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid port file format"))?;
         let port: u16 = port_str
-            .trim()
             .parse()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let stream = TcpStream::connect(("127.0.0.1", port))?;
         stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
         stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
-        Ok(stream)
+        Ok((stream, Some(token.to_string())))
     }
 
-    pub fn bind(id: &str) -> std::io::Result<Listener> {
+    pub fn bind(id: &str) -> std::io::Result<(Listener, Option<String>)> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let port = listener.local_addr()?.port();
+        let mut buf = [0u8; 16];
+        getrandom::getrandom(&mut buf).expect("failed to generate IPC token");
+        let token: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
         let port_path = instance_file(id);
-        std::fs::write(&port_path, port.to_string())?;
-        Ok(listener)
+        std::fs::write(&port_path, format!("{}:{}", port, token))?;
+        Ok((listener, Some(token)))
     }
 }
 
@@ -135,7 +139,7 @@ fn parse_ranges(s: &str) -> Result<Vec<(usize, usize)>, String> {
 }
 
 pub fn send_to_existing(id: &str, args: &crate::cli::CliArgs) -> Result<(), Box<dyn std::error::Error>> {
-    let mut stream = transport::connect(id)?;
+    let (mut stream, ipc_token) = transport::connect(id)?;
 
     let request = if !args.query.is_empty() {
         let props: Vec<String> = args.query.iter().map(|q| format!("{:?}", q).to_lowercase()).collect();
@@ -159,6 +163,9 @@ pub fn send_to_existing(id: &str, args: &crate::cli::CliArgs) -> Result<(), Box<
         serde_json::json!({ "type": "Update", "body": args.body, "title": args.title })
     };
 
+    if let Some(ref token) = ipc_token {
+        stream.write_all(format!("{}\n", token).as_bytes())?;
+    }
     stream.write_all(request.to_string().as_bytes())?;
     stream.shutdown(std::net::Shutdown::Write)?;
 
@@ -200,7 +207,7 @@ pub fn send_create_window(
     body: Option<String>,
     title: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut stream = transport::connect("tsumugi-primary")?;
+    let (mut stream, ipc_token) = transport::connect("tsumugi-primary")?;
 
     let request = serde_json::json!({
         "type": "CreateWindow",
@@ -209,6 +216,9 @@ pub fn send_create_window(
         "title": title,
     });
 
+    if let Some(ref token) = ipc_token {
+        stream.write_all(format!("{}\n", token).as_bytes())?;
+    }
     stream.write_all(request.to_string().as_bytes())?;
     stream.shutdown(std::net::Shutdown::Write)?;
 
@@ -233,7 +243,7 @@ pub fn send_create_window(
 /// Per-window IPC listener
 pub fn start_listener(instance_id: String, window_label: String, app: AppHandle) {
     std::thread::spawn(move || {
-        let listener = match transport::bind(&instance_id) {
+        let (listener, ipc_token) = match transport::bind(&instance_id) {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("tsumugi: Failed to start IPC listener for {}: {}", instance_id, e);
@@ -243,7 +253,7 @@ pub fn start_listener(instance_id: String, window_label: String, app: AppHandle)
 
         for stream in listener.incoming() {
             if let Ok(mut stream) = stream {
-                handle_stream(&app, &window_label, &mut stream);
+                handle_stream(&app, &window_label, &mut stream, ipc_token.as_deref());
             }
         }
     });
@@ -252,7 +262,7 @@ pub fn start_listener(instance_id: String, window_label: String, app: AppHandle)
 /// Primary socket listener — only handles CreateWindow requests
 pub fn start_primary_listener(app: AppHandle) {
     std::thread::spawn(move || {
-        let listener = match transport::bind("tsumugi-primary") {
+        let (listener, ipc_token) = match transport::bind("tsumugi-primary") {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("tsumugi: Failed to start primary listener: {}", e);
@@ -262,15 +272,35 @@ pub fn start_primary_listener(app: AppHandle) {
 
         for stream in listener.incoming() {
             if let Ok(mut stream) = stream {
-                handle_primary_stream(&app, &mut stream);
+                handle_primary_stream(&app, &mut stream, ipc_token.as_deref());
             }
         }
     });
 }
 
-fn handle_stream(app: &AppHandle, window_label: &str, stream: &mut (impl Read + Write)) {
+const MAX_IPC_SIZE: u64 = 50 * 1024 * 1024;
+
+fn handle_stream(app: &AppHandle, window_label: &str, stream: &mut (impl Read + Write), expected_token: Option<&str>) {
     let mut buf = String::new();
-    if stream.read_to_string(&mut buf).is_ok() {
+    let read_ok = {
+        let mut limited = (&mut *stream).take(MAX_IPC_SIZE);
+        limited.read_to_string(&mut buf).is_ok()
+    };
+    if read_ok {
+        // Verify IPC token (Windows)
+        if let Some(token) = expected_token {
+            match buf.split_once('\n') {
+                Some((received, rest)) if received == token => {
+                    buf = rest.to_string();
+                }
+                _ => {
+                    let resp = IpcResponse { ok: false, value: Some("Unauthorized".to_string()) };
+                    let _ = stream.write_all(serde_json::to_string(&resp).unwrap_or_default().as_bytes());
+                    return;
+                }
+            }
+        }
+
         if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
             let response = match req {
                 IpcRequest::Update { body, title } => handle_update(app, window_label, body, title),
@@ -294,9 +324,27 @@ fn handle_stream(app: &AppHandle, window_label: &str, stream: &mut (impl Read + 
     }
 }
 
-fn handle_primary_stream(app: &AppHandle, stream: &mut (impl Read + Write)) {
+fn handle_primary_stream(app: &AppHandle, stream: &mut (impl Read + Write), expected_token: Option<&str>) {
     let mut buf = String::new();
-    if stream.read_to_string(&mut buf).is_ok() {
+    let read_ok = {
+        let mut limited = (&mut *stream).take(MAX_IPC_SIZE);
+        limited.read_to_string(&mut buf).is_ok()
+    };
+    if read_ok {
+        // Verify IPC token (Windows)
+        if let Some(token) = expected_token {
+            match buf.split_once('\n') {
+                Some((received, rest)) if received == token => {
+                    buf = rest.to_string();
+                }
+                _ => {
+                    let resp = IpcResponse { ok: false, value: Some("Unauthorized".to_string()) };
+                    let _ = stream.write_all(serde_json::to_string(&resp).unwrap_or_default().as_bytes());
+                    return;
+                }
+            }
+        }
+
         if let Ok(req) = serde_json::from_str::<IpcRequest>(&buf) {
             let response = match req {
                 IpcRequest::CreateWindow { file, body, title } => {
@@ -336,8 +384,11 @@ pub fn list_instances() {
                 if id == "tsumugi-primary" {
                     continue;
                 }
-                if let Ok(mut stream) = transport::connect(id) {
+                if let Ok((mut stream, ipc_token)) = transport::connect(id) {
                     let req = r#"{"type":"Query","properties":["title"]}"#;
+                    if let Some(ref token) = ipc_token {
+                        stream.write_all(format!("{}\n", token).as_bytes()).ok();
+                    }
                     if stream.write_all(req.as_bytes()).is_ok()
                         && stream.shutdown(std::net::Shutdown::Write).is_ok()
                     {
@@ -386,8 +437,11 @@ pub(crate) fn get_instances() -> Vec<(String, String)> {
                 if id == "tsumugi-primary" {
                     continue;
                 }
-                if let Ok(mut stream) = transport::connect(id) {
+                if let Ok((mut stream, ipc_token)) = transport::connect(id) {
                     let req = r#"{"type":"Query","properties":["title"]}"#;
+                    if let Some(ref token) = ipc_token {
+                        stream.write_all(format!("{}\n", token).as_bytes()).ok();
+                    }
                     if stream.write_all(req.as_bytes()).is_ok()
                         && stream.shutdown(std::net::Shutdown::Write).is_ok()
                     {

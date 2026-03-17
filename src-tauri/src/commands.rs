@@ -7,13 +7,48 @@ use crate::state::{WindowMode, WindowStates};
 use crate::tags::{TagEntry, TagState};
 use crate::update_checker::{UpdateInfo, UpdateResult};
 
+/// Validate and normalize a file path, blocking access to sensitive system directories.
+fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
+    if path.contains('\0') {
+        return Err("Invalid path".to_string());
+    }
+    let p = std::path::Path::new(path);
+
+    // Resolve to canonical path (resolves symlinks, .., etc.)
+    let canonical = std::fs::canonicalize(p).or_else(|_| {
+        // For new files: canonicalize parent directory
+        p.parent()
+            .ok_or_else(|| "Invalid path".to_string())
+            .and_then(|parent| {
+                std::fs::canonicalize(parent).map_err(|e| format!("Invalid path: {}", e))
+            })
+            .map(|cp| cp.join(p.file_name().unwrap_or_default()))
+    })?;
+
+    // Block sensitive system directories
+    let path_str = canonical.to_string_lossy();
+    let blocked: &[&str] = if cfg!(target_os = "windows") {
+        &["C:\\Windows", "C:\\Program Files"]
+    } else {
+        &["/etc", "/usr", "/bin", "/sbin", "/System"]
+    };
+    for prefix in blocked {
+        if path_str.starts_with(prefix) {
+            return Err(format!("Access denied: {}", prefix));
+        }
+    }
+    Ok(canonical)
+}
+
 #[command]
 pub fn read_file(path: String) -> Result<String, String> {
+    let path = validate_path(&path)?.to_string_lossy().to_string();
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
 }
 
 #[command]
 pub fn save_file(path: String, content: String) -> Result<(), String> {
+    let path = validate_path(&path)?.to_string_lossy().to_string();
     std::fs::write(&path, &content).map_err(|e| format!("Failed to write {}: {}", path, e))
 }
 
@@ -65,6 +100,8 @@ pub fn get_initial_content(window: tauri::Window, states: tauri::State<'_, Windo
 
 #[command]
 pub fn rename_file(old_path: String, new_path: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) -> Result<String, String> {
+    let old_path = validate_path(&old_path)?.to_string_lossy().to_string();
+    let new_path = validate_path(&new_path)?.to_string_lossy().to_string();
     std::fs::rename(&old_path, &new_path)
         .map_err(|e| format!("Failed to rename: {}", e))?;
     let abs_path = std::fs::canonicalize(&new_path)
@@ -84,6 +121,7 @@ pub fn rename_file(old_path: String, new_path: String, window: tauri::Window, st
 
 #[command]
 pub fn save_binary_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    let path = validate_path(&path)?.to_string_lossy().to_string();
     std::fs::write(&path, &data).map_err(|e| format!("Failed to write {}: {}", path, e))
 }
 

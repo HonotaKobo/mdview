@@ -4607,6 +4607,7 @@ version = "0.3.19"
 dependencies = [
  "clap",
  "dirs 5.0.1",
+ "getrandom 0.2.17",
  "libc",
  "notify",
  "notify-debouncer-mini",

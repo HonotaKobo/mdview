@@ -83,15 +83,15 @@ function renderPreview(block: Block, preview: HTMLElement): void {
       // Strip --- delimiters and render as YAML-highlighted code
       const yamlContent = block.text.replace(/^---\s*\n?/, '').replace(/\n?---\s*$/, '');
       const highlighted = hljs.highlight(yamlContent, { language: 'yaml' }).value;
-      preview.innerHTML = `<pre class="hljs"><code>${highlighted}</code></pre>`;
+      preview.innerHTML = sanitizeHtml(`<pre class="hljs"><code>${highlighted}</code></pre>`);
       break;
     }
     case 'math':
       try {
-        preview.innerHTML = katex.renderToString(block.text, {
+        preview.innerHTML = sanitizeHtml(katex.renderToString(block.text, {
           throwOnError: false,
           displayMode: true,
-        });
+        }));
       } catch {
         preview.textContent = block.text;
       }
