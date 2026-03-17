@@ -6,6 +6,8 @@ use std::sync::Mutex;
 pub struct TagEntry {
     pub path: String,
     pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -90,6 +92,7 @@ impl TagStore {
             self.data.entries.push(TagEntry {
                 path: path.to_string(),
                 tags: vec![tag.to_string()],
+                memo: None,
             });
         }
         self.save();
@@ -114,6 +117,7 @@ impl TagStore {
             self.data.entries.push(TagEntry {
                 path: path.to_string(),
                 tags,
+                memo: None,
             });
         }
         self.save();

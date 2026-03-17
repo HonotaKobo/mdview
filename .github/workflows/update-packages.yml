@@ -83,18 +83,18 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Download dmgs and compute hashes
+      - name: Download apps and compute hashes
         id: hash
         run: |
           BASE="https://github.com/HonotaKobo/tsumugi/releases/download/${{ steps.release.outputs.tag }}"
           VERSION="${{ steps.release.outputs.version }}"
 
-          curl -fSL -o arm.dmg "$BASE/tsumugi_${VERSION}_aarch64.dmg"
-          ARM_HASH=$(sha256sum arm.dmg | awk '{print $1}')
+          curl -fSL -o arm.app.tar.gz "$BASE/tsumugi_${VERSION}_aarch64.app.tar.gz"
+          ARM_HASH=$(sha256sum arm.app.tar.gz | awk '{print $1}')
           echo "arm=$ARM_HASH" >> "$GITHUB_OUTPUT"
 
-          curl -fSL -o intel.dmg "$BASE/tsumugi_${VERSION}_x64.dmg"
-          INTEL_HASH=$(sha256sum intel.dmg | awk '{print $1}')
+          curl -fSL -o intel.app.tar.gz "$BASE/tsumugi_${VERSION}_x64.app.tar.gz"
+          INTEL_HASH=$(sha256sum intel.app.tar.gz | awk '{print $1}')
           echo "intel=$INTEL_HASH" >> "$GITHUB_OUTPUT"
 
           echo "ARM SHA256: $ARM_HASH"
@@ -120,7 +120,7 @@ jobs:
             sha256 arm: "ARM_HASH_PLACEHOLDER",
                    intel: "INTEL_HASH_PLACEHOLDER"
 
-            url "https://github.com/HonotaKobo/tsumugi/releases/download/v#{version}/tsumugi_#{version}_#{arch}.dmg"
+            url "https://github.com/HonotaKobo/tsumugi/releases/download/v#{version}/tsumugi_#{version}_#{arch}.app.tar.gz"
             name "tsumugi"
             desc "Markdown viewer for the AI age"
             homepage "https://github.com/HonotaKobo/tsumugi"
