@@ -106,6 +106,7 @@ async function initPlatformUI() {
     await customTitleBar.init();
     if (isHome) {
       customTitleBar.setTitle('');
+      customTitleBar.disableMaximize();
     } else if (currentTitle !== 'Untitled') {
       customTitleBar.setTitle(currentTitle);
     }

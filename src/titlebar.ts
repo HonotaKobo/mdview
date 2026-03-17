@@ -43,6 +43,7 @@ export class CustomTitleBar {
   private openMenuId: string | null = null;
   private translations: Record<string, string> = {};
   private checkStates: Record<string, boolean> = {};
+  private _maximizeDisabled = false;
 
   async init(): Promise<void> {
     this.translations = await invoke<Record<string, string>>('get_translations');
@@ -72,6 +73,13 @@ export class CustomTitleBar {
     if (this.titleEl) {
       this.titleEl.textContent = title ? `${title} \u2014 tsumugi` : 'tsumugi';
     }
+  }
+
+  /** Hide maximize button and disable double-click maximize (for fixed-size windows) */
+  disableMaximize(): void {
+    const btn = this.el.querySelector('#tb-maximize') as HTMLElement | null;
+    if (btn) btn.style.display = 'none';
+    this._maximizeDisabled = true;
   }
 
   private t(key: string): string {
@@ -327,7 +335,7 @@ export class CustomTitleBar {
     btn.id = id;
 
     if (type === 'minimize') {
-      btn.innerHTML = '<svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>';
+      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="1"><path d="M 2 4 L 2 13 L 11 13 L 11 4 Z"/><path d="M 4 2 L 13 2 L 13 12"/></g></svg>';
     } else if (type === 'maximize') {
       btn.innerHTML = this.maximizeSvg();
     } else {
@@ -386,6 +394,7 @@ export class CustomTitleBar {
     });
 
     this.el.querySelector('#tb-maximize')!.addEventListener('click', async () => {
+      if (this._maximizeDisabled) return;
       const win = getCurrentWindow();
       if (await win.isMaximized()) {
         await win.unmaximize();
@@ -400,6 +409,7 @@ export class CustomTitleBar {
 
     // Double-click on title row to maximize/restore
     this.el.querySelector('.titlebar-title')!.addEventListener('dblclick', async () => {
+      if (this._maximizeDisabled) return;
       const win = getCurrentWindow();
       if (await win.isMaximized()) {
         await win.unmaximize();
