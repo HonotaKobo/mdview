@@ -120,7 +120,7 @@ jobs:
             sha256 arm: "ARM_HASH_PLACEHOLDER",
                    intel: "INTEL_HASH_PLACEHOLDER"
 
-            url "https://github.com/HonotaKobo/tsumugi/releases/download/v#{version}/tsumugi_#{version}_#{arch}.app.tar.gz"
+            url "https://github.com/HonotaKobo/tsumugi/releases/download/v#{version}/tsumugi_#{arch}.app.tar.gz"
             name "tsumugi"
             desc "Markdown viewer for the AI age"
             homepage "https://github.com/HonotaKobo/tsumugi"
