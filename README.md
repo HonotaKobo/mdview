@@ -59,11 +59,18 @@ brew install --cask tsumugi
 
 ### Windows（Scoop）
 
-[Scoop](https://scoop.sh/) が未インストールの場合は、先にインストールしてください。
-
 ```powershell
 scoop bucket add tsumugi https://github.com/HonotaKobo/scoop-tsumugi
 scoop install tsumugi
+```
+
+Scoop が未インストールの場合は、先にインストールしてください。
+
+[![Scoop](https://img.shields.io/badge/Scoop-scoop.sh-blue?style=flat-square)](https://scoop.sh/)
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
 ```
 
 ### その他
