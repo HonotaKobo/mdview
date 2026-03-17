@@ -45,7 +45,7 @@ export class HomeScreen {
 
   async init(): Promise<void> {
     // Fix window size for home screen
-    await getCurrentWindow().setResizable(false);
+    try { await getCurrentWindow().setResizable(false); } catch { /* permission may be missing */ }
 
     // Hide editor elements
     document.getElementById('find-bar')!.style.display = 'none';

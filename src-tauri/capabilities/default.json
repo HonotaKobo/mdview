@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "windows": ["main", "doc-*", "about", "tag-manager"],
+  "windows": ["main", "main-home", "doc-*", "about", "tag-manager"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
@@ -13,6 +13,7 @@
     "core:window:allow-is-maximized",
     "core:window:allow-set-always-on-top",
     "core:window:allow-is-always-on-top",
+    "core:window:allow-set-resizable",
     "core:window:allow-start-dragging",
     "dialog:default",
     "dialog:allow-open",
