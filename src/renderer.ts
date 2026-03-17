@@ -39,7 +39,7 @@ const md: MarkdownIt = new MarkdownIt({
   typographer: true,
   breaks: true,
   highlight: (str: string, lang: string): string => {
-    // Mermaid blocks: don't highlight, leave for post-processing
+    // Mermaid ブロック: ハイライトせず、後処理に委ねる
     if (lang === 'mermaid') {
       return `<pre class="mermaid-source"><code>${escapeHtml(str)}</code></pre>`;
     }
@@ -74,7 +74,7 @@ const md: MarkdownIt = new MarkdownIt({
 
 let deflistRenderCount = 0;
 
-// Custom plugin: checkboxes, radio buttons, and text inputs in definition list <dd> elements
+// カスタムプラグイン: 定義リスト <dd> 要素内のチェックボックス、ラジオボタン、テキスト入力
 function deflistTaskPlugin(md: MarkdownIt): void {
   md.core.ruler.after('inline', 'deflist-task', (state) => {
     const tokens = state.tokens;
@@ -83,7 +83,7 @@ function deflistTaskPlugin(md: MarkdownIt): void {
     let radioGroupId = 0;
 
     for (let i = 0; i < tokens.length; i++) {
-      // Track dt_open for radio group boundaries
+      // ラジオグループの境界として dt_open を追跡する
       if (tokens[i].type === 'dt_open') {
         radioGroupId++;
         continue;
@@ -91,14 +91,14 @@ function deflistTaskPlugin(md: MarkdownIt): void {
 
       if (tokens[i].type !== 'dd_open') continue;
 
-      // Find the next inline token inside this dd
+      // この dd 内の次の inline トークンを探す
       for (let j = i + 1; j < tokens.length && tokens[j].type !== 'dd_close'; j++) {
         if (tokens[j].type !== 'inline') continue;
         const content = tokens[j].content;
         const children = tokens[j].children ?? [];
         tokens[j].children = children;
 
-        // 1) Combined: [R:"x?"][T:"value"] optional-label
+        // 1) 複合: [R:"x?"][T:"value"] ラベル(任意)
         let match = content.match(/^\[R:"(x?)"\]\[T:"([^"]*)"\]\s?(.*)/);
         if (match) {
           const radioChecked = match[1] === 'x';
@@ -120,7 +120,7 @@ function deflistTaskPlugin(md: MarkdownIt): void {
           break;
         }
 
-        // 2) Radio: [R:"x?"] label
+        // 2) ラジオボタン: [R:"x?"] ラベル
         match = content.match(/^\[R:"(x?)"\]\s?/);
         if (match) {
           const checked = match[1] === 'x';
@@ -147,7 +147,7 @@ function deflistTaskPlugin(md: MarkdownIt): void {
           break;
         }
 
-        // 3) Text: [T:"value"] label
+        // 3) テキスト入力: [T:"value"] ラベル
         match = content.match(/^\[T:"([^"]*)"\]\s?(.*)/);
         if (match) {
           const textValue = match[1];
@@ -165,7 +165,7 @@ function deflistTaskPlugin(md: MarkdownIt): void {
           break;
         }
 
-        // 4) Checkbox: [ ] or [x] (existing)
+        // 4) チェックボックス: [ ] または [x] (既存)
         match = content.match(/^\[([ xX])\]\s?/);
         if (match) {
           const checked = match[1] === 'x' || match[1] === 'X';
@@ -271,7 +271,7 @@ function tocPlugin(mdInstance: MarkdownIt): void {
 
 md.use(tocPlugin);
 
-/** Expose the markdown-it instance for block parsing in editor mode */
+/** エディタモードでのブロックパースのために markdown-it インスタンスを公開する */
 export function getMarkdownIt(): MarkdownIt {
   return md;
 }

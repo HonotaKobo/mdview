@@ -38,7 +38,7 @@ impl I18n {
                     .unwrap_or_else(|_| EN.to_string());
                 let mut custom: serde_json::Value = serde_json::from_str(&custom_json)
                     .unwrap_or_else(|_| base.clone());
-                // Fill missing keys from EN into custom, and save back if anything was added
+                // ENからカスタムに不足キーを補完し、追加があれば保存
                 if deep_fill_missing(&mut custom, &base) {
                     if let Ok(json) = serde_json::to_string_pretty(&custom) {
                         let tmp = path.with_extension("tmp");
@@ -57,7 +57,7 @@ impl I18n {
         &self.locale
     }
 
-    /// Get a translation by dot-separated key (e.g. "menu.file_open")
+    /// ドット区切りのキーで翻訳を取得する（例: "menu.file_open"）
     pub fn t(&self, key: &str) -> String {
         let mut current = &self.translations;
         for part in key.split('.') {
@@ -69,7 +69,7 @@ impl I18n {
         current.as_str().map(|s| s.to_string()).unwrap_or_else(|| key.to_string())
     }
 
-    /// Return all translations as a flat map for the frontend
+    /// フロントエンド用に全翻訳をフラットマップとして返す
     pub fn flat_map(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
         flatten(&self.translations, String::new(), &mut map);
@@ -78,21 +78,21 @@ impl I18n {
 
 }
 
-/// Recursively fill missing keys in `target` from `source`.
-/// Returns true if any keys were added.
+/// `source`から`target`に不足しているキーを再帰的に補完する。
+/// キーが追加された場合はtrueを返す。
 fn deep_fill_missing(target: &mut serde_json::Value, source: &serde_json::Value) -> bool {
     let mut changed = false;
     if let (Some(target_obj), Some(source_obj)) = (target.as_object_mut(), source.as_object()) {
         for (key, source_val) in source_obj {
             if let Some(target_val) = target_obj.get_mut(key) {
-                // Both have the key — recurse if both are objects
+                // 両方にキーが存在する — 両方がオブジェクトなら再帰
                 if target_val.is_object() && source_val.is_object() {
                     if deep_fill_missing(target_val, source_val) {
                         changed = true;
                     }
                 }
             } else {
-                // Key missing in custom — add from EN
+                // カスタムにキーが不足 — ENから追加
                 target_obj.insert(key.clone(), source_val.clone());
                 changed = true;
             }

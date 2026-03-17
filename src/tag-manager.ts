@@ -19,7 +19,7 @@ export class TagManager {
   private tagCounts: [string, number][] = [];
   private tagSortBy: 'name' | 'count' = 'name';
 
-  // Persistent DOM refs (B1: avoid re-creating search input)
+  // 永続的な DOM 参照 (B1: 検索入力の再生成を避ける)
   private wrapper: HTMLElement | null = null;
   private searchInput: HTMLInputElement | null = null;
   private cardListEl: HTMLElement | null = null;
@@ -64,7 +64,7 @@ export class TagManager {
     }
   }
 
-  // F2: AND search - split query by spaces/commas
+  // F2: AND 検索 - クエリをスペース/カンマで分割する
   private getFilteredEntries(): TagEntry[] {
     if (!this.searchQuery) return this.entries;
     const keywords = this.searchQuery
@@ -81,7 +81,7 @@ export class TagManager {
     );
   }
 
-  // B1: Create frame structure once
+  // B1: フレーム構造を一度だけ作成する
   private renderFrame(): void {
     this.container.innerHTML = '';
     this.container.style.padding = '0';
@@ -91,7 +91,7 @@ export class TagManager {
     this.wrapper = document.createElement('div');
     this.wrapper.className = 'tm-container';
 
-    // F7: Left sidebar
+    // F7: 左サイドバー
     this.sidebarEl = document.createElement('div');
     this.sidebarEl.className = 'tm-sidebar';
     this.sidebarEl.style.display = this.sidebarVisible ? 'flex' : 'none';
@@ -100,11 +100,11 @@ export class TagManager {
     const mainArea = document.createElement('div');
     mainArea.className = 'tm-main';
 
-    // Search bar
+    // 検索バー
     const searchBar = document.createElement('div');
     searchBar.className = 'tm-search-bar';
 
-    // F7: Hamburger button
+    // F7: ハンバーガーボタン
     const hamburger = document.createElement('button');
     hamburger.className = 'tm-hamburger';
     hamburger.innerHTML = '&#9776;';
@@ -127,7 +127,7 @@ export class TagManager {
     this.searchCountEl.className = 'tm-search-count';
     searchBar.appendChild(this.searchCountEl);
 
-    // F4: Select all checkbox
+    // F4: 全選択チェックボックス
     const selectAllLabel = document.createElement('label');
     selectAllLabel.className = 'tm-select-all-label';
     this.selectAllCheckbox = document.createElement('input');
@@ -152,18 +152,18 @@ export class TagManager {
 
     mainArea.appendChild(searchBar);
 
-    // Card list
+    // カードリスト
     this.cardListEl = document.createElement('div');
     this.cardListEl.className = 'tm-card-list';
     mainArea.appendChild(this.cardListEl);
 
-    // Empty state
+    // 空の状態表示
     this.emptyEl = document.createElement('div');
     this.emptyEl.className = 'tm-empty';
     this.emptyEl.style.display = 'none';
     mainArea.appendChild(this.emptyEl);
 
-    // F4: Batch action bar
+    // F4: 一括操作バー
     this.batchBarEl = document.createElement('div');
     this.batchBarEl.className = 'tm-batch-bar';
     this.batchBarEl.style.display = 'none';
@@ -173,7 +173,7 @@ export class TagManager {
     this.container.appendChild(this.wrapper);
   }
 
-  // B1: Update only the card list (preserves search input focus)
+  // B1: カードリストのみ更新する（検索入力のフォーカスを維持する）
   private renderCardList(): void {
     if (!this.cardListEl || !this.searchCountEl || !this.emptyEl) return;
 
@@ -201,7 +201,7 @@ export class TagManager {
       const row = document.createElement('div');
       row.className = 'tm-row' + (exists ? '' : ' tm-invalid');
 
-      // F4: Checkbox
+      // F4: チェックボックス
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'tm-checkbox';
@@ -224,7 +224,7 @@ export class TagManager {
       const body = document.createElement('div');
       body.className = 'tm-body';
 
-      // U3: Filename display
+      // U3: ファイル名の表示
       const filename = entry.path.split(/[/\\]/).pop() || entry.path;
       const filenameEl = document.createElement('div');
       filenameEl.className = 'tm-filename';
@@ -240,7 +240,7 @@ export class TagManager {
       filenameEl.appendChild(filenameText);
       body.appendChild(filenameEl);
 
-      // Path (secondary info)
+      // パス（補足情報）
       const pathRow = document.createElement('div');
       pathRow.className = 'tm-path-row';
       const pathEl = document.createElement('span');
@@ -250,7 +250,7 @@ export class TagManager {
       pathRow.appendChild(pathEl);
       body.appendChild(pathRow);
 
-      // Memo row
+      // メモ行
       const memoRow = document.createElement('div');
       memoRow.className = 'tm-memo-row';
 
@@ -303,21 +303,21 @@ export class TagManager {
       memoRow.appendChild(memoInput);
       body.appendChild(memoRow);
 
-      // Tags row with inline CRUD (F3)
+      // タグ行（インライン CRUD 付き）(F3)
       const tagsRow = document.createElement('div');
       tagsRow.className = 'tm-tags';
       for (const tag of entry.tags) {
         const chip = document.createElement('span');
         chip.className = 'tm-tag-chip';
 
-        // F1: Clickable label to add to search
+        // F1: クリックで検索に追加するラベル
         const chipLabel = document.createElement('span');
         chipLabel.className = 'tm-tag-chip-label';
         chipLabel.textContent = tag;
         chipLabel.addEventListener('click', () => this.addToSearch(tag));
         chip.appendChild(chipLabel);
 
-        // F3: Remove button on chip
+        // F3: チップ上の削除ボタン
         const chipRemove = document.createElement('button');
         chipRemove.className = 'tm-tag-chip-remove';
         chipRemove.textContent = '\u00d7';
@@ -331,7 +331,7 @@ export class TagManager {
         tagsRow.appendChild(chip);
       }
 
-      // F3: Inline add tag input
+      // F3: インラインのタグ追加入力
       const addTagInput = document.createElement('input');
       addTagInput.type = 'text';
       addTagInput.className = 'tm-inline-tag-input';
@@ -350,7 +350,7 @@ export class TagManager {
       body.appendChild(tagsRow);
       row.appendChild(body);
 
-      // Actions
+      // アクション
       const actions = document.createElement('div');
       actions.className = 'tm-actions';
 
@@ -369,7 +369,7 @@ export class TagManager {
       if (!exists) openBtn.disabled = true;
       actions.appendChild(openBtn);
 
-      // U4: Folder button
+      // U4: フォルダボタン
       const folderBtn = document.createElement('button');
       folderBtn.className = 'tm-btn';
       folderBtn.textContent = t('ui.tm_folder');
@@ -390,7 +390,7 @@ export class TagManager {
     this.updateBatchBar();
   }
 
-  // F1: Add tag name to search query
+  // F1: タグ名を検索クエリに追加する
   private addToSearch(tag: string): void {
     if (!this.searchInput) return;
     const current = this.searchInput.value.trim();
@@ -401,7 +401,7 @@ export class TagManager {
     this.renderCardList();
   }
 
-  // F4: Update batch action bar
+  // F4: 一括操作バーを更新する
   private updateBatchBar(): void {
     if (!this.batchBarEl) return;
     if (this.selectedPaths.size === 0) {
@@ -445,7 +445,7 @@ export class TagManager {
     });
   }
 
-  // F7: Render tag sidebar
+  // F7: タグサイドバーを描画する
   private renderSidebar(): void {
     if (!this.sidebarEl) return;
     this.sidebarEl.innerHTML = '';
@@ -536,7 +536,7 @@ export class TagManager {
     this.sidebarEl.appendChild(list);
   }
 
-  // F7: Toggle sidebar visibility
+  // F7: サイドバーの表示/非表示を切り替える
   private toggleSidebar(): void {
     this.sidebarVisible = !this.sidebarVisible;
     if (this.sidebarEl) {
@@ -565,7 +565,7 @@ export class TagManager {
     }
   }
 
-  // B3: Fire-and-forget (no await to prevent freeze)
+  // B3: 発行して忘れる方式（フリーズ防止のため await しない）
   private openFile(path: string): void {
     invoke('open_new_window', { file: path });
   }
@@ -579,7 +579,7 @@ export class TagManager {
     if (this.sidebarVisible) this.renderSidebar();
   }
 
-  // U4: Reveal file in system file manager
+  // U4: システムのファイルマネージャーでファイルを表示する
   private async revealInFolder(path: string): Promise<void> {
     try {
       await revealItemInDir(path);
@@ -588,7 +588,7 @@ export class TagManager {
     }
   }
 
-  // F3: Remove tag from a specific entry
+  // F3: 特定のエントリからタグを削除する
   private async removeTagFromEntry(path: string, tag: string): Promise<void> {
     await invoke('tag_remove', { path, tag });
     await this.load();
@@ -597,7 +597,7 @@ export class TagManager {
     if (this.sidebarVisible) this.renderSidebar();
   }
 
-  // F3: Add tag to a specific entry
+  // F3: 特定のエントリにタグを追加する
   private async addTagToEntry(path: string, tag: string): Promise<void> {
     await invoke('tag_add', { path, tag });
     await this.load();
@@ -606,7 +606,7 @@ export class TagManager {
     if (this.sidebarVisible) this.renderSidebar();
   }
 
-  // F4: Batch add tag to selected entries
+  // F4: 選択されたエントリにタグを一括追加する
   private async batchAddTag(tag: string): Promise<void> {
     const paths = Array.from(this.selectedPaths);
     await invoke('tag_batch_add', { paths, tag });
@@ -617,7 +617,7 @@ export class TagManager {
     if (this.sidebarVisible) this.renderSidebar();
   }
 
-  // F5: Rename tag across all entries
+  // F5: 全エントリのタグ名を変更する
   private async renameTag(oldName: string): Promise<void> {
     const newName = prompt(t('ui.tm_rename_tag_prompt'), oldName);
     if (!newName || newName === oldName) return;
@@ -628,7 +628,7 @@ export class TagManager {
     if (this.sidebarVisible) this.renderSidebar();
   }
 
-  // F5: Remove tag from all entries
+  // F5: 全エントリからタグを削除する
   private async removeAllTag(tagName: string): Promise<void> {
     const msg = t('ui.tm_delete_tag_confirm').replace('{tag}', tagName);
     if (!confirm(msg)) return;

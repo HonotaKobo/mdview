@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::WindowStates;
 
-// --- Platform-specific transport ---
+// --- プラットフォーム固有のトランスポート ---
 
 #[cfg(unix)]
 mod transport {
@@ -96,7 +96,7 @@ mod transport {
     }
 }
 
-// --- Public API ---
+// --- 公開API ---
 
 pub fn instance_file(id: &str) -> PathBuf {
     transport::instance_file(id)
@@ -174,7 +174,7 @@ pub fn send_to_existing(id: &str, args: &crate::cli::CliArgs) -> Result<(), Box<
 
     let resp = serde_json::from_str::<IpcResponse>(&response_buf)?;
 
-    // Read operations: output result to stdout
+    // 読み取り操作: 結果を標準出力に出力
     if !args.query.is_empty() || args.grep.is_some() || args.lines.is_some() {
         if resp.ok {
             if let Some(value) = resp.value {
@@ -189,7 +189,7 @@ pub fn send_to_existing(id: &str, args: &crate::cli::CliArgs) -> Result<(), Box<
         }
     }
 
-    // Write operations: exit code only
+    // 書き込み操作: 終了コードのみ
     if !resp.ok {
         if let Some(value) = resp.value {
             eprintln!("tsumugi: {}", value);
@@ -200,8 +200,8 @@ pub fn send_to_existing(id: &str, args: &crate::cli::CliArgs) -> Result<(), Box<
     Ok(())
 }
 
-/// Send a CreateWindow request to the primary process.
-/// Returns Ok(()) if the primary handled it, Err if no primary exists.
+/// プライマリプロセスにCreateWindowリクエストを送信する。
+/// プライマリが処理した場合はOk(())を返し、プライマリが存在しない場合はErrを返す。
 pub fn send_create_window(
     file: Option<String>,
     body: Option<String>,
@@ -240,7 +240,7 @@ pub fn send_create_window(
     Ok(())
 }
 
-/// Per-window IPC listener
+/// ウィンドウごとのIPCリスナー
 pub fn start_listener(instance_id: String, window_label: String, app: AppHandle) {
     std::thread::spawn(move || {
         let (listener, ipc_token) = match transport::bind(&instance_id) {
@@ -259,7 +259,7 @@ pub fn start_listener(instance_id: String, window_label: String, app: AppHandle)
     });
 }
 
-/// Primary socket listener — only handles CreateWindow requests
+/// プライマリソケットリスナー — CreateWindowリクエストのみを処理
 pub fn start_primary_listener(app: AppHandle) {
     std::thread::spawn(move || {
         let (listener, ipc_token) = match transport::bind("tsumugi-primary") {
@@ -287,7 +287,7 @@ fn handle_stream(app: &AppHandle, window_label: &str, stream: &mut (impl Read + 
         limited.read_to_string(&mut buf).is_ok()
     };
     if read_ok {
-        // Verify IPC token (Windows)
+        // IPCトークンを検証（Windows）
         if let Some(token) = expected_token {
             match buf.split_once('\n') {
                 Some((received, rest)) if received == token => {
@@ -331,7 +331,7 @@ fn handle_primary_stream(app: &AppHandle, stream: &mut (impl Read + Write), expe
         limited.read_to_string(&mut buf).is_ok()
     };
     if read_ok {
-        // Verify IPC token (Windows)
+        // IPCトークンを検証（Windows）
         if let Some(token) = expected_token {
             match buf.split_once('\n') {
                 Some((received, rest)) if received == token => {
@@ -380,7 +380,7 @@ pub fn list_instances() {
         let path = entry.path();
         if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
             if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
-                // Skip the primary socket
+                // プライマリソケットはスキップ
                 if id == "tsumugi-primary" {
                     continue;
                 }
@@ -408,7 +408,7 @@ pub fn list_instances() {
                         }
                     }
                 }
-                // Stale entry — skip
+                // 古いエントリ — スキップ
             }
         }
     }
@@ -418,7 +418,7 @@ pub fn list_instances() {
     }
 }
 
-/// Returns list of instances as Vec<(id, title)> for API use
+/// API用にインスタンスの一覧をVec<(id, title)>で返す
 pub(crate) fn get_instances() -> Vec<(String, String)> {
     let dir = transport::instance_dir();
     if !dir.exists() {
@@ -433,7 +433,7 @@ pub(crate) fn get_instances() -> Vec<(String, String)> {
         let path = entry.path();
         if path.extension().map(|e| e == transport::INSTANCE_EXT).unwrap_or(false) {
             if let Some(id) = path.file_stem().and_then(|s| s.to_str()) {
-                // Skip the primary socket
+                // プライマリソケットはスキップ
                 if id == "tsumugi-primary" {
                     continue;
                 }
@@ -464,7 +464,7 @@ pub(crate) fn get_instances() -> Vec<(String, String)> {
     result
 }
 
-// --- Handler functions ---
+// --- ハンドラ関数 ---
 
 pub(crate) fn handle_update(app: &AppHandle, window_label: &str, body: Option<String>, title: Option<String>) -> IpcResponse {
     let _ = app.emit_to(window_label, "content-update", serde_json::json!({ "body": body, "title": title }));
@@ -523,14 +523,14 @@ pub(crate) fn handle_query(app: &AppHandle, window_label: &str, properties: &[St
         None => return IpcResponse { ok: false, value: Some(format!("Window not found: {}", window_label)) },
     };
 
-    // Expand "all" into all properties
+    // "all"を全プロパティに展開
     let expanded: Vec<&str> = if properties.iter().any(|p| p == "all") {
         ALL_PROPERTIES.to_vec()
     } else {
         properties.iter().map(|s| s.as_str()).collect()
     };
 
-    // Single property: return plain value for backward compatibility
+    // 単一プロパティ: 後方互換性のためプレーン値を返す
     if expanded.len() == 1 {
         let prop = expanded[0];
         // "status" is already JSON, keep its original behavior
@@ -547,7 +547,7 @@ pub(crate) fn handle_query(app: &AppHandle, window_label: &str, properties: &[St
         };
     }
 
-    // Multiple properties: return JSON object
+    // 複数プロパティ: JSONオブジェクトを返す
     let mut map = serde_json::Map::new();
     for prop in &expanded {
         if let Some(val) = query_single(state, prop) {
@@ -614,7 +614,7 @@ pub(crate) fn handle_lines(app: &AppHandle, window_label: &str, start: usize, en
     IpcResponse { ok: true, value: Some(results.join("\n")) }
 }
 
-/// Apply an edit to current_content and notify frontend
+/// current_contentに編集を適用し、フロントエンドに通知する
 fn apply_edit(app: &AppHandle, window_label: &str, editor: impl FnOnce(&mut Vec<String>) -> Result<(), String>) -> IpcResponse {
     let states = app.state::<WindowStates>();
     let mut states = states.lock().unwrap();

@@ -136,7 +136,7 @@
   margin-right: 0.5em;
 }
 
-/* Definition lists */
+/* 定義リスト */
 #content dl {
   margin-bottom: 16px;
 }
@@ -185,7 +185,7 @@
   box-shadow: 0 0 0 1px var(--link-color);
 }
 
-/* Table of Contents */
+/* 目次 */
 #content .toc {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -220,17 +220,17 @@
   text-decoration: underline;
 }
 
-/* highlight.js overrides for theme integration */
+/* highlight.js のテーマ統合用オーバーライド */
 #content pre.hljs {
   background: var(--code-bg);
 }
 
-/* Code block wrapper */
+/* コードブロックのラッパー */
 .code-block-wrapper {
   position: relative;
 }
 
-/* Code block copy button */
+/* コードブロックのコピーボタン */
 .code-copy-btn {
   position: absolute;
   top: 8px;
@@ -256,7 +256,7 @@
   color: var(--text-primary);
 }
 
-/* Mermaid diagrams */
+/* Mermaid ダイアグラム */
 .mermaid-container {
   margin-bottom: 16px;
   text-align: center;
@@ -273,7 +273,7 @@
   border-color: var(--danger-color);
 }
 
-/* Footnotes */
+/* 脚注 */
 #content .footnotes-sep {
   margin-top: 24px;
 }

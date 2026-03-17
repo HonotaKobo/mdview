@@ -8,11 +8,11 @@ export async function handleSave(
   const savedPath = await invoke<string | null>('get_saved_path');
 
   if (savedPath) {
-    // Overwrite existing file
+    // 既存ファイルを上書き保存する
     await invoke('save_file', { path: savedPath, content });
     await invoke('notify_saved', { path: savedPath });
   } else {
-    // Save As dialog
+    // 「名前を付けて保存」ダイアログを表示する
     await handleSaveAs(content, defaultTitle);
   }
 }

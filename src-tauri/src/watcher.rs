@@ -13,7 +13,7 @@ pub struct FileWatcher {
     watched_path: Mutex<Option<String>>,
 }
 
-/// Window label → FileWatcher
+/// ウィンドウラベル → FileWatcher
 pub type FileWatchers = Mutex<HashMap<String, FileWatcher>>;
 
 impl FileWatcher {
@@ -25,7 +25,7 @@ impl FileWatcher {
     }
 
     pub fn watch(&mut self, app: AppHandle, window_label: String, path: String) {
-        // Stop previous watcher
+        // 前のウォッチャーを停止
         self._debouncer = None;
 
         let watch_path = path.clone();
@@ -36,7 +36,7 @@ impl FileWatcher {
             if let Ok(events) = res {
                 for event in events {
                     if event.kind == DebouncedEventKind::Any {
-                        // Re-read file and update state + frontend
+                        // ファイルを再読み込みし、状態とフロントエンドを更新
                         if let Ok(content) = std::fs::read_to_string(&watch_path) {
                             {
                                 let states = app_handle.state::<WindowStates>();

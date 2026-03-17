@@ -1,4 +1,4 @@
-/* ===== Home Screen Layout ===== */
+/* ===== ホーム画面レイアウト ===== */
 
 #home-screen {
   display: flex;
@@ -7,7 +7,7 @@
   overflow: hidden;
 }
 
-/* Sidebar Navigation */
+/* サイドバーナビゲーション */
 #home-sidebar-nav {
   width: 52px;
   background: var(--bg-secondary);
@@ -70,7 +70,7 @@
   background: rgba(9, 105, 218, 0.14);
 }
 
-/* Content Area */
+/* コンテンツエリア */
 #home-content-area {
   flex: 1;
   overflow: hidden;
@@ -78,7 +78,7 @@
   flex-direction: column;
 }
 
-/* Panel Header */
+/* パネルヘッダー */
 .home-panel-header {
   display: flex;
   align-items: center;
@@ -98,7 +98,7 @@
   flex: 1;
 }
 
-/* ===== Home Tab ===== */
+/* ===== ホームタブ ===== */
 .home-tab-content {
   flex: 1;
   overflow-y: auto;
@@ -122,7 +122,7 @@
   margin-bottom: 24px;
 }
 
-/* Action Cards */
+/* アクションカード */
 .home-action-cards {
   display: flex;
   gap: 12px;
@@ -183,7 +183,7 @@
   color: var(--text-secondary);
 }
 
-/* Section Header */
+/* セクションヘッダー */
 .home-section-header {
   display: flex;
   align-items: center;
@@ -206,7 +206,7 @@
   background: var(--border-color);
 }
 
-/* Recent List */
+/* 最近のファイル一覧 */
 .home-recent-list {
   display: flex;
   flex-direction: column;
@@ -321,9 +321,9 @@
   text-align: center;
 }
 
-/* ===== Tags Tab ===== */
+/* ===== タグタブ ===== */
 
-/* Search Box */
+/* 検索ボックス */
 .home-search-box {
   display: flex;
   align-items: center;
@@ -363,7 +363,7 @@
   opacity: 0.7;
 }
 
-/* Tag Filter Chips */
+/* タグフィルターチップ */
 .home-tag-toolbar {
   display: flex;
   align-items: center;
@@ -404,7 +404,7 @@
   border-color: var(--link-color);
 }
 
-/* Tag Table */
+/* タグテーブル */
 .home-tag-table-wrapper {
   flex: 1;
   overflow-y: auto;
@@ -513,7 +513,7 @@
   text-align: center;
 }
 
-/* ===== Home Status Bar ===== */
+/* ===== ホームステータスバー ===== */
 
 #home-status-bar {
   display: flex;
@@ -532,7 +532,7 @@
   flex: 1;
 }
 
-/* Scrollbar */
+/* スクロールバー */
 .home-tab-content::-webkit-scrollbar,
 .home-tag-table-wrapper::-webkit-scrollbar {
   width: 8px;
@@ -554,7 +554,7 @@
   background: rgba(128, 128, 128, 0.5);
 }
 
-/* Print: hide home screen */
+/* 印刷時: ホーム画面を非表示にする */
 @media print {
   #home-screen,
   #home-status-bar {

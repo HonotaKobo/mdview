@@ -79,10 +79,10 @@ impl RecentStore {
             .unwrap_or_default()
             .as_secs();
 
-        // Remove existing entry with same path
+        // 同じパスの既存エントリを削除
         self.data.entries.retain(|e| e.path != path);
 
-        // Insert at front
+        // 先頭に挿入
         self.data.entries.insert(
             0,
             RecentEntry {
@@ -92,7 +92,7 @@ impl RecentStore {
             },
         );
 
-        // Trim to max
+        // 最大数に切り詰め
         self.data.entries.truncate(self.max_entries);
         self.save();
     }

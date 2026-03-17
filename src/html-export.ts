@@ -42,7 +42,7 @@ function collectStyles(): string {
         css.push(rule.cssText);
       }
     } catch {
-      // Skip inaccessible stylesheets
+      // アクセスできないスタイルシートはスキップする
     }
   }
   return css.join('\n');

@@ -5,7 +5,7 @@ import hljs from 'highlight.js';
 
 const EDIT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 
-/** Footnote definitions context for resolving references in previews */
+/** 脚注定義コンテキスト */
 let _footnoteContext = '';
 
 export function setFootnoteContext(defs: string): void {
@@ -13,9 +13,9 @@ export function setFootnoteContext(defs: string): void {
 }
 
 /**
- * Render a single block into an HTML element for edit mode.
- * Each block has a rendered preview (default) and a textarea editor
- * with formatting toolbar (shown when the edit icon is clicked).
+ * 編集モード用に単一ブロックをHTML要素にレンダリングする。
+ * 各ブロックはレンダリング済みプレビュー（デフォルト）と、
+ * 編集アイコンクリック時に表示されるtoolbar付きtextareaエディタを持つ。
  */
 export function renderBlockElement(block: Block): HTMLElement {
   const wrapper = document.createElement('div');
@@ -23,13 +23,13 @@ export function renderBlockElement(block: Block): HTMLElement {
   wrapper.dataset.blockKey = block.key;
   wrapper.dataset.blockType = block.type;
 
-  // HR: no editing needed
+  // HR: 編集不要
   if (block.type === 'hr') {
     wrapper.appendChild(document.createElement('hr'));
     return wrapper;
   }
 
-  // Edit button (visible on hover)
+  // 編集ボタン（ホバー時に表示）
   const editBtn = document.createElement('button');
   editBtn.className = 'block-edit-btn';
   editBtn.innerHTML = EDIT_ICON;
@@ -47,13 +47,13 @@ export function renderBlockElement(block: Block): HTMLElement {
   });
   wrapper.appendChild(editBtn);
 
-  // Preview (rendered markdown)
+  // プレビュー（レンダリング済みmarkdown）
   const preview = document.createElement('div');
   preview.className = 'block-preview';
   renderPreview(block, preview);
   wrapper.appendChild(preview);
 
-  // Double-click preview to enter edit mode
+  // プレビューをダブルクリックで編集モードに入る
   preview.addEventListener('dblclick', () => {
     if (!wrapper.classList.contains('editing')) {
       wrapper.classList.add('editing');
@@ -65,7 +65,7 @@ export function renderBlockElement(block: Block): HTMLElement {
     }
   });
 
-  // Source (textarea + toolbar, hidden by default)
+  // ソース（textarea + toolbar、デフォルトで非表示）
   const source = document.createElement('div');
   source.className = 'block-source';
   renderSource(block, source);
@@ -74,13 +74,13 @@ export function renderBlockElement(block: Block): HTMLElement {
   return wrapper;
 }
 
-// --- Preview ---
+// --- プレビュー ---
 
 function renderPreview(block: Block, preview: HTMLElement): void {
   const md = getMarkdownIt();
   switch (block.type) {
     case 'front_matter': {
-      // Strip --- delimiters and render as YAML-highlighted code
+      // --- 区切りを除去してYAMLハイライト付きコードとしてレンダリング
       const yamlContent = block.text.replace(/^---\s*\n?/, '').replace(/\n?---\s*$/, '');
       const highlighted = hljs.highlight(yamlContent, { language: 'yaml' }).value;
       preview.innerHTML = sanitizeHtml(`<pre class="hljs"><code>${highlighted}</code></pre>`);
@@ -135,14 +135,14 @@ function renderPreview(block: Block, preview: HTMLElement): void {
     }
   }
 
-  // Add copy buttons to any <pre> elements in the preview
+  // プレビュー内の<pre>要素にコピーボタンを追加
   addCopyButtons(preview);
 }
 
-// --- Source (textarea + toolbar) ---
+// --- ソース（textarea + toolbar）---
 
 function renderSource(block: Block, source: HTMLElement): void {
-  // Textarea — for fence/math, include delimiters in the editable area
+  // textarea — fence/mathの場合、区切り文字も編集領域に含める
   const textarea = document.createElement('textarea');
   textarea.className = 'block-editor-textarea';
 
@@ -160,7 +160,7 @@ function renderSource(block: Block, source: HTMLElement): void {
   textarea.addEventListener('focus', () => autoResize(textarea));
   source.appendChild(textarea);
 
-  // Formatting toolbar (text-oriented blocks only)
+  // 書式設定toolbar（テキスト系ブロックのみ）
   if (!['fence', 'code', 'math'].includes(block.type)) {
     source.appendChild(createToolbar(textarea));
   }
@@ -171,13 +171,13 @@ function autoResize(textarea: HTMLTextAreaElement): void {
   textarea.style.height = textarea.scrollHeight + 'px';
 }
 
-// --- Formatting toolbar ---
+// --- 書式設定toolbar ---
 
 function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
   const toolbar = document.createElement('div');
   toolbar.className = 'block-editor-toolbar';
 
-  // Inline formatting buttons
+  // インライン書式ボタン
   const inlineButtons: { html: string; title: string; prefix: string; suffix: string }[] = [
     { html: '<strong>B</strong>', title: 'Bold', prefix: '**', suffix: '**' },
     { html: '<em>I</em>', title: 'Italic', prefix: '*', suffix: '*' },
@@ -203,12 +203,12 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
     toolbar.appendChild(button);
   }
 
-  // Separator
+  // 区切り
   const sep = document.createElement('span');
   sep.className = 'toolbar-sep';
   toolbar.appendChild(sep);
 
-  // Line-prefix buttons
+  // 行頭プレフィックスボタン
   const lineButtons: { html: string; title: string; prefix: string }[] = [
     { html: 'H1', title: 'Heading 1', prefix: '# ' },
     { html: 'H2', title: 'Heading 2', prefix: '## ' },
@@ -235,7 +235,7 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
 }
 
 /**
- * Count consecutive occurrences of `ch` immediately before `pos` in `str`.
+ * str の pos の直前にある ch の連続出現数をカウントする。
  */
 function countCharBefore(str: string, pos: number, ch: string): number {
   let count = 0;
@@ -244,7 +244,7 @@ function countCharBefore(str: string, pos: number, ch: string): number {
 }
 
 /**
- * Count consecutive occurrences of `ch` starting at `pos` in `str`.
+ * str の pos から始まる ch の連続出現数をカウントする。
  */
 function countCharAt(str: string, pos: number, ch: string): number {
   let count = 0;
@@ -253,28 +253,28 @@ function countCharAt(str: string, pos: number, ch: string): number {
 }
 
 /**
- * For Bold/Italic (* based markers), expand selection to the full word
- * between markers when cursor is inside *text* with no selection.
- * Returns [start, end] of the effective selection.
+ * Bold/Italic（* ベースのマーカー）用に、カーソルが *text* 内にあり選択なしの場合、
+ * マーカー間の単語全体に選択を拡張する。
+ * 有効な選択範囲 [start, end] を返す。
  */
 function expandSelectionForAsterisks(value: string, start: number, end: number): [number, number] {
   if (start !== end) return [start, end];
 
   // Find how many * are immediately before/after the cursor region
-  // Walk left to find start of the "word" between asterisks
+  // 左に移動してアスタリスク間の「単語」の開始位置を見つける
   let wordStart = start;
   let wordEnd = start;
 
-  // Walk left until we hit * or start of string
+  // * または文字列の先頭に到達するまで左に移動
   while (wordStart > 0 && value[wordStart - 1] !== '*' && value[wordStart - 1] !== '\n') {
     wordStart--;
   }
-  // Walk right until we hit * or end of string
+  // * または文字列の末尾に到達するまで右に移動
   while (wordEnd < value.length && value[wordEnd] !== '*' && value[wordEnd] !== '\n') {
     wordEnd++;
   }
 
-  // Check that we're actually between * markers
+  // 実際に * マーカーの間にいることを確認
   const starsBefore = countCharBefore(value, wordStart, '*');
   const starsAfter = countCharAt(value, wordEnd, '*');
 
@@ -292,20 +292,20 @@ function wrapSelection(textarea: HTMLTextAreaElement, prefix: string, suffix: st
 
   const isAsteriskBased = /^\*+$/.test(prefix) && /^\*+$/.test(suffix);
 
-  // For * based formatting with no selection, expand to word between markers
+  // * ベースの書式で選択なしの場合、マーカー間の単語に拡張
   if (isAsteriskBased && start === end) {
     [start, end] = expandSelectionForAsterisks(value, start, end);
   }
 
   if (isAsteriskBased) {
-    // Smart asterisk handling: * = italic (1), ** = bold (2), *** = bold+italic (3)
+    // スマートアスタリスク処理: * = italic (1), ** = bold (2), *** = bold+italic (3)
     const markerLen = prefix.length; // 1 for italic, 2 for bold
     const starsBefore = countCharBefore(value, start, '*');
     const starsAfter = countCharAt(value, end, '*');
     const currentMarkers = Math.min(starsBefore, starsAfter);
 
     if (currentMarkers >= markerLen) {
-      // Already has this formatting — remove exactly `markerLen` asterisks
+      // 既にこの書式がある — markerLen 個のアスタリスクを正確に削除
       const newBefore = value.slice(0, start - markerLen);
       const inner = value.slice(start, end);
       const newAfter = value.slice(end + markerLen);
@@ -313,14 +313,14 @@ function wrapSelection(textarea: HTMLTextAreaElement, prefix: string, suffix: st
       textarea.selectionStart = start - markerLen;
       textarea.selectionEnd = end - markerLen;
     } else {
-      // Add asterisks
+      // アスタリスクを追加
       const inner = value.slice(start, end) || 'text';
       textarea.value = value.slice(0, start) + prefix + inner + suffix + value.slice(end);
       textarea.selectionStart = start + prefix.length;
       textarea.selectionEnd = start + prefix.length + inner.length;
     }
   } else {
-    // Non-asterisk markers: check surrounding text for toggle off
+    // 非アスタリスクマーカー: 周囲のテキストをチェックしてトグルオフ
     const beforePrefix = value.slice(start - prefix.length, start);
     const afterSuffix = value.slice(end, end + suffix.length);
 
@@ -351,42 +351,42 @@ function wrapSelection(textarea: HTMLTextAreaElement, prefix: string, suffix: st
   textarea.dispatchEvent(new Event('input'));
 }
 
-/** Toggle a line prefix (e.g., '# ', '> ', '- ') on the current line */
+/** 現在の行の行頭プレフィックス（例: '# ', '> ', '- '）をトグルする */
 function toggleLinePrefix(textarea: HTMLTextAreaElement, prefix: string): void {
   const { selectionStart: start, value } = textarea;
 
-  // Find start of the current line
+  // 現在の行の開始位置を見つける
   let lineStart = value.lastIndexOf('\n', start - 1) + 1;
   const lineEnd = value.indexOf('\n', start);
   const lineEndPos = lineEnd === -1 ? value.length : lineEnd;
   const line = value.slice(lineStart, lineEndPos);
 
-  // For heading prefixes, remove any existing heading prefix first
+  // 見出しプレフィックスの場合、既存の見出しプレフィックスを先に削除
   const headingPrefixes = ['# ', '## ', '### ', '#### ', '##### ', '###### '];
   const isHeadingBtn = headingPrefixes.includes(prefix);
 
   if (isHeadingBtn) {
     const existingMatch = line.match(/^(#{1,6})\s+/);
     if (existingMatch && existingMatch[0] === prefix) {
-      // Same heading level: toggle off (remove prefix)
+      // 同じ見出しレベル: トグルオフ（プレフィックスを削除）
       textarea.value = value.slice(0, lineStart) + line.slice(prefix.length) + value.slice(lineEndPos);
       textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - prefix.length);
     } else if (existingMatch) {
-      // Different heading level: replace
+      // 異なる見出しレベル: 置換
       const oldPrefix = existingMatch[0];
       textarea.value = value.slice(0, lineStart) + prefix + line.slice(oldPrefix.length) + value.slice(lineEndPos);
       textarea.selectionStart = textarea.selectionEnd = start + (prefix.length - oldPrefix.length);
     } else {
-      // No heading: add prefix
+      // 見出しなし: プレフィックスを追加
       textarea.value = value.slice(0, lineStart) + prefix + line + value.slice(lineEndPos);
       textarea.selectionStart = textarea.selectionEnd = start + prefix.length;
     }
   } else if (line.startsWith(prefix)) {
-    // Has prefix: remove it
+    // プレフィックスあり: 削除
     textarea.value = value.slice(0, lineStart) + line.slice(prefix.length) + value.slice(lineEndPos);
     textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - prefix.length);
   } else {
-    // No prefix: add it
+    // プレフィックスなし: 追加
     textarea.value = value.slice(0, lineStart) + prefix + line + value.slice(lineEndPos);
     textarea.selectionStart = textarea.selectionEnd = start + prefix.length;
   }

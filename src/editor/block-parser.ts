@@ -3,8 +3,8 @@ import { type Block, generateBlockKey, resetBlockCounter } from './block-model';
 import { getMarkdownIt } from '../renderer';
 
 /**
- * Parse markdown content into blocks using markdown-it's token stream.
- * Each block maps to a contiguous range of source lines.
+ * markdown-it のトークンストリームを使用して markdown コンテンツをブロックに分割する。
+ * 各ブロックはソース行の連続範囲に対応する。
  */
 export function parseBlocks(content: string): Block[] {
   resetBlockCounter();
@@ -17,7 +17,7 @@ export function parseBlocks(content: string): Block[] {
   while (i < tokens.length) {
     const token = tokens[i];
 
-    // Skip tokens without source map (inline, softbreak, etc.)
+    // ソースマップのないトークンをスキップ（inline, softbreak など）
     if (!token.map) {
       i++;
       continue;
@@ -30,14 +30,14 @@ export function parseBlocks(content: string): Block[] {
       blocks.push(block);
     }
 
-    // Skip past the closing token for open/close pairs
+    // 開始/終了ペアの終了トークンまでスキップ
     i = skipToClose(tokens, i, token) + 1;
   }
 
-  // Post-process: merge HTML structures (details, div, etc.)
+  // 後処理: HTML構造をマージ（details, div など）
   blocks = mergeHtmlStructures(blocks, lines);
 
-  // Post-process: fill gaps for uncovered lines (footnotes, etc.)
+  // 後処理: 未カバー行のギャップを埋める（脚注など）
   blocks = fillUncoveredLines(blocks, lines);
 
   return blocks;
@@ -56,7 +56,7 @@ function tokenToBlock(
   switch (token.type) {
     case 'heading_open': {
       const level = parseInt(token.tag.slice(1), 10);
-      // Find the inline content
+      // インラインコンテンツを検索
       return {
         key: generateBlockKey(),
         type: 'heading',
@@ -80,7 +80,7 @@ function tokenToBlock(
       return {
         key: generateBlockKey(),
         type: 'fence',
-        text: token.content.replace(/\n$/, ''), // inner content without trailing newline
+        text: token.content.replace(/\n$/, ''), // 末尾改行を除いた内部コンテンツ
         lang: token.info.trim() || undefined,
         sourceStart: start,
         sourceEnd: end,
@@ -177,7 +177,7 @@ function tokenToBlock(
       };
 
     default:
-      // Unknown block-level token with map — treat as paragraph
+      // マップ付きの未知のブロックレベルトークン — 段落として扱う
       if (token.map) {
         return {
           key: generateBlockKey(),
@@ -192,16 +192,16 @@ function tokenToBlock(
 }
 
 /**
- * Skip from an opening token to its matching close token.
- * For self-closing tokens (fence, hr, html_block), returns the same index.
+ * 開始トークンから対応する終了トークンまでスキップする。
+ * 自己完結トークン（fence, hr, html_block）の場合は同じインデックスを返す。
  */
 function skipToClose(tokens: Token[], index: number, token: Token): number {
-  // Self-closing tokens
+  // 自己完結トークン
   if (token.nesting !== 1) {
     return index;
   }
 
-  // Find matching close token
+  // 対応する終了トークンを検索
   const closeType = token.type.replace('_open', '_close');
   let depth = 1;
   for (let j = index + 1; j < tokens.length; j++) {
@@ -215,9 +215,9 @@ function skipToClose(tokens: Token[], index: number, token: Token): number {
 }
 
 /**
- * Merge HTML blocks that form a single structure (e.g., <details>...</details>).
- * When markdown-it splits multi-line HTML into separate tokens with interleaved
- * markdown content, merge them back into a single block.
+ * 単一の構造を形成するHTMLブロックをマージする（例: <details>...</details>）。
+ * markdown-it が複数行HTMLを個別のトークンに分割し、間にmarkdownコンテンツが挟まる場合、
+ * それらを単一ブロックに再統合する。
  */
 function mergeHtmlStructures(blocks: Block[], lines: string[]): Block[] {
   const mergeableTags = ['details', 'div', 'section', 'article', 'aside', 'nav', 'figure'];
@@ -231,12 +231,12 @@ function mergeHtmlStructures(blocks: Block[], lines: string[]): Block[] {
       if (match) {
         const tag = match[1].toLowerCase();
         if (mergeableTags.includes(tag) && !block.text.includes(`</${tag}`)) {
-          // Opening tag without matching close — find the closing block
+          // 対応する閉じタグのない開始タグ — 閉じブロックを検索
           let j = i + 1;
           let found = false;
           while (j < blocks.length) {
             if (blocks[j].type === 'html' && blocks[j].text.includes(`</${tag}`)) {
-              // Merge blocks i through j using original source lines
+              // 元のソース行を使用してブロック i から j をマージ
               const mergedText = lines.slice(block.sourceStart, blocks[j].sourceEnd).join('\n');
               result.push({
                 key: block.key,
@@ -262,9 +262,8 @@ function mergeHtmlStructures(blocks: Block[], lines: string[]): Block[] {
 }
 
 /**
- * Find source lines not covered by any block and create blocks for them.
- * This handles footnote definitions and other content that markdown-it
- * processes without assigning source maps.
+ * どのブロックにもカバーされていないソース行を見つけてブロックを作成する。
+ * markdown-it がソースマップを割り当てずに処理する脚注定義などのコンテンツを処理する。
  */
 function fillUncoveredLines(blocks: Block[], lines: string[]): Block[] {
   blocks.sort((a, b) => a.sourceStart - b.sourceStart);
@@ -285,7 +284,7 @@ function fillUncoveredLines(blocks: Block[], lines: string[]): Block[] {
     } else {
       if (uncoveredStart !== -1) {
         const text = lines.slice(uncoveredStart, line).join('\n');
-        // Only create block if there's non-blank content
+        // 空白でないコンテンツがある場合のみブロックを作成
         if (text.trim()) {
           blocks.push({
             key: generateBlockKey(),

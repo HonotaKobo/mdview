@@ -20,7 +20,7 @@ use state::{LastFocusedDoc, WindowMode, WindowState, WindowStates};
 use tags::{TagState, TagStore};
 use watcher::{FileWatcher, FileWatchers};
 
-/// Strip Windows extended-length path prefix (`\\?\`) from canonicalized paths.
+/// 正規化されたパスからWindowsの拡張パスプレフィックス (`\\?\`) を除去する。
 pub(crate) fn normalize_path(path: &str) -> String {
     #[cfg(target_os = "windows")]
     {
@@ -31,18 +31,18 @@ pub(crate) fn normalize_path(path: &str) -> String {
     path.to_string()
 }
 
-/// Create a new document window in the current process.
-/// Returns the instance_id of the new window.
+/// 現在のプロセスで新しいドキュメントウィンドウを作成する。
+/// 新しいウィンドウの instance_id を返す。
 pub(crate) fn open_document_window(
     app: &tauri::AppHandle,
     file: Option<String>,
     body: Option<String>,
     title: Option<String>,
 ) -> Result<String, String> {
-    // Generate unique label
+    // 一意なラベルを生成
     let label = format!("doc-{:04x}", rand_u16());
 
-    // Generate instance ID
+    // インスタンスIDを生成
     let instance_id = if let Some(ref f) = file {
         file_to_id(f)
     } else if body.is_some() {
@@ -51,7 +51,7 @@ pub(crate) fn open_document_window(
         format!("gui-{:04x}", rand_u16())
     };
 
-    // Resolve content
+    // コンテンツを解決
     let (content, doc_title, file_path) = if let Some(ref f) = file {
         let abs_path = std::fs::canonicalize(f)
             .unwrap_or_else(|_| std::path::PathBuf::from(f));
@@ -72,7 +72,7 @@ pub(crate) fn open_document_window(
         (String::new(), title.clone().unwrap_or_else(|| "Untitled".to_string()), None)
     };
 
-    // Create window state
+    // ウィンドウ状態を作成
     let mut ws = WindowState::new(instance_id.clone(), doc_title.clone(), content);
     ws.content_explicitly_set = file.is_some() || body.is_some();
     if file.is_none() && body.is_none() {
@@ -82,13 +82,13 @@ pub(crate) fn open_document_window(
         ws.saved_path = Some(fp.clone());
     }
 
-    // Insert into WindowStates
+    // WindowStates に挿入
     {
         let states = app.state::<WindowStates>();
         states.lock().unwrap().insert(label.clone(), ws);
     }
 
-    // Create the window
+    // ウィンドウを作成
     let builder = tauri::WebviewWindowBuilder::new(
         app,
         &label,
@@ -103,24 +103,24 @@ pub(crate) fn open_document_window(
 
     let _window = builder.build().map_err(|e| e.to_string())?;
 
-    // Start per-window IPC listener
+    // ウィンドウごとの IPC リスナーを開始
     ipc::start_listener(instance_id.clone(), label.clone(), app.clone());
 
-    // Write HTTP port file (same port as shared server)
+    // HTTPポートファイルを書き込み（共有サーバーと同じポート）
     {
         let http_info = app.state::<http_api::HttpServerInfo>();
         let port_path = ipc::instance_file(&instance_id).with_extension("http");
         write_port_file(&port_path, &format!("{}:{}", http_info.port, http_info.token));
     }
 
-    // Start file watcher if needed
+    // 必要に応じてファイル監視を開始
     if let Some(ref fp) = file_path {
         let mut fw = FileWatcher::new();
         fw.watch(app.clone(), label.clone(), fp.clone());
         let watchers = app.state::<FileWatchers>();
         watchers.lock().unwrap().insert(label.clone(), fw);
 
-        // Track in recent files
+        // 最近使ったファイルに追加
         let recent = app.state::<RecentState>();
         let mut store = recent.lock().unwrap();
         store.add(fp, &doc_title);
@@ -132,13 +132,13 @@ pub(crate) fn open_document_window(
 }
 
 pub fn run() {
-    // Set AppUserModelID so all instances share one taskbar button
+    // すべてのインスタンスが1つのタスクバーボタンを共有するように AppUserModelID を設定
     #[cfg(target_os = "windows")]
     set_app_user_model_id();
 
     let mut args = cli::CliArgs::parse();
 
-    // --body - : read from stdin (must happen before daemonize)
+    // --body - : 標準入力から読み取り（デーモン化の前に行う必要あり）
     let stdin_read = if args.body.as_deref() == Some("-") {
         use std::io::Read as _;
         let mut input = String::new();
@@ -151,7 +151,7 @@ pub fn run() {
         false
     };
 
-    // Determine the instance ID for the first window
+    // 最初のウィンドウのインスタンスIDを決定
     let id = args.id.clone().unwrap_or_else(|| {
         if args.body.is_some() {
             let auto_id = format!("body-{:04x}", rand_u16());
@@ -166,15 +166,15 @@ pub fn run() {
         }
     });
 
-    // If --id is specified, try to reach an existing instance
+    // --id が指定された場合、既存のインスタンスへの接続を試みる
     if args.id.is_some() {
         if ipc::send_to_existing(&id, &args).is_ok() {
             return;
         }
-        // Existing instance not found — fall through to launch
+        // 既存インスタンスが見つからない — 起動処理に fall through
     }
 
-    // If this is a read/write operation requiring an existing instance, error out
+    // 既存インスタンスが必要な読み書き操作の場合、エラーで終了
     if !args.query.is_empty() || args.grep.is_some() || args.lines.is_some()
         || args.delete.is_some() || args.insert.is_some() || args.replace.is_some()
     {
@@ -186,16 +186,16 @@ pub fn run() {
         return;
     }
 
-    // Try to delegate to an existing primary process (create window there)
+    // 既存のプライマリプロセスに委譲を試みる（そちらでウィンドウを作成）
     if args.id.is_none() {
         let file_arg = args.file.clone().or_else(|| args.file_pos.clone());
         if ipc::send_create_window(file_arg, args.body.clone(), args.title.clone()).is_ok() {
             return;
         }
-        // No primary process — fall through to become one
+        // プライマリプロセスが存在しない — 自身がプライマリになるよう fall through
     }
 
-    // Daemonize: re-launch self in background so the terminal is freed immediately
+    // デーモン化: バックグラウンドで自身を再起動し、ターミナルを即座に解放する
     #[cfg(target_os = "macos")]
     let should_daemonize = !args.foreground && {
         use std::io::IsTerminal;
@@ -214,15 +214,15 @@ pub fn run() {
         let exe = std::env::current_exe().expect("failed to get executable path");
         let mut child_args: Vec<String> = std::env::args().skip(1).collect();
         child_args.push("--_foreground".to_string());
-        // Pass auto-generated ID explicitly so the child doesn't regenerate it
+        // 自動生成したIDを明示的に渡し、子プロセスで再生成されないようにする
         if args.id.is_none() {
             child_args.push("--id".to_string());
             child_args.push(id.clone());
         }
         use std::process::{Command, Stdio};
 
-        // On macOS, launch through the .app bundle via `open` so that
-        // the Dock shows the proper app icon.
+        // macOSでは `open` 経由で .app バンドルから起動し、
+        // Dockに正しいアプリアイコンを表示させる。
         #[cfg(target_os = "macos")]
         let use_open = !stdin_read && find_app_bundle(&exe).is_some();
         #[cfg(not(target_os = "macos"))]
@@ -250,7 +250,7 @@ pub fn run() {
                 .stderr(Stdio::inherit());
 
             if stdin_read {
-                // Pipe the stdin content to the child process (which will read it via --body -)
+                // 標準入力の内容を子プロセスにパイプする（子プロセスは --body - で読み取る）
                 cmd.stdin(Stdio::piped());
                 let mut child = cmd.spawn().expect("failed to launch tsumugi");
                 if let Some(mut child_stdin) = child.stdin.take() {
@@ -271,7 +271,7 @@ pub fn run() {
     let initial_title = args.title.clone().unwrap_or_else(|| "Untitled".to_string());
     let initial_file = args.file.clone().or_else(|| args.file_pos.clone());
 
-    // For file mode: read content upfront and store in state
+    // ファイルモードの場合: コンテンツを事前に読み込んで状態に保存
     let (resolved_content, resolved_title, resolved_file_path) = if !initial_content.is_empty() {
         (initial_content.clone(), initial_title.clone(), None)
     } else if let Some(ref file_path) = initial_file {
@@ -306,7 +306,7 @@ pub fn run() {
         app_state.saved_path = Some(fp.clone());
     }
 
-    // Prepare initial states
+    // 初期状態を準備
     let mut initial_states = HashMap::new();
     initial_states.insert("main".to_string(), app_state);
 
@@ -365,7 +365,7 @@ pub fn run() {
             let menu = menu::build_menu(app.handle(), &i18n)?;
             app.set_menu(menu)?;
 
-            // On Windows, disable native decorations for custom title bar
+            // Windowsではカスタムタイトルバーのためにネイティブ装飾を無効化
             #[cfg(target_os = "windows")]
             {
                 if let Some(window) = app.get_webview_window("main") {
@@ -375,30 +375,30 @@ pub fn run() {
 
             app.manage(i18n::I18nState::new(i18n));
 
-            // Start shared HTTP server
+            // 共有HTTPサーバーを起動
             let (http_port, http_token) = http_api::start_http_server(app.handle().clone());
             app.manage(http_api::HttpServerInfo { port: http_port, token: http_token.clone() });
 
-            // Write HTTP port file for the initial window
+            // 初期ウィンドウ用のHTTPポートファイルを書き込み
             let port_path = ipc::instance_file(&id_for_setup).with_extension("http");
             write_port_file(&port_path, &format!("{}:{}", http_port, http_token));
             eprintln!("tsumugi: HTTP API listening on http://127.0.0.1:{}", http_port);
             eprintln!("tsumugi: port file: {}", port_path.display());
 
-            // Start per-window IPC listener for initial window
+            // 初期ウィンドウ用のウィンドウごとの IPC リスナーを開始
             ipc::start_listener(id_for_setup.clone(), "main".to_string(), app.handle().clone());
 
-            // Start primary socket listener
+            // プライマリソケットリスナーを開始
             ipc::start_primary_listener(app.handle().clone());
 
-            // Start file watcher for initial window if needed
+            // 必要に応じて初期ウィンドウのファイル監視を開始
             if let Some(ref fp) = resolved_file_path_for_setup {
                 let mut fw = FileWatcher::new();
                 fw.watch(app.handle().clone(), "main".to_string(), fp.clone());
                 let watchers = app.state::<FileWatchers>();
                 watchers.lock().unwrap().insert("main".to_string(), fw);
 
-                // Track in recent files
+                // 最近使ったファイルに追加
                 let title = std::path::Path::new(fp)
                     .file_name()
                     .map(|f| f.to_string_lossy().to_string())
@@ -417,7 +417,7 @@ pub fn run() {
             let label = window.label().to_string();
 
             match event {
-                // Track focus for document windows and home window
+                // ドキュメントウィンドウとホームウィンドウのフォーカスを追跡
                 tauri::WindowEvent::Focused(true) => {
                     if label == "main" || label.starts_with("doc-") || label.starts_with("main-home") {
                         let app = window.app_handle();
@@ -425,11 +425,11 @@ pub fn run() {
                         *last_focused.lock().unwrap() = label;
                     }
                 }
-                // Clean up on window destroy
+                // ウィンドウ破棄時のクリーンアップ
                 tauri::WindowEvent::Destroyed => {
-                    // Skip non-document windows (about only)
+                    // ドキュメント以外のウィンドウはスキップ（aboutのみ）
                     if label != "main" && !label.starts_with("doc-") && !label.starts_with("main-home") {
-                        // But clean up about window state if it exists
+                        // ただしaboutウィンドウの状態が存在する場合はクリーンアップ
                         if label == "about" {
                             let app = window.app_handle();
                             let states = app.state::<WindowStates>();
@@ -440,7 +440,7 @@ pub fn run() {
 
                     let app = window.app_handle();
 
-                    // Remove state and get instance_id for cleanup
+                    // 状態を削除し、クリーンアップ用の instance_id を取得
                     let instance_id;
                     let should_exit;
                     {
@@ -448,27 +448,27 @@ pub fn run() {
                         let mut states = states.lock().unwrap();
                         instance_id = states.get(&label).map(|s| s.instance_id.clone());
                         states.remove(&label);
-                        // Check if any document windows remain
+                        // ドキュメントウィンドウが残っているか確認
                         should_exit = !states.values().any(|s| {
-                            // about window is not a document window
+                            // aboutウィンドウはドキュメントウィンドウではない
                             s.instance_id != "about"
                         });
                     }
 
-                    // Clean up IPC socket and HTTP port file
+                    // IPC ソケットとHTTPポートファイルをクリーンアップ
                     if let Some(ref id) = instance_id {
                         let path = ipc::instance_file(id);
                         std::fs::remove_file(&path).ok();
                         std::fs::remove_file(path.with_extension("http")).ok();
                     }
 
-                    // Clean up file watcher
+                    // ファイル監視をクリーンアップ
                     {
                         let watchers = app.state::<FileWatchers>();
                         watchers.lock().unwrap().remove(&label);
                     }
 
-                    // If no document windows remain, exit app
+                    // ドキュメントウィンドウが残っていなければアプリを終了
                     if should_exit {
                         app.exit(0);
                     }
@@ -479,7 +479,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(move |_app_handle, event| {
-            // macOS file association: open file in a new window
+            // macOSファイル関連付け: 新しいウィンドウでファイルを開く
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
                 for url in urls {
@@ -509,8 +509,13 @@ pub fn run() {
                 }
             }
             match event {
+                tauri::RunEvent::ExitRequested { api, code, .. } => {
+                    if code.is_none() {
+                        api.prevent_exit();
+                    }
+                }
                 tauri::RunEvent::Exit => {
-                    // Clean up primary socket
+                    // プライマリソケットをクリーンアップ
                     let primary_path = ipc::instance_file("tsumugi-primary");
                     std::fs::remove_file(&primary_path).ok();
                 }
@@ -551,7 +556,7 @@ fn rand_u16() -> u16 {
     u16::from_le_bytes(buf)
 }
 
-/// Walk up from the executable path to find the enclosing .app bundle.
+/// 実行ファイルのパスから親方向に辿り、囲んでいる .app バンドルを探す。
 #[cfg(target_os = "macos")]
 fn find_app_bundle(exe: &std::path::Path) -> Option<std::path::PathBuf> {
     let mut path = exe.to_path_buf();
@@ -565,7 +570,7 @@ fn find_app_bundle(exe: &std::path::Path) -> Option<std::path::PathBuf> {
     }
 }
 
-/// Set the AppUserModelID so that all tsumugi instances share a single taskbar button.
+/// すべての tsumugi インスタンスが1つのタスクバーボタンを共有するように AppUserModelID を設定する。
 #[cfg(target_os = "windows")]
 fn set_app_user_model_id() {
     use std::os::windows::ffi::OsStrExt;

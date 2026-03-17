@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 
-// --- Types ---
+// --- 型定義 ---
 
 type MenuEntry = NormalItem | CheckItem | SeparatorItem | SubMenuItem;
 
@@ -35,7 +35,7 @@ interface MenuDef {
   items: MenuEntry[];
 }
 
-// --- Custom Title Bar ---
+// --- カスタムタイトルバー ---
 
 export class CustomTitleBar {
   private el!: HTMLElement;
@@ -48,7 +48,7 @@ export class CustomTitleBar {
   async init(): Promise<void> {
     this.translations = await invoke<Record<string, string>>('get_translations');
 
-    // Initialize check states from localStorage
+    // localStorage からチェック状態を初期化する
     const savedTheme = localStorage.getItem('tsumugi-theme') || 'auto';
     const savedLocale = localStorage.getItem('tsumugi-locale') || 'auto';
     this.checkStates = {
@@ -68,14 +68,14 @@ export class CustomTitleBar {
     this.listenForStateChanges();
   }
 
-  /** Update the displayed title (called from main.ts) */
+  /** 表示タイトルを更新する（main.ts から呼び出される） */
   setTitle(title: string): void {
     if (this.titleEl) {
       this.titleEl.textContent = title ? `${title} \u2014 tsumugi` : 'tsumugi';
     }
   }
 
-  /** Hide maximize button and disable double-click maximize (for fixed-size windows) */
+  /** 最大化ボタンを非表示にし、ダブルクリックによる最大化を無効にする（固定サイズウィンドウ用） */
   disableMaximize(): void {
     const btn = this.el.querySelector('#tb-maximize') as HTMLElement | null;
     if (btn) btn.style.display = 'none';
@@ -179,13 +179,13 @@ export class CustomTitleBar {
     ];
   }
 
-  // --- DOM construction ---
+  // --- DOM 構築 ---
 
   private build(): HTMLElement {
     const titlebar = document.createElement('div');
     titlebar.id = 'custom-titlebar';
 
-    // Row 1: Icon + Title + window controls
+    // 行1: アイコン + タイトル + ウィンドウ操作ボタン
     const titleRow = document.createElement('div');
     titleRow.className = 'titlebar-title-row';
 
@@ -207,7 +207,7 @@ export class CustomTitleBar {
 
     titleRow.appendChild(titleDrag);
 
-    // Window control buttons
+    // ウィンドウ操作ボタン
     const controls = document.createElement('div');
     controls.className = 'titlebar-controls';
     controls.appendChild(this.createCtrlBtn('tb-minimize', 'minimize'));
@@ -217,7 +217,7 @@ export class CustomTitleBar {
 
     titlebar.appendChild(titleRow);
 
-    // Row 2: Menu bar
+    // 行2: メニューバー
     const menuRow = document.createElement('div');
     menuRow.className = 'titlebar-menu-row';
 
@@ -267,7 +267,7 @@ export class CustomTitleBar {
     const entry = document.createElement('div');
     entry.className = 'menu-entry has-submenu';
 
-    // Add empty check span for consistent left alignment
+    // 左揃えを統一するための空のチェック用 span を追加する
     const check = document.createElement('span');
     check.className = 'entry-check';
     check.textContent = '';
@@ -304,7 +304,7 @@ export class CustomTitleBar {
     entry.className = 'menu-entry';
     entry.dataset.action = item.id;
 
-    // Always add check span for consistent left alignment
+    // 左揃えを統一するために常にチェック用 span を追加する
     const check = document.createElement('span');
     check.className = 'entry-check';
     if (item.type === 'check') {
@@ -356,12 +356,12 @@ export class CustomTitleBar {
       + '<rect x="0" y="2" width="9" height="9" stroke="currentColor" fill="var(--titlebar-bg)" stroke-width="1"/></svg>';
   }
 
-  // --- Event handling ---
+  // --- イベント処理 ---
 
   private setupEvents(): void {
     this.setupMenuItemEvents();
 
-    // Click outside menus to close
+    // メニュー外をクリックしたら閉じる
     document.addEventListener('mousedown', (e) => {
       if (this.openMenuId) {
         const menuArea = this.el.querySelector('.titlebar-menu')!;
@@ -371,7 +371,7 @@ export class CustomTitleBar {
       }
     });
 
-    // Click on action items (event delegation — works with rebuilt DOM)
+    // アクション項目のクリック（イベント委譲 — DOM 再構築後も動作する）
     this.el.addEventListener('click', (e) => {
       const entry = (e.target as HTMLElement).closest('.menu-entry[data-action]') as HTMLElement | null;
       if (entry && !entry.classList.contains('has-submenu')) {
@@ -381,14 +381,14 @@ export class CustomTitleBar {
       }
     });
 
-    // Escape to close menus
+    // Escape キーでメニューを閉じる
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.openMenuId) {
         this.closeAll();
       }
     });
 
-    // Window control buttons
+    // ウィンドウ操作ボタン
     this.el.querySelector('#tb-minimize')!.addEventListener('click', () => {
       getCurrentWindow().minimize();
     });
@@ -407,7 +407,7 @@ export class CustomTitleBar {
       getCurrentWindow().close();
     });
 
-    // Double-click on title row to maximize/restore
+    // タイトル行のダブルクリックで最大化/元に戻す
     this.el.querySelector('.titlebar-title')!.addEventListener('dblclick', async () => {
       if (this._maximizeDisabled) return;
       const win = getCurrentWindow();
@@ -418,7 +418,7 @@ export class CustomTitleBar {
       }
     });
 
-    // Update maximize/restore icon on window resize
+    // ウィンドウリサイズ時に最大化/元に戻すアイコンを更新する
     window.addEventListener('resize', async () => {
       const maximized = await getCurrentWindow().isMaximized();
       this.updateMaximizeIcon(maximized);
@@ -426,7 +426,7 @@ export class CustomTitleBar {
   }
 
   private setupMenuItemEvents(): void {
-    // Click on top-level menu labels
+    // トップレベルのメニューラベルをクリック
     this.el.querySelectorAll('.menu-top-label').forEach(label => {
       label.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -435,7 +435,7 @@ export class CustomTitleBar {
       });
     });
 
-    // Hover switches menu when one is already open
+    // メニューが開いている状態でホバーすると別のメニューに切り替わる
     this.el.querySelectorAll('.menu-top-item').forEach(item => {
       item.addEventListener('mouseenter', () => {
         if (this.openMenuId) {
@@ -461,7 +461,7 @@ export class CustomTitleBar {
     });
   }
 
-  // --- Menu state ---
+  // --- メニュー状態管理 ---
 
   private toggleMenu(menuId: string): void {
     if (this.openMenuId === menuId) {
@@ -485,7 +485,7 @@ export class CustomTitleBar {
 
   private async executeAction(id: string): Promise<void> {
     await invoke('execute_menu_action', { id });
-    // Locale change — re-fetch translations and rebuild menu
+    // 言語変更 — 翻訳データを再取得してメニューを再構築する
     if (id === 'locale_en' || id === 'locale_ja' || id === 'locale_custom') {
       const locale = id.replace('locale_', '');
       localStorage.setItem('tsumugi-locale', locale);
@@ -531,7 +531,7 @@ export class CustomTitleBar {
 
       menuBar.appendChild(topItem);
     }
-    // Re-attach menu-specific events
+    // メニュー固有のイベントを再登録する
     this.setupMenuItemEvents();
   }
 

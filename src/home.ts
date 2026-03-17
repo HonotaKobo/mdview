@@ -16,7 +16,7 @@ interface TagEntry {
   memo?: string;
 }
 
-// SVG icons as template strings
+// SVG アイコン（テンプレート文字列）
 const ICON_HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>';
 const ICON_TAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
 const ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
@@ -29,7 +29,7 @@ const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 export class HomeScreen {
   private activeTab: 'home' | 'tags' = 'home';
 
-  // Data
+  // データ
   private recentEntries: RecentEntry[] = [];
   private tagEntries: TagEntry[] = [];
   private tagCounts: [string, number][] = [];
@@ -37,17 +37,17 @@ export class HomeScreen {
   private tagSearchQuery = '';
   private activeChips: Set<string> = new Set();
 
-  // DOM refs
+  // DOM 参照
   private homeTabBtn!: HTMLButtonElement;
   private tagsTabBtn!: HTMLButtonElement;
   private contentArea!: HTMLElement;
   private statusBar!: HTMLElement;
 
   async init(): Promise<void> {
-    // Fix window size for home screen
-    try { await getCurrentWindow().setResizable(false); } catch { /* permission may be missing */ }
+    // ホーム画面のウィンドウサイズを固定する
+    try { await getCurrentWindow().setResizable(false); } catch { /* 権限がない可能性あり */ }
 
-    // Hide editor elements
+    // エディタ要素を非表示にする
     document.getElementById('find-bar')!.style.display = 'none';
     document.getElementById('main-area')!.style.display = 'none';
     document.getElementById('status-bar')!.style.display = 'none';
@@ -65,18 +65,18 @@ export class HomeScreen {
   }
 
   applyTranslations(): void {
-    // Rebuild nav labels
+    // ナビゲーションラベルを再構築する
     this.homeTabBtn.querySelector('span')!.textContent = t('ui.home_tab');
     this.tagsTabBtn.querySelector('span')!.textContent = t('ui.home_tags_tab');
     this.renderActiveTab();
   }
 
   private buildLayout(): void {
-    // Create home screen container
+    // ホーム画面コンテナを作成する
     const screen = document.createElement('div');
     screen.id = 'home-screen';
 
-    // Sidebar nav
+    // サイドバーナビゲーション
     const sidebar = document.createElement('div');
     sidebar.id = 'home-sidebar-nav';
 
@@ -99,16 +99,16 @@ export class HomeScreen {
 
     screen.appendChild(sidebar);
 
-    // Content area
+    // コンテンツエリア
     this.contentArea = document.createElement('div');
     this.contentArea.id = 'home-content-area';
     screen.appendChild(this.contentArea);
 
-    // Insert before status bar
+    // ステータスバーの前に挿入する
     const statusBar = document.getElementById('status-bar')!;
     document.body.insertBefore(screen, statusBar);
 
-    // Create home status bar
+    // ホーム用ステータスバーを作成する
     this.statusBar = document.createElement('div');
     this.statusBar.id = 'home-status-bar';
     document.body.insertBefore(this.statusBar, statusBar);
@@ -145,12 +145,12 @@ export class HomeScreen {
     this.updateStatusBar();
   }
 
-  // ===== Home Tab =====
+  // ===== ホームタブ =====
 
   private renderHomeTab(): void {
     this.contentArea.innerHTML = '';
 
-    // Panel header
+    // パネルヘッダー
     const header = document.createElement('div');
     header.className = 'home-panel-header';
     const title = document.createElement('span');
@@ -159,14 +159,14 @@ export class HomeScreen {
     header.appendChild(title);
     this.contentArea.appendChild(header);
 
-    // Scrollable content
+    // スクロール可能なコンテンツ
     const scrollArea = document.createElement('div');
     scrollArea.className = 'home-tab-content';
 
     const inner = document.createElement('div');
     inner.className = 'home-inner';
 
-    // Greeting
+    // あいさつ文
     const greeting = document.createElement('div');
     greeting.className = 'home-greeting';
     const h1 = document.createElement('h1');
@@ -177,7 +177,7 @@ export class HomeScreen {
     greeting.appendChild(p);
     inner.appendChild(greeting);
 
-    // Action cards
+    // アクションカード
     const cards = document.createElement('div');
     cards.className = 'home-action-cards';
 
@@ -197,7 +197,7 @@ export class HomeScreen {
 
     inner.appendChild(cards);
 
-    // Recent files section
+    // 最近使ったファイルセクション
     const sectionHeader = document.createElement('div');
     sectionHeader.className = 'home-section-header';
     const h2 = document.createElement('h2');
@@ -217,7 +217,7 @@ export class HomeScreen {
       const list = document.createElement('div');
       list.className = 'home-recent-list';
 
-      // Build a tag lookup from tagEntries
+      // tagEntries からタグの検索用マップを作成する
       const tagMap = new Map<string, string[]>();
       for (const entry of this.tagEntries) {
         tagMap.set(entry.path, entry.tags);
@@ -227,13 +227,13 @@ export class HomeScreen {
         const item = document.createElement('div');
         item.className = 'home-recent-item';
 
-        // File icon
+        // ファイルアイコン
         const icon = document.createElement('div');
         icon.className = 'home-recent-icon';
         icon.innerHTML = ICON_FILE;
         item.appendChild(icon);
 
-        // Info
+        // ファイル情報
         const info = document.createElement('div');
         info.className = 'home-recent-info';
         const name = document.createElement('div');
@@ -247,7 +247,7 @@ export class HomeScreen {
         info.appendChild(pathEl);
         item.appendChild(info);
 
-        // Tags
+        // タグ
         const tags = tagMap.get(entry.path);
         if (tags && tags.length > 0) {
           const tagsEl = document.createElement('div');
@@ -261,13 +261,13 @@ export class HomeScreen {
           item.appendChild(tagsEl);
         }
 
-        // Date
+        // 日付
         const dateEl = document.createElement('div');
         dateEl.className = 'home-recent-date';
         dateEl.textContent = this.relativeTime(entry.last_opened);
         item.appendChild(dateEl);
 
-        // Remove button
+        // 削除ボタン
         const removeBtn = document.createElement('button');
         removeBtn.className = 'home-recent-remove';
         removeBtn.textContent = '\u00d7';
@@ -278,7 +278,7 @@ export class HomeScreen {
         });
         item.appendChild(removeBtn);
 
-        // Click to open
+        // クリックでファイルを開く
         item.addEventListener('click', () => this.openRecentFile(entry.path));
 
         list.appendChild(item);
@@ -313,12 +313,12 @@ export class HomeScreen {
     return card;
   }
 
-  // ===== Tags Tab =====
+  // ===== タグタブ =====
 
   private renderTagsTab(): void {
     this.contentArea.innerHTML = '';
 
-    // Panel header with search
+    // パネルヘッダー（検索付き）
     const header = document.createElement('div');
     header.className = 'home-panel-header';
     const title = document.createElement('span');
@@ -345,17 +345,17 @@ export class HomeScreen {
     header.appendChild(searchBox);
     this.contentArea.appendChild(header);
 
-    // Tag filter chips
+    // タグフィルターチップ
     const toolbar = document.createElement('div');
     toolbar.className = 'home-tag-toolbar';
     const chips = document.createElement('div');
     chips.className = 'home-tag-chips';
 
-    // "All" chip
+    // 「すべて」チップ
     const allChip = document.createElement('button');
     allChip.className = 'home-tag-chip' + (this.activeChips.size === 0 ? ' active' : '');
     allChip.textContent = t('ui.tm_select_all').replace('選択', '');
-    // Use a simpler label
+    // よりシンプルなラベルを使用する
     allChip.textContent = this.activeChips.size === 0 ? '\u2713 ' + t('ui.tm_all_tags') : t('ui.tm_all_tags');
     allChip.addEventListener('click', () => {
       this.activeChips.clear();
@@ -363,7 +363,7 @@ export class HomeScreen {
     });
     chips.appendChild(allChip);
 
-    // Tag chips sorted by count
+    // 件数順にソートされたタグチップ
     const sorted = [...this.tagCounts].sort((a, b) => b[1] - a[1]);
     for (const [tagName] of sorted) {
       const chip = document.createElement('button');
@@ -382,7 +382,7 @@ export class HomeScreen {
     toolbar.appendChild(chips);
     this.contentArea.appendChild(toolbar);
 
-    // Table wrapper
+    // テーブルラッパー
     const tableWrapper = document.createElement('div');
     tableWrapper.className = 'home-tag-table-wrapper';
     tableWrapper.id = 'home-tag-table-wrapper';
@@ -412,7 +412,7 @@ export class HomeScreen {
     const table = document.createElement('table');
     table.className = 'home-tag-table';
 
-    // Header
+    // ヘッダー
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const headerTexts = [
@@ -436,14 +436,14 @@ export class HomeScreen {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // Body
+    // テーブル本体
     const tbody = document.createElement('tbody');
     for (const entry of filtered) {
       const exists = this.pathStatus.get(entry.path) ?? true;
       const tr = document.createElement('tr');
       if (!exists) tr.style.opacity = '0.5';
 
-      // Filename
+      // ファイル名
       const tdName = document.createElement('td');
       tdName.className = 'cell-filename';
       const filename = entry.path.split(/[/\\]/).pop() || entry.path;
@@ -454,14 +454,14 @@ export class HomeScreen {
       }
       tr.appendChild(tdName);
 
-      // Path
+      // パス
       const tdPath = document.createElement('td');
       tdPath.className = 'cell-path';
       tdPath.textContent = this.shortenPath(entry.path);
       tdPath.title = entry.path;
       tr.appendChild(tdPath);
 
-      // Memo
+      // メモ
       const tdMemo = document.createElement('td');
       tdMemo.className = 'cell-memo';
 
@@ -511,7 +511,7 @@ export class HomeScreen {
       tdMemo.appendChild(memoInput);
       tr.appendChild(tdMemo);
 
-      // Tags
+      // タグ
       const tdTags = document.createElement('td');
       const tagsDiv = document.createElement('div');
       tagsDiv.className = 'cell-tags';
@@ -524,26 +524,26 @@ export class HomeScreen {
       tdTags.appendChild(tagsDiv);
       tr.appendChild(tdTags);
 
-      // Actions
+      // アクション
       const tdActions = document.createElement('td');
       const actionsDiv = document.createElement('div');
       actionsDiv.className = 'cell-actions';
 
-      // Open button
+      // 開くボタン
       const openBtn = this.createIconButton(ICON_OPEN, t('ui.tm_open'), () => {
         this.openFileFromTags(entry.path);
       });
       if (!exists) openBtn.disabled = true;
       actionsDiv.appendChild(openBtn);
 
-      // Folder button
+      // フォルダボタン
       const folderBtn = this.createIconButton(ICON_FOLDER, t('ui.tm_folder'), () => {
         revealItemInDir(entry.path).catch(() => {});
       });
       if (!exists) folderBtn.disabled = true;
       actionsDiv.appendChild(folderBtn);
 
-      // Delete button
+      // 削除ボタン
       const deleteBtn = this.createIconButton(ICON_TRASH, t('ui.tm_delete'), async () => {
         await invoke('tag_delete_entry', { path: entry.path });
         await this.loadData();
@@ -578,14 +578,14 @@ export class HomeScreen {
   private getFilteredTagEntries(): TagEntry[] {
     let entries = this.tagEntries;
 
-    // Filter by active chips
+    // アクティブなチップでフィルタリングする
     if (this.activeChips.size > 0) {
       entries = entries.filter(e =>
         e.tags.some(tag => this.activeChips.has(tag))
       );
     }
 
-    // Filter by search query
+    // 検索クエリでフィルタリングする
     if (this.tagSearchQuery) {
       const q = this.tagSearchQuery.toLowerCase();
       const keywords = q.split(/[\s,]+/).filter(k => k.length > 0);
@@ -603,7 +603,7 @@ export class HomeScreen {
     return entries;
   }
 
-  // ===== Status Bar =====
+  // ===== ステータスバー =====
 
   private updateStatusBar(): void {
     if (this.activeTab === 'home') {
@@ -628,7 +628,7 @@ export class HomeScreen {
     }
   }
 
-  // ===== Actions =====
+  // ===== アクション =====
 
   private newFile(): void {
     invoke('open_new_window', { file: null, body: '', closeSelf: true });
@@ -658,17 +658,17 @@ export class HomeScreen {
     this.renderHomeTab();
   }
 
-  // ===== Helpers =====
+  // ===== ヘルパー =====
 
   private shortenPath(fullPath: string): string {
     const home = fullPath.replace(/\\/g, '/');
-    // Try to shorten with ~
+    // ~ を使ってパスを短縮する
     const homeDir = home.includes('/Users/')
       ? home.replace(/^\/Users\/[^/]+/, '~')
       : home.includes('\\Users\\')
         ? home.replace(/^.*?\\Users\\[^\\]+/, '~')
         : home;
-    // Show directory only (remove filename)
+    // ディレクトリのみ表示する（ファイル名を除去）
     const lastSlash = homeDir.lastIndexOf('/');
     if (lastSlash > 0) {
       return homeDir.substring(0, lastSlash + 1);

@@ -7,21 +7,21 @@ use tiny_http::{Header, Method, Response, Server};
 use crate::ipc;
 use crate::state::{LastFocusedDoc, WindowStates};
 
-/// HTTP server info (shared across all windows)
+/// HTTPサーバー情報（全ウィンドウで共有）
 pub struct HttpServerInfo {
     pub port: u16,
     pub token: String,
 }
 
-/// Generate a random hex token for API authentication using CSPRNG.
+/// CSPRNGを使用してAPI認証用のランダムな16進トークンを生成する。
 fn generate_token() -> String {
     let mut buf = [0u8; 16];
     getrandom::getrandom(&mut buf).expect("failed to generate random token");
     buf.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-/// Start HTTP API server on a random localhost port.
-/// Returns (port, token). The caller writes port files per window.
+/// ランダムなlocalhostポートでHTTP APIサーバーを起動する。
+/// (port, token)を返す。呼び出し元がウィンドウごとにポートファイルを書き込む。
 pub fn start_http_server(app: AppHandle) -> (u16, String) {
     let server = Server::http("127.0.0.1:0").expect("failed to start HTTP API server");
     let port = server.server_addr().to_ip().unwrap().port();
@@ -31,7 +31,7 @@ pub fn start_http_server(app: AppHandle) -> (u16, String) {
 
     std::thread::spawn(move || {
         for mut request in server.incoming_requests() {
-            // Check token authentication
+            // トークン認証を確認
             let response = if !verify_token(&request, &expected_token) {
                 ipc::IpcResponse {
                     ok: false,
@@ -62,7 +62,7 @@ pub fn start_http_server(app: AppHandle) -> (u16, String) {
     (port, token)
 }
 
-/// Verify the Bearer token from the Authorization header.
+/// Authorizationヘッダーからのベアラートークンを検証する。
 fn verify_token(request: &tiny_http::Request, expected: &str) -> bool {
     for header in request.headers() {
         if header.field.as_str().to_ascii_lowercase() == "authorization" {
@@ -91,7 +91,7 @@ fn error_response(msg: &str) -> ipc::IpcResponse {
     }
 }
 
-/// Extract Content-Type (without parameters like charset) from request headers.
+/// リクエストヘッダーからContent-Typeを取得する（charsetなどのパラメータは除く）。
 fn get_content_type(request: &tiny_http::Request) -> String {
     for header in request.headers() {
         if header.field.as_str().to_ascii_lowercase() == "content-type" {
@@ -102,7 +102,7 @@ fn get_content_type(request: &tiny_http::Request) -> String {
     String::new()
 }
 
-/// Extract a query parameter value from a URL string.
+/// URL文字列からクエリパラメータの値を取得する。
 fn parse_query_param(url: &str, key: &str) -> Option<String> {
     let query = url.split('?').nth(1)?;
     for pair in query.split('&') {
@@ -115,7 +115,7 @@ fn parse_query_param(url: &str, key: &str) -> Option<String> {
     None
 }
 
-/// Percent-decode a URL-encoded string (handles + as space, %XX sequences).
+/// URLエンコードされた文字列をパーセントデコードする（+をスペースとして、%XXシーケンスを処理）。
 fn url_decode(s: &str) -> String {
     let mut bytes = Vec::new();
     let mut iter = s.bytes();
@@ -147,8 +147,8 @@ fn url_decode(s: &str) -> String {
     String::from_utf8(bytes).unwrap_or_else(|_| s.to_string())
 }
 
-/// Fix invalid JSON escape sequences (e.g. \d, \s, \w from regex in code blocks).
-/// Scans character by character so that valid escapes (\n, \\, \", etc.) are preserved.
+/// 無効なJSONエスケープシーケンスを修正する（例: コードブロック内の正規表現による\d, \s, \w）。
+/// 1文字ずつ走査し、有効なエスケープ（\n, \\, \"など）はそのまま保持する。
 fn fix_json_escapes(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
@@ -162,7 +162,7 @@ fn fix_json_escapes(s: &str) -> String {
                         chars.next();
                     }
                     _ => {
-                        // Invalid JSON escape: add extra backslash
+                        // 無効なJSONエスケープ: バックスラッシュを追加
                         result.push('\\');
                         result.push('\\');
                         result.push(next);
@@ -178,7 +178,7 @@ fn fix_json_escapes(s: &str) -> String {
     result
 }
 
-/// Try parsing JSON, and on failure retry after fixing invalid escape sequences.
+/// JSONのパースを試み、失敗した場合は無効なエスケープシーケンスを修正して再試行する。
 fn parse_json_lenient<T: serde::de::DeserializeOwned>(body: &str) -> Result<T, String> {
     match serde_json::from_str::<T>(body) {
         Ok(v) => Ok(v),
@@ -190,9 +190,9 @@ fn parse_json_lenient<T: serde::de::DeserializeOwned>(body: &str) -> Result<T, S
     }
 }
 
-/// Resolve the window label from the request URL's `?id=` parameter.
-/// If `id` matches an instance_id in WindowStates, returns the corresponding window label.
-/// Otherwise falls back to the last focused document window.
+/// リクエストURLの`?id=`パラメータからウィンドウラベルを解決する。
+/// `id`がWindowStates内のinstance_idに一致する場合、対応するウィンドウラベルを返す。
+/// それ以外の場合は、最後にフォーカスされたドキュメントウィンドウにフォールバックする。
 fn resolve_window_label(app: &AppHandle, url: &str) -> String {
     if let Some(id) = parse_query_param(url, "id") {
         let states = app.state::<WindowStates>();
@@ -200,12 +200,12 @@ fn resolve_window_label(app: &AppHandle, url: &str) -> String {
         if let Some((label, _)) = states.iter().find(|(_, s)| s.instance_id == id) {
             return label.clone();
         }
-        // Try using id as a window label directly
+        // idをウィンドウラベルとして直接使用を試みる
         if states.contains_key(&id) {
             return id;
         }
     }
-    // Default to last focused document
+    // デフォルトで最後にフォーカスされたドキュメントを使用
     let focused = app.state::<LastFocusedDoc>();
     let label = focused.lock().unwrap().clone();
     label
@@ -215,14 +215,14 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
     let url = request.url().to_string();
     let method = request.method().clone();
 
-    // Strip query string for routing
+    // ルーティングのためクエリ文字列を除去
     let path = url.split('?').next().unwrap_or(&url);
 
-    // Resolve target window
+    // 対象ウィンドウを解決
     let window_label = resolve_window_label(app, &url);
 
     match (method, path) {
-        // Pass-through: accept IpcRequest JSON directly
+        // パススルー: IpcRequest JSONを直接受け付ける
         (Method::Post, "/") => {
             let body = match read_body(request) {
                 Ok(b) => b,
@@ -234,7 +234,7 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             }
         }
 
-        // REST-style endpoints
+        // RESTスタイルのエンドポイント
         (Method::Post, "/update") => {
             let content_type = get_content_type(request);
             let body = match read_body(request) {
@@ -243,11 +243,11 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             };
 
             if content_type == "text/markdown" || content_type == "text/plain" {
-                // Raw body mode: body is markdown text, title from query param
+                // 生ボディモード: ボディはMarkdownテキスト、タイトルはクエリパラメータから取得
                 let title = parse_query_param(&url, "title");
                 ipc::handle_update(app, &window_label, Some(body), title)
             } else {
-                // JSON mode (default, backward compatible)
+                // JSONモード（デフォルト、後方互換）
                 match parse_json_lenient::<UpdateRequest>(&body) {
                     Ok(r) => ipc::handle_update(app, &window_label, r.body, r.title),
                     Err(e) => error_response(&e),
@@ -272,7 +272,7 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             };
 
             if content_type == "text/plain" {
-                // Raw body mode: body is the regex pattern
+                // 生ボディモード: ボディは正規表現パターン
                 ipc::handle_grep(app, &window_label, &body)
             } else {
                 match parse_json_lenient::<GrepRequest>(&body) {
@@ -309,7 +309,7 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             };
 
             if content_type == "text/markdown" || content_type == "text/plain" {
-                // Raw body mode: body is the content, line from query param
+                // 生ボディモード: ボディはコンテンツ、行番号はクエリパラメータから取得
                 match parse_query_param(&url, "line").and_then(|v| v.parse::<usize>().ok()) {
                     Some(line) => ipc::handle_insert(app, &window_label, line, &body),
                     None => error_response("Missing or invalid query parameter: line"),
@@ -329,7 +329,7 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
             };
 
             if content_type == "text/markdown" || content_type == "text/plain" {
-                // Raw body mode: body is the content, start/end from query params
+                // 生ボディモード: ボディはコンテンツ、start/endはクエリパラメータから取得
                 let start = parse_query_param(&url, "start").and_then(|v| v.parse::<usize>().ok());
                 let end = parse_query_param(&url, "end").and_then(|v| v.parse::<usize>().ok());
                 match (start, end) {
@@ -386,7 +386,7 @@ fn dispatch_ipc_request(app: &AppHandle, window_label: &str, req: ipc::IpcReques
     }
 }
 
-// --- Request structs for REST endpoints ---
+// --- RESTエンドポイント用のリクエスト構造体 ---
 
 #[derive(Deserialize)]
 struct UpdateRequest {

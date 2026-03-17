@@ -1,6 +1,6 @@
-/* === Edit Mode Styles === */
+/* === 編集モードのスタイル === */
 
-/* Block wrapper */
+/* ブロックのラッパー */
 .md-block {
   position: relative;
   border-left: 2px solid transparent;
@@ -14,7 +14,7 @@
   border-left-color: var(--link-color);
 }
 
-/* --- Preview / Source toggle --- */
+/* --- プレビュー / ソース切り替え --- */
 .block-source {
   display: none;
 }
@@ -27,7 +27,7 @@
   display: block;
 }
 
-/* --- Edit button (visible on hover) --- */
+/* --- 編集ボタン（ホバー時に表示） --- */
 .block-edit-btn {
   position: absolute;
   top: 4px;
@@ -56,7 +56,7 @@
   color: var(--text-primary);
 }
 
-/* --- Textarea --- */
+/* --- テキストエリア --- */
 .block-editor-textarea {
   display: block;
   width: 100%;
@@ -80,7 +80,7 @@
   border-color: var(--link-color);
 }
 
-/* Delimiter labels (```, $$) */
+/* デリミタラベル (```, $$) */
 .source-label {
   color: var(--text-secondary);
   font-family: var(--font-mono);
@@ -90,7 +90,7 @@
   user-select: none;
 }
 
-/* --- Formatting toolbar --- */
+/* --- 書式設定ツールバー --- */
 .block-editor-toolbar {
   display: flex;
   gap: 2px;
@@ -123,16 +123,16 @@
   align-self: center;
 }
 
-/* Edit mode body */
+/* 編集モード時のbody */
 body.edit-mode #content {
   cursor: default;
   min-height: 100%;
 }
 
 
-/* Copy buttons are already hidden when .block-preview is hidden via .editing */
+/* .editing で .block-preview が非表示のとき、コピーボタンも自動的に非表示になる */
 
-/* --- Block gap (add button between blocks) --- */
+/* --- ブロック間のギャップ（ブロック間の追加ボタン） --- */
 .block-gap {
   position: relative;
   height: 8px;
@@ -170,7 +170,7 @@ body.edit-mode #content {
   border-color: var(--text-secondary);
 }
 
-/* Print: hide edit mode indicators */
+/* 印刷時: 編集モードの表示要素を非表示にする */
 @media print {
   .block-edit-btn,
   .block-gap {

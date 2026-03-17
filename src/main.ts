@@ -46,7 +46,7 @@ let tagSidebar: TagSidebar;
 let updateModal: UpdateModal;
 let homeScreen: HomeScreen | null = null;
 
-// Determine window mode and initialize
+// ウィンドウモード判定と初期化
 (async () => {
 const windowMode = await invoke<string>('get_window_mode');
 isHome = windowMode === 'home';
@@ -98,7 +98,7 @@ function updateWindowTitle(title: string) {
   customTitleBar?.setTitle(title);
 }
 
-// Initialize custom title bar on Windows
+// Windows でカスタムタイトルバーを初期化する
 async function initPlatformUI() {
   const platform = await invoke<string>('get_platform');
   if (platform === 'windows') {
@@ -116,7 +116,7 @@ initPlatformUI();
 
 
 
-// Open file dialog that opens in a new window
+// ファイル選択ダイアログを開き、新しいウィンドウで開く
 async function openFileInNewWindow() {
   const selected = await open({
     multiple: false,
@@ -169,7 +169,7 @@ async function reloadCurrentFile() {
   }
 }
 
-// Debounce guard to prevent double-firing from native menu + JS handler
+// ネイティブメニューと JS ハンドラの二重発火を防ぐデバウンスガード
 const actionDebounce = new Set<string>();
 function debounced(action: string, fn: () => void) {
   if (actionDebounce.has(action)) return;
@@ -246,7 +246,7 @@ if (isEditor) {
     }
   });
 
-  // Re-check for content set by macOS file open event (race condition workaround)
+  // macOS のファイルオープンイベントで設定されたコンテンツを再確認する（競合状態の回避策）
   setTimeout(async () => {
     const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
     if (contentSet && body && body !== currentContent) {

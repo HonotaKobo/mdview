@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 
-/// Unescape \n → newline, \\ → backslash
+/// \n → 改行、\\ → バックスラッシュにアンエスケープする
 fn unescape(s: &str) -> Result<String, String> {
     let mut result = String::new();
     let mut chars = s.chars();
@@ -25,63 +25,63 @@ fn unescape(s: &str) -> Result<String, String> {
 #[derive(Parser, Debug)]
 #[command(name = "tsumugi", about = "Markdown viewer for the AI age")]
 pub struct CliArgs {
-    /// Markdown file path (positional argument)
+    /// Markdownファイルパス（位置引数）
     #[arg(value_name = "FILE")]
     pub file_pos: Option<String>,
 
-    /// Open a markdown file (use with --id for AI tracking)
+    /// Markdownファイルを開く（AI追跡には--idと併用）
     #[arg(long, value_name = "PATH", conflicts_with = "file_pos")]
     pub file: Option<String>,
 
-    /// Markdown body content (full replacement, use \n for newlines)
+    /// Markdownボディコンテンツ（全置換、改行には\nを使用）
     #[arg(long, value_parser = unescape, conflicts_with_all = ["file_pos", "file", "delete", "insert", "replace", "grep", "lines"])]
     pub body: Option<String>,
 
-    /// Window identifier (same ID updates existing window)
+    /// ウィンドウ識別子（同じIDで既存ウィンドウを更新）
     #[arg(long)]
     pub id: Option<String>,
 
-    /// Document title (window title / default save filename)
+    /// ドキュメントタイトル（ウィンドウタイトル / デフォルト保存ファイル名）
     #[arg(long, short)]
     pub title: Option<String>,
 
-    /// Query existing instance properties (requires --id, repeatable)
+    /// 既存インスタンスのプロパティを問い合わせる（--idが必要、繰り返し可能）
     #[arg(long, value_name = "PROPERTY", conflicts_with_all = ["body", "file", "file_pos", "delete", "insert", "replace"])]
     pub query: Vec<QueryProperty>,
 
-    /// List all open windows
+    /// 開いているすべてのウィンドウを一覧表示
     #[arg(long, conflicts_with_all = ["body", "file", "file_pos", "id", "title", "query", "grep", "lines", "delete", "insert", "replace"])]
     pub list: bool,
 
-    // --- Search (read-only, requires --id) ---
+    // --- 検索（読み取り専用、--idが必要） ---
 
-    /// Search content with regex (returns line numbers)
+    /// 正規表現でコンテンツを検索する（行番号を返す）
     #[arg(long, value_name = "PATTERN", conflicts_with_all = ["body", "file", "file_pos", "delete", "insert", "replace", "lines"])]
     pub grep: Option<String>,
 
-    /// Get content at line range (e.g. "10-20", "5")
+    /// 行範囲のコンテンツを取得する（例: "10-20", "5"）
     #[arg(long, value_name = "RANGE", conflicts_with_all = ["body", "file", "file_pos", "delete", "insert", "replace", "grep"])]
     pub lines: Option<String>,
 
-    // --- Line editing (write, requires --id) ---
+    // --- 行編集（書き込み、--idが必要） ---
 
-    /// Delete lines (e.g. "199-200,203")
+    /// 行を削除する（例: "199-200,203"）
     #[arg(long, value_name = "RANGE", conflicts_with_all = ["body", "file", "file_pos", "insert", "replace", "grep", "lines", "query"])]
     pub delete: Option<String>,
 
-    /// Insert content before line (use with --content)
+    /// 指定行の前にコンテンツを挿入する（--contentと併用）
     #[arg(long, value_name = "LINE", conflicts_with_all = ["body", "file", "file_pos", "delete", "replace", "grep", "lines", "query"])]
     pub insert: Option<usize>,
 
-    /// Replace line range with content (e.g. "42-45", use with --content)
+    /// 行範囲をコンテンツで置換する（例: "42-45"、--contentと併用）
     #[arg(long, value_name = "RANGE", conflicts_with_all = ["body", "file", "file_pos", "delete", "insert", "grep", "lines", "query"])]
     pub replace: Option<String>,
 
-    /// Content for --insert / --replace (use \n for newlines)
+    /// --insert / --replace用のコンテンツ（改行には\nを使用）
     #[arg(long, value_parser = unescape)]
     pub content: Option<String>,
 
-    /// Internal: run GUI in foreground (used by daemonize logic)
+    /// 内部用: GUIをフォアグラウンドで実行する（デーモン化ロジックで使用）
     #[arg(long = "_foreground", hide = true)]
     pub foreground: bool,
 
@@ -89,16 +89,16 @@ pub struct CliArgs {
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum QueryProperty {
-    /// Saved file path (empty + exit 1 if unsaved)
+    /// 保存済みファイルパス（未保存の場合は空 + 終了コード1）
     Path,
-    /// Current markdown source
+    /// 現在のMarkdownソース
     Body,
-    /// Document title
+    /// ドキュメントタイトル
     Title,
-    /// Instance status as JSON
+    /// インスタンスの状態（JSON形式）
     Status,
-    /// Total line count
+    /// 総行数
     Linecount,
-    /// All properties as JSON
+    /// 全プロパティ（JSON形式）
     All,
 }

@@ -70,7 +70,7 @@ pub fn perform_update() -> UpdateResult {
         "windows" => {
             match find_scoop() {
                 Some(scoop) => {
-                    // Ensure the scoop bucket is registered (no-op if already added)
+                    // scoopバケットが登録されていることを確認する（既に追加済みなら何もしない）
                     let _ = std::process::Command::new("cmd.exe")
                         .args(["/C", scoop.as_str(), "bucket", "add", "tsumugi",
                                "https://github.com/HonotaKobo/scoop-tsumugi"])
@@ -92,16 +92,16 @@ pub fn perform_update() -> UpdateResult {
     }
 }
 
-/// Locate the `brew` executable.
-/// GUI apps on macOS do not inherit the user's shell PATH, so we check
-/// well-known installation directories first.
+/// `brew`実行ファイルを探す。
+/// macOSのGUIアプリはユーザーのシェルPATHを継承しないため、
+/// まず既知のインストールディレクトリを確認する。
 fn find_brew() -> Option<String> {
-    // Apple Silicon
+    // Apple Silicon（Appleシリコン）
     let apple_silicon = "/opt/homebrew/bin/brew";
     if std::path::Path::new(apple_silicon).exists() {
         return Some(apple_silicon.to_string());
     }
-    // Intel Mac
+    // Intel Mac（インテルMac）
     let intel = "/usr/local/bin/brew";
     if std::path::Path::new(intel).exists() {
         return Some(intel.to_string());
@@ -109,18 +109,18 @@ fn find_brew() -> Option<String> {
     None
 }
 
-/// Locate the `scoop.cmd` shim on Windows.
-/// GUI apps do not inherit the user's shell PATH, so we check
-/// well-known installation directories.
+/// Windows上で`scoop.cmd`シムを探す。
+/// GUIアプリはユーザーのシェルPATHを継承しないため、
+/// 既知のインストールディレクトリを確認する。
 fn find_scoop() -> Option<String> {
-    // Custom install location via SCOOP env var
+    // SCOOP環境変数によるカスタムインストール場所
     if let Ok(scoop_dir) = std::env::var("SCOOP") {
         let path = std::path::PathBuf::from(&scoop_dir).join("shims").join("scoop.cmd");
         if path.exists() {
             return Some(path.to_string_lossy().to_string());
         }
     }
-    // Default: %USERPROFILE%\scoop
+    // デフォルト: %USERPROFILE%\scoop
     if let Ok(home) = std::env::var("USERPROFILE") {
         let path = std::path::PathBuf::from(&home).join("scoop").join("shims").join("scoop.cmd");
         if path.exists() {

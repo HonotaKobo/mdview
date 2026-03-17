@@ -7,16 +7,16 @@ use crate::state::{WindowMode, WindowStates};
 use crate::tags::{TagEntry, TagState};
 use crate::update_checker::{UpdateInfo, UpdateResult};
 
-/// Validate and normalize a file path, blocking access to sensitive system directories.
+/// ファイルパスを検証・正規化し、機密性の高いシステムディレクトリへのアクセスをブロックする。
 fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
     if path.contains('\0') {
         return Err("Invalid path".to_string());
     }
     let p = std::path::Path::new(path);
 
-    // Resolve to canonical path (resolves symlinks, .., etc.)
+    // 正規パスに解決（シンボリックリンク、.. などを解決）
     let canonical = std::fs::canonicalize(p).or_else(|_| {
-        // For new files: canonicalize parent directory
+        // 新規ファイルの場合: 親ディレクトリを正規化
         p.parent()
             .ok_or_else(|| "Invalid path".to_string())
             .and_then(|parent| {
@@ -25,7 +25,7 @@ fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
             .map(|cp| cp.join(p.file_name().unwrap_or_default()))
     })?;
 
-    // Block sensitive system directories
+    // 機密性の高いシステムディレクトリをブロック
     let path_str = canonical.to_string_lossy();
     let blocked: &[&str] = if cfg!(target_os = "windows") {
         &["C:\\Windows", "C:\\Program Files"]
@@ -64,7 +64,7 @@ pub fn notify_saved(
         state.saved_path = Some(path.clone());
         state.dirty = false;
     }
-    // Track in recent files
+    // 最近使ったファイルに追加
     let title = std::path::Path::new(&path)
         .file_name()
         .map(|f| f.to_string_lossy().to_string())
@@ -233,11 +233,11 @@ pub fn perform_update() -> UpdateResult {
 
 #[command]
 pub fn restart_app(app: tauri::AppHandle, states: tauri::State<'_, WindowStates>) {
-    // Clean up primary socket
+    // プライマリソケットをクリーンアップ
     let primary_path = crate::ipc::instance_file("tsumugi-primary");
     std::fs::remove_file(&primary_path).ok();
 
-    // Clean up per-window sockets and HTTP port files
+    // ウィンドウごとのソケットとHTTPポートファイルをクリーンアップ
     {
         let states = states.lock().unwrap();
         for (_, state) in states.iter() {
@@ -297,7 +297,7 @@ pub fn tag_get_counts(state: tauri::State<'_, TagState>) -> Vec<(String, usize)>
     store.get_counts()
 }
 
-// --- Recent files ---
+// --- 最近使ったファイル ---
 
 #[command]
 pub fn recent_get_all(state: tauri::State<'_, RecentState>) -> Vec<RecentEntry> {
@@ -323,7 +323,7 @@ pub fn recent_clear(state: tauri::State<'_, RecentState>) {
     store.clear();
 }
 
-// --- Window mode ---
+// --- ウィンドウモード ---
 
 #[command]
 pub fn get_window_mode(window: tauri::Window, states: tauri::State<'_, WindowStates>) -> String {

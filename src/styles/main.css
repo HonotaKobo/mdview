@@ -55,7 +55,7 @@ body {
   overflow: hidden;
 }
 
-/* Custom title bar (Windows only — injected by JS) */
+/* カスタムタイトルバー（Windows専用 — JSで挿入） */
 #custom-titlebar {
   display: flex;
   flex-direction: column;
@@ -66,7 +66,7 @@ body {
   font-size: 12px;
 }
 
-/* Row 1: Title + window controls */
+/* 行1: タイトル + ウィンドウコントロール */
 .titlebar-title-row {
   display: flex;
   align-items: center;
@@ -96,7 +96,7 @@ body {
   white-space: nowrap;
 }
 
-/* Row 2: Menu bar */
+/* 行2: メニューバー */
 .titlebar-menu-row {
   display: flex;
   align-items: center;
@@ -197,7 +197,7 @@ body {
   background: var(--border-color);
 }
 
-/* Submenus */
+/* サブメニュー */
 .has-submenu {
   position: relative;
 }
@@ -219,7 +219,7 @@ body {
   display: block;
 }
 
-/* Window control buttons */
+/* ウィンドウ操作ボタン */
 .titlebar-controls {
   display: flex;
   height: 100%;
@@ -247,13 +247,13 @@ body {
   color: #ffffff !important;
 }
 
-/* Dark mode dropdown shadow */
+/* ダークモードのドロップダウン影 */
 :root[data-theme='dark'] .menu-dropdown,
 :root[data-theme='dark'] .menu-submenu {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-/* Find bar */
+/* 検索バー */
 #find-bar {
   display: flex;
   flex-direction: column;
@@ -311,7 +311,7 @@ body {
   color: var(--text-primary);
 }
 
-/* ==highlight== (markdown-it-mark) */
+/* ==ハイライト== (markdown-it-mark) */
 #content mark:not(.find-highlight) {
   background: rgba(255, 235, 59, 0.4);
   color: inherit;
@@ -323,7 +323,7 @@ body {
   background: rgba(255, 235, 59, 0.25);
 }
 
-/* Search highlight */
+/* 検索ハイライト */
 mark.find-highlight {
   background: var(--find-highlight);
   color: inherit;
@@ -347,7 +347,7 @@ mark.find-highlight.active {
   overflow-y: auto;
 }
 
-/* Tag sidebar */
+/* タグサイドバー */
 #tag-sidebar {
   width: 280px;
   flex-shrink: 0;
@@ -524,7 +524,7 @@ mark.find-highlight.active {
   width: 100%;
 }
 
-/* Status bar */
+/* ステータスバー */
 #status-bar {
   display: flex;
   align-items: center;
@@ -557,7 +557,7 @@ mark.find-highlight.active {
   color: var(--text-primary);
 }
 
-/* Tag add modal — U1: positioned bottom-right */
+/* タグ追加モーダル — U1: 右下に配置 */
 #tag-add-overlay {
   position: fixed;
   top: 0;
@@ -600,7 +600,7 @@ mark.find-highlight.active {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* Update modal */
+/* アップデートモーダル */
 #update-overlay {
   position: fixed;
   top: 0;
@@ -671,7 +671,7 @@ mark.find-highlight.active {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* Tag manager styles */
+/* タグマネージャーのスタイル */
 .tm-container {
   display: flex;
   flex-direction: row;
@@ -829,7 +829,7 @@ mark.find-highlight.active {
   gap: 2px;
 }
 
-/* F1: Clickable chip label */
+/* F1: クリック可能なチップラベル */
 .tm-tag-chip-label {
   cursor: pointer;
 }
@@ -839,7 +839,7 @@ mark.find-highlight.active {
   color: var(--link-color);
 }
 
-/* F3: Remove button on chip */
+/* F3: チップの削除ボタン */
 .tm-tag-chip-remove {
   background: none;
   border: none;
@@ -858,7 +858,7 @@ mark.find-highlight.active {
   color: var(--danger-color);
 }
 
-/* F3: Inline tag input */
+/* F3: インラインタグ入力 */
 .tm-inline-tag-input {
   padding: 1px 6px;
   border: 1px solid var(--border-color);
@@ -917,7 +917,7 @@ mark.find-highlight.active {
   color: #ffffff;
 }
 
-/* U3: Filename display */
+/* U3: ファイル名表示 */
 .tm-filename {
   display: flex;
   align-items: center;
@@ -927,14 +927,14 @@ mark.find-highlight.active {
   color: var(--text-primary);
 }
 
-/* F4: Checkbox */
+/* F4: チェックボックス */
 .tm-checkbox {
   flex-shrink: 0;
   cursor: pointer;
   accent-color: var(--link-color);
 }
 
-/* F4: Select all */
+/* F4: すべて選択 */
 .tm-select-all-label {
   display: flex;
   align-items: center;
@@ -954,7 +954,7 @@ mark.find-highlight.active {
   user-select: none;
 }
 
-/* F4: Batch action bar */
+/* F4: 一括操作バー */
 .tm-batch-bar {
   display: flex;
   align-items: center;
@@ -992,7 +992,7 @@ mark.find-highlight.active {
   white-space: nowrap;
 }
 
-/* F6: Autocomplete dropdown */
+/* F6: オートコンプリートドロップダウン */
 .tag-autocomplete {
   position: absolute;
   top: 100%;
@@ -1024,7 +1024,7 @@ mark.find-highlight.active {
   color: #ffffff;
 }
 
-/* F7: Hamburger button */
+/* F7: ハンバーガーボタン */
 .tm-hamburger {
   background: none;
   border: 1px solid var(--border-color);
@@ -1042,7 +1042,7 @@ mark.find-highlight.active {
   background: rgba(128, 128, 128, 0.15);
 }
 
-/* F7: Tag sidebar */
+/* F7: タグサイドバー */
 .tm-sidebar {
   width: 220px;
   flex-shrink: 0;
@@ -1169,7 +1169,7 @@ mark.find-highlight.active {
   color: var(--danger-color);
 }
 
-/* Memo styles — Tag Manager */
+/* メモのスタイル — タグマネージャー */
 .tm-memo-row {
   display: flex;
   align-items: center;
@@ -1213,7 +1213,7 @@ mark.find-highlight.active {
   border-color: var(--link-color);
 }
 
-/* Memo styles — Home Tags Table */
+/* メモのスタイル — ホームタグテーブル */
 .cell-memo {
   max-width: 0;
 }
@@ -1248,7 +1248,7 @@ mark.find-highlight.active {
   border-color: var(--link-color);
 }
 
-/* Print styles */
+/* 印刷用スタイル */
 @media print {
   @page {
     margin: 10mm;

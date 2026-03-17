@@ -9,7 +9,7 @@ use crate::i18n::{I18n, I18nState, Locale, save_locale_setting};
 use crate::state::LastFocusedDoc;
 
 pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Menu<Wry>> {
-    // --- File menu ---
+    // --- ファイルメニュー ---
     let file_menu = SubmenuBuilder::new(app, i18n.t("menu.file"))
         .item(&MenuItemBuilder::with_id("file_new_window", i18n.t("menu.file_new_window"))
             .accelerator("CmdOrCtrl+N")
@@ -45,11 +45,11 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
-    // --- Edit menu ---
+    // --- 編集メニュー ---
     #[allow(unused_mut)]
     let mut edit_builder = SubmenuBuilder::new(app, i18n.t("menu.edit"));
 
-    // macOS: add standard editing items so webview text operations work
+    // macOS: 標準の編集項目を追加し、webviewのテキスト操作を有効にする
     #[cfg(target_os = "macos")]
     {
         edit_builder = edit_builder
@@ -86,7 +86,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
-    // --- Tag menu ---
+    // --- タグメニュー ---
     let tag_menu = SubmenuBuilder::new(app, i18n.t("menu.tag"))
         .item(&MenuItemBuilder::with_id("tag_add", i18n.t("menu.tag_add"))
             .accelerator("CmdOrCtrl+T")
@@ -98,7 +98,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
-    // --- View menu ---
+    // --- 表示メニュー ---
     let theme_submenu = SubmenuBuilder::new(app, i18n.t("menu.view_theme"))
         .item(&CheckMenuItemBuilder::with_id("theme_dark", i18n.t("menu.view_theme_dark"))
             .build(app)?)
@@ -142,7 +142,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
-    // --- Help menu ---
+    // --- ヘルプメニュー ---
     let help_menu = SubmenuBuilder::new(app, i18n.t("menu.help"))
         .item(&MenuItemBuilder::with_id("help_check_updates", i18n.t("menu.help_check_updates"))
             .build(app)?)
@@ -151,7 +151,7 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .build()?;
 
-    // macOS: add app menu with standard items
+    // macOS: 標準項目を含むアプリメニューを追加
     #[cfg(target_os = "macos")]
     {
         let app_menu = SubmenuBuilder::new(app, "tsumugi")
@@ -187,19 +187,19 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
     }
 }
 
-/// Get the last focused document window label
+/// 最後にフォーカスされたドキュメントウィンドウのラベルを取得する
 fn get_focused_label(app: &AppHandle) -> String {
     let focused = app.state::<LastFocusedDoc>();
     let label = focused.lock().unwrap().clone();
     label
 }
 
-/// Execute a menu action by ID. Shared by native menu events and the frontend command.
+/// IDでメニューアクションを実行する。ネイティブメニューイベントとフロントエンドコマンドで共用。
 pub fn execute_action(app: &AppHandle, id: &str) {
     let focused_label = get_focused_label(app);
 
     match id {
-        // Quit: exit the app (close all windows)
+        // 終了: アプリを終了する（全ウィンドウを閉じる）
         "file_quit" => {
             app.exit(0);
         }
@@ -243,14 +243,14 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             open_about_window(app);
         }
 
-        // Theme — update check marks and emit to ALL windows (global setting)
+        // テーマ — チェックマークを更新し、全ウィンドウにイベントを送信（グローバル設定）
         "theme_dark" | "theme_light" | "theme_auto" => {
             update_theme_checks(app, id);
             let theme = id.strip_prefix("theme_").unwrap_or("auto");
             let _ = app.emit("menu-action", serde_json::json!({ "action": "theme_change", "value": theme }));
         }
 
-        // Language — save setting, rebuild menu, update state, emit to ALL windows
+        // 言語 — 設定を保存し、メニューを再構築し、状態を更新し、全ウィンドウにイベントを送信
         "locale_en" | "locale_ja" | "locale_custom" => {
             let locale = match id {
                 "locale_en" => Locale::En,
@@ -259,7 +259,7 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             };
             save_locale_setting(&locale);
 
-            // Save current menu check states before rebuild
+            // メニュー再構築前にチェック状態を保存
             let current_theme = ["theme_dark", "theme_light", "theme_auto"]
                 .iter()
                 .find(|tid| get_check_state(app, tid))
@@ -268,29 +268,29 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             let status_bar = get_check_state(app, "view_status_bar");
             let always_on_top = get_check_state(app, "view_always_on_top");
 
-            // Rebuild menu with new locale
+            // 新しいロケールでメニューを再構築
             let new_i18n = I18n::with_locale(locale);
             if let Ok(menu) = build_menu(app, &new_i18n) {
                 let _ = app.set_menu(menu);
             }
 
-            // Restore check states
+            // チェック状態を復元
             update_theme_checks(app, &current_theme);
             set_check_state(app, "view_status_bar", status_bar);
             set_check_state(app, "view_always_on_top", always_on_top);
 
-            // Update I18n state
+            // I18n状態を更新
             let i18n_state = app.state::<I18nState>();
             {
                 let mut guard = i18n_state.lock().unwrap();
                 *guard = new_i18n;
             }
 
-            // Broadcast locale change to ALL windows
+            // 全ウィンドウにロケール変更を通知
             let _ = app.emit("menu-action", serde_json::json!({ "action": "locale_changed" }));
         }
 
-        // All other actions — emit to focused document window
+        // その他のアクション — フォーカス中のドキュメントウィンドウにイベントを送信
         _ => {
             let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": id }));
         }
@@ -302,7 +302,7 @@ pub fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
 }
 
 fn open_about_window(app: &AppHandle) {
-    // If about window already exists, focus it
+    // Aboutウィンドウが既に存在する場合はフォーカスする
     if let Some(window) = app.get_webview_window("about") {
         let _ = window.set_focus();
         return;
@@ -318,7 +318,7 @@ fn open_about_window(app: &AppHandle) {
          - License: MIT\n"
     );
 
-    // Create about window state
+    // Aboutウィンドウの状態を作成
     {
         let states = app.state::<crate::state::WindowStates>();
         let mut states = states.lock().unwrap();
@@ -352,7 +352,7 @@ fn open_about_window(app: &AppHandle) {
 }
 
 fn open_home_window(app: &AppHandle) {
-    // Check if a home window already exists
+    // ホームウィンドウが既に存在するか確認
     let home_label = {
         let states = app.state::<crate::state::WindowStates>();
         let states = states.lock().unwrap();
@@ -370,13 +370,13 @@ fn open_home_window(app: &AppHandle) {
             let _ = window.set_focus();
         }
     } else {
-        // Create a new home window via open_document_window (file=None, body=None → Home mode)
+        // open_document_windowで新しいホームウィンドウを作成（file=None, body=None → Homeモード）
         let _ = crate::open_document_window(app, None, None, None);
     }
 }
 
 fn open_tag_manager(app: &AppHandle) {
-    // Check if a home window exists (main window with Home mode)
+    // ホームウィンドウが存在するか確認（Homeモードのメインウィンドウ）
     let home_label = {
         let states = app.state::<crate::state::WindowStates>();
         let states = states.lock().unwrap();
@@ -390,13 +390,13 @@ fn open_tag_manager(app: &AppHandle) {
     };
 
     if let Some(label) = home_label {
-        // Focus existing home window and switch to tags tab
+        // 既存のホームウィンドウにフォーカスし、タグタブに切り替え
         if let Some(window) = app.get_webview_window(&label) {
             let _ = window.set_focus();
             let _ = app.emit_to(&label, "switch-to-tags-tab", ());
         }
     } else {
-        // Create a new home window
+        // 新しいホームウィンドウを作成
         let home_id = format!("home-{:04x}", crate::rand_u16());
         let mut ws = crate::state::WindowState::new(
             home_id.clone(),
@@ -428,7 +428,7 @@ fn open_tag_manager(app: &AppHandle) {
                 {
                     let _ = window.set_decorations(false);
                 }
-                // Switch to tags tab after window is ready
+                // ウィンドウの準備完了後にタグタブに切り替え
                 let _ = app.emit_to(&label as &str, "switch-to-tags-tab", ());
             }
         });

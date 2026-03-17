@@ -11,7 +11,7 @@ export class TagSidebar {
   private tagCount: HTMLElement;
   private currentPath: string | null = null;
 
-  // F6: Autocomplete state
+  // F6: オートコンプリート状態
   private autocompleteEl: HTMLElement;
   private allTags: string[] = [];
   private autocompleteIndex = -1;
@@ -27,7 +27,7 @@ export class TagSidebar {
 
     this.addBtn.addEventListener('click', () => this.addTagFromInput());
 
-    // Modified keydown handler with autocomplete support (F6)
+    // オートコンプリート対応のキーダウンハンドラ (F6)
     (this.input as HTMLInputElement).addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -49,7 +49,7 @@ export class TagSidebar {
 
     this.closeBtn.addEventListener('click', () => this.hide());
 
-    // F6: Setup autocomplete
+    // F6: オートコンプリートのセットアップ
     this.autocompleteEl = document.createElement('div');
     this.autocompleteEl.className = 'tag-autocomplete';
     this.autocompleteEl.style.display = 'none';
@@ -70,7 +70,7 @@ export class TagSidebar {
     return this.sidebar.style.display !== 'none';
   }
 
-  // U2: Focus the tag input
+  // U2: タグ入力にフォーカスする
   focusInput(): void {
     (this.input as HTMLInputElement).focus();
   }
@@ -166,7 +166,7 @@ export class TagSidebar {
     if (!tag || !this.currentPath) return;
     await invoke('tag_add', { path: this.currentPath, tag });
     input.value = '';
-    this.allTags = []; // Clear autocomplete cache
+    this.allTags = []; // オートコンプリートのキャッシュをクリア
     this.hideAutocomplete();
     await this.loadTags();
   }
@@ -174,11 +174,11 @@ export class TagSidebar {
   private async removeTag(tag: string): Promise<void> {
     if (!this.currentPath) return;
     await invoke('tag_remove', { path: this.currentPath, tag });
-    this.allTags = []; // Clear autocomplete cache
+    this.allTags = []; // オートコンプリートのキャッシュをクリア
     await this.loadTags();
   }
 
-  // F6: Autocomplete methods
+  // F6: オートコンプリートメソッド
   private async updateAutocomplete(): Promise<void> {
     const input = this.input as HTMLInputElement;
     const value = input.value.trim().toLowerCase();
