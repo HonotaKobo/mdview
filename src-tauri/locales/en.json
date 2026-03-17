@@ -94,6 +94,8 @@
     "tm_all_tags": "All Tags",
     "tm_sort_name": "Name",
     "tm_sort_count": "Count",
+    "tm_memo_placeholder": "Memo...",
+    "tm_memo_header": "Memo",
     "tm_title": "Tag Manager — tsumugi",
     "home_tab": "Home",
     "home_tags_tab": "Tags",

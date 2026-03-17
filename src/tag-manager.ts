@@ -6,6 +6,7 @@ import { t } from './i18n';
 interface TagEntry {
   path: string;
   tags: string[];
+  memo?: string;
 }
 
 export class TagManager {
@@ -74,7 +75,8 @@ export class TagManager {
     return this.entries.filter(e =>
       keywords.every(q =>
         e.path.toLowerCase().includes(q) ||
-        e.tags.some(tag => tag.toLowerCase().includes(q))
+        e.tags.some(tag => tag.toLowerCase().includes(q)) ||
+        (e.memo && e.memo.toLowerCase().includes(q))
       )
     );
   }
@@ -247,6 +249,59 @@ export class TagManager {
       pathEl.title = entry.path;
       pathRow.appendChild(pathEl);
       body.appendChild(pathRow);
+
+      // Memo row
+      const memoRow = document.createElement('div');
+      memoRow.className = 'tm-memo-row';
+
+      const memoDisplay = document.createElement('span');
+      memoDisplay.className = 'tm-memo-display';
+      memoDisplay.textContent = entry.memo || t('ui.tm_memo_placeholder');
+      memoDisplay.title = entry.memo || '';
+      if (!entry.memo) {
+        memoDisplay.classList.add('tm-memo-placeholder');
+      }
+
+      const memoInput = document.createElement('input');
+      memoInput.type = 'text';
+      memoInput.className = 'tm-memo-input';
+      memoInput.value = entry.memo || '';
+      memoInput.maxLength = 100;
+      memoInput.placeholder = t('ui.tm_memo_placeholder');
+      memoInput.style.display = 'none';
+
+      memoDisplay.addEventListener('click', () => {
+        memoDisplay.style.display = 'none';
+        memoInput.style.display = 'block';
+        memoInput.focus();
+      });
+
+      const saveMemo = async () => {
+        const val = memoInput.value.trim();
+        const memo = val || null;
+        await invoke('tag_set_memo', { path: entry.path, memo });
+        entry.memo = val || undefined;
+        memoDisplay.textContent = val || t('ui.tm_memo_placeholder');
+        memoDisplay.title = val;
+        memoDisplay.classList.toggle('tm-memo-placeholder', !val);
+        memoInput.style.display = 'none';
+        memoDisplay.style.display = '';
+      };
+
+      memoInput.addEventListener('blur', saveMemo);
+      memoInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          memoInput.blur();
+        } else if (e.key === 'Escape') {
+          memoInput.value = entry.memo || '';
+          memoInput.style.display = 'none';
+          memoDisplay.style.display = '';
+        }
+      });
+
+      memoRow.appendChild(memoDisplay);
+      memoRow.appendChild(memoInput);
+      body.appendChild(memoRow);
 
       // Tags row with inline CRUD (F3)
       const tagsRow = document.createElement('div');

@@ -148,6 +148,14 @@ impl TagStore {
         self.save();
     }
 
+    pub fn set_memo(&mut self, path: &str, memo: Option<String>) {
+        let memo = memo.filter(|m| !m.is_empty());
+        if let Some(entry) = self.find_entry_mut(path) {
+            entry.memo = memo;
+            self.save();
+        }
+    }
+
     pub fn validate_paths(&self) -> Vec<(String, bool)> {
         self.data
             .entries
@@ -176,6 +184,7 @@ impl TagStore {
                 self.data.entries.push(TagEntry {
                     path: path.clone(),
                     tags: vec![tag.to_string()],
+                    memo: None,
                 });
             }
         }

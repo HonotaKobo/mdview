@@ -13,6 +13,7 @@ interface RecentEntry {
 interface TagEntry {
   path: string;
   tags: string[];
+  memo?: string;
 }
 
 // SVG icons as template strings
@@ -415,18 +416,19 @@ export class HomeScreen {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const headerTexts = [
-      { key: 'filename', width: '22%' },
-      { key: 'path', width: '30%' },
-      { key: 'tags', width: '28%' },
-      { key: 'actions', width: '20%', align: 'right' },
+      { key: 'filename', width: '18%' },
+      { key: 'path', width: '24%' },
+      { key: 'memo', width: '18%' },
+      { key: 'tags', width: '22%' },
+      { key: 'actions', width: '18%', align: 'right' },
     ];
     for (const h of headerTexts) {
       const th = document.createElement('th');
       th.style.width = h.width;
       if (h.align) th.style.textAlign = h.align;
-      // Header labels
       if (h.key === 'filename') th.textContent = 'File';
       else if (h.key === 'path') th.textContent = 'Path';
+      else if (h.key === 'memo') th.textContent = t('ui.tm_memo_header');
       else if (h.key === 'tags') th.textContent = t('ui.home_tags_tab');
       else th.textContent = '';
       headerRow.appendChild(th);
@@ -458,6 +460,56 @@ export class HomeScreen {
       tdPath.textContent = this.shortenPath(entry.path);
       tdPath.title = entry.path;
       tr.appendChild(tdPath);
+
+      // Memo
+      const tdMemo = document.createElement('td');
+      tdMemo.className = 'cell-memo';
+
+      const memoDisplay = document.createElement('span');
+      memoDisplay.className = 'home-memo-display';
+      memoDisplay.textContent = entry.memo || '';
+      memoDisplay.title = entry.memo || '';
+
+      const memoInput = document.createElement('input');
+      memoInput.type = 'text';
+      memoInput.className = 'home-memo-input';
+      memoInput.value = entry.memo || '';
+      memoInput.maxLength = 100;
+      memoInput.placeholder = t('ui.tm_memo_placeholder');
+      memoInput.style.display = 'none';
+
+      memoDisplay.addEventListener('click', (e) => {
+        e.stopPropagation();
+        memoDisplay.style.display = 'none';
+        memoInput.style.display = 'block';
+        memoInput.focus();
+      });
+
+      const saveMemo = async () => {
+        const val = memoInput.value.trim();
+        const memo = val || null;
+        await invoke('tag_set_memo', { path: entry.path, memo });
+        entry.memo = val || undefined;
+        memoDisplay.textContent = val;
+        memoDisplay.title = val;
+        memoInput.style.display = 'none';
+        memoDisplay.style.display = '';
+      };
+
+      memoInput.addEventListener('blur', saveMemo);
+      memoInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') memoInput.blur();
+        else if (e.key === 'Escape') {
+          memoInput.value = entry.memo || '';
+          memoInput.style.display = 'none';
+          memoDisplay.style.display = '';
+        }
+      });
+      memoInput.addEventListener('click', (e) => e.stopPropagation());
+
+      tdMemo.appendChild(memoDisplay);
+      tdMemo.appendChild(memoInput);
+      tr.appendChild(tdMemo);
 
       // Tags
       const tdTags = document.createElement('td');
@@ -541,7 +593,8 @@ export class HomeScreen {
         entries = entries.filter(e =>
           keywords.every(k =>
             e.path.toLowerCase().includes(k) ||
-            e.tags.some(tag => tag.toLowerCase().includes(k))
+            e.tags.some(tag => tag.toLowerCase().includes(k)) ||
+            (e.memo && e.memo.toLowerCase().includes(k))
           )
         );
       }

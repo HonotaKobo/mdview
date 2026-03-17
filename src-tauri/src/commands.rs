@@ -216,6 +216,12 @@ pub fn tag_relink(old_path: String, new_path: String, state: tauri::State<'_, Ta
 }
 
 #[command]
+pub fn tag_set_memo(path: String, memo: Option<String>, state: tauri::State<'_, TagState>) {
+    let mut store = state.lock().unwrap();
+    store.set_memo(&path, memo);
+}
+
+#[command]
 pub fn check_for_updates() -> Result<UpdateInfo, String> {
     crate::update_checker::check_update()
 }

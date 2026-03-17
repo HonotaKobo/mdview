@@ -1169,6 +1169,85 @@ mark.find-highlight.active {
   color: var(--danger-color);
 }
 
+/* Memo styles — Tag Manager */
+.tm-memo-row {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+  min-height: 20px;
+}
+
+.tm-memo-display {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  padding: 1px 0;
+}
+
+.tm-memo-display:hover {
+  color: var(--text-primary);
+}
+
+.tm-memo-placeholder {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+.tm-memo-input {
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.tm-memo-input:focus {
+  border-color: var(--link-color);
+}
+
+/* Memo styles — Home Tags Table */
+.cell-memo {
+  max-width: 0;
+}
+
+.home-memo-display {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.home-memo-display:hover {
+  color: var(--text-primary);
+}
+
+.home-memo-input {
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.home-memo-input:focus {
+  border-color: var(--link-color);
+}
+
 /* Print styles */
 @media print {
   @page {

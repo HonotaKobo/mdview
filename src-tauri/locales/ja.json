@@ -94,6 +94,8 @@
     "tm_all_tags": "すべてのタグ",
     "tm_sort_name": "名前順",
     "tm_sort_count": "件数順",
+    "tm_memo_placeholder": "メモ…",
+    "tm_memo_header": "メモ",
     "tm_title": "タグ管理 — tsumugi",
     "home_tab": "ホーム",
     "home_tags_tab": "タグ",

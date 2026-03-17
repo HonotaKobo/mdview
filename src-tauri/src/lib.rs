@@ -344,6 +344,7 @@ pub fn run() {
             commands::tag_get_all,
             commands::tag_delete_entry,
             commands::tag_relink,
+            commands::tag_set_memo,
             commands::tag_validate_paths,
             commands::tag_get_all_unique_tags,
             commands::tag_batch_add,
