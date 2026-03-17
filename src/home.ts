@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { t } from './i18n';
@@ -42,6 +43,9 @@ export class HomeScreen {
   private statusBar!: HTMLElement;
 
   async init(): Promise<void> {
+    // Fix window size for home screen
+    await getCurrentWindow().setResizable(false);
+
     // Hide editor elements
     document.getElementById('find-bar')!.style.display = 'none';
     document.getElementById('main-area')!.style.display = 'none';
