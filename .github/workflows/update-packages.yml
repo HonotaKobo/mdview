@@ -89,11 +89,11 @@ jobs:
           BASE="https://github.com/HonotaKobo/tsumugi/releases/download/${{ steps.release.outputs.tag }}"
           VERSION="${{ steps.release.outputs.version }}"
 
-          curl -fSL -o arm.app.tar.gz "$BASE/tsumugi_${VERSION}_aarch64.app.tar.gz"
+          curl -fSL -o arm.app.tar.gz "$BASE/tsumugi_aarch64.app.tar.gz"
           ARM_HASH=$(sha256sum arm.app.tar.gz | awk '{print $1}')
           echo "arm=$ARM_HASH" >> "$GITHUB_OUTPUT"
 
-          curl -fSL -o intel.app.tar.gz "$BASE/tsumugi_${VERSION}_x64.app.tar.gz"
+          curl -fSL -o intel.app.tar.gz "$BASE/tsumugi_x64.app.tar.gz"
           INTEL_HASH=$(sha256sum intel.app.tar.gz | awk '{print $1}')
           echo "intel=$INTEL_HASH" >> "$GITHUB_OUTPUT"
 
