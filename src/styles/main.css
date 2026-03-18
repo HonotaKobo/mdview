@@ -41,6 +41,8 @@
     'Liberation Mono', monospace;
   --danger-color: #d1242f;
   --danger-color-subtle: #d1242f15;
+  --link-color-subtle: rgba(9, 105, 218, 0.08);
+  --link-color-subtle-hover: rgba(9, 105, 218, 0.14);
 }
 
 :root[data-theme='dark'] {
@@ -59,6 +61,8 @@
     'Liberation Mono', monospace;
   --danger-color: #f85149;
   --danger-color-subtle: #f8514920;
+  --link-color-subtle: rgba(88, 166, 255, 0.08);
+  --link-color-subtle-hover: rgba(88, 166, 255, 0.14);
 }
 
 * {
@@ -1237,41 +1241,6 @@ mark.find-highlight.active {
 }
 
 .tm-memo-input:focus {
-  border-color: var(--link-color);
-}
-
-/* メモのスタイル — ホームタグテーブル */
-.cell-memo {
-  max-width: 0;
-}
-
-.home-memo-display {
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-
-.home-memo-display:hover {
-  color: var(--text-primary);
-}
-
-.home-memo-input {
-  width: 100%;
-  padding: 2px 6px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: inherit;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  outline: none;
-}
-
-.home-memo-input:focus {
   border-color: var(--link-color);
 }
 

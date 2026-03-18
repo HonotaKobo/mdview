@@ -75,10 +75,12 @@ export class HomeScreen {
     // ホーム画面コンテナを作成する
     const screen = document.createElement('div');
     screen.id = 'home-screen';
+    screen.className = 'flex flex-1 min-h-0 overflow-hidden';
 
     // サイドバーナビゲーション
     const sidebar = document.createElement('div');
     sidebar.id = 'home-sidebar-nav';
+    sidebar.className = 'w-[52px] bg-[var(--bg-secondary)] border-r border-[var(--border-color)] flex flex-col items-center py-2 gap-0.5 shrink-0';
 
     this.homeTabBtn = this.createNavItem(t('ui.home_tab'), ICON_HOME, () => {
       this.activeTab = 'home';
@@ -102,6 +104,7 @@ export class HomeScreen {
     // コンテンツエリア
     this.contentArea = document.createElement('div');
     this.contentArea.id = 'home-content-area';
+    this.contentArea.className = 'flex-1 overflow-hidden flex flex-col';
     screen.appendChild(this.contentArea);
 
     // ステータスバーの前に挿入する
@@ -111,14 +114,16 @@ export class HomeScreen {
     // ホーム用ステータスバーを作成する
     this.statusBar = document.createElement('div');
     this.statusBar.id = 'home-status-bar';
+    this.statusBar.className = 'flex gap-2.5 px-4 py-[3px] bg-[var(--bg-secondary)] text-[11px] text-[var(--text-secondary)] border-t border-[var(--border-color)] shrink-0 items-center select-none';
     document.body.insertBefore(this.statusBar, statusBar);
   }
 
   private createNavItem(label: string, icon: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
-    btn.className = 'home-nav-item';
+    btn.className = 'w-10 h-10 flex flex-col items-center justify-center rounded-[6px] cursor-pointer transition-all duration-150 text-[var(--text-secondary)] gap-0.5 border-none bg-transparent font-[inherit] hover:bg-[rgba(128,128,128,0.2)] hover:text-[var(--text-primary)] [&>svg]:w-[18px] [&>svg]:h-[18px] home-nav-item';
     btn.innerHTML = icon;
     const span = document.createElement('span');
+    span.className = 'text-[9px] tracking-[0.3px] leading-none';
     span.textContent = label;
     btn.appendChild(span);
     btn.addEventListener('click', onClick);
@@ -152,26 +157,28 @@ export class HomeScreen {
 
     // パネルヘッダー
     const header = document.createElement('div');
-    header.className = 'home-panel-header';
+    header.className = 'flex items-center px-8 pt-4 pb-3 gap-3 border-b border-[var(--border-color)] shrink-0';
     const title = document.createElement('span');
-    title.className = 'home-panel-title';
+    title.className = 'text-[15px] font-semibold text-[var(--text-primary)]';
     title.textContent = t('ui.home_tab');
     header.appendChild(title);
     this.contentArea.appendChild(header);
 
     // スクロール可能なコンテンツ
     const scrollArea = document.createElement('div');
-    scrollArea.className = 'home-tab-content';
+    scrollArea.className = 'flex-1 overflow-y-auto home-tab-content';
 
     const inner = document.createElement('div');
-    inner.className = 'home-inner';
+    inner.className = 'p-8 max-w-[900px]';
 
     // あいさつ文
     const greeting = document.createElement('div');
     greeting.className = 'home-greeting';
     const h1 = document.createElement('h1');
+    h1.className = 'text-2xl font-semibold leading-tight mb-1';
     h1.textContent = t('ui.home_greeting');
     const p = document.createElement('p');
+    p.className = 'text-[var(--text-secondary)] text-[13px] mb-6';
     p.textContent = t('ui.home_greeting_sub');
     greeting.appendChild(h1);
     greeting.appendChild(p);
@@ -179,7 +186,7 @@ export class HomeScreen {
 
     // アクションカード
     const cards = document.createElement('div');
-    cards.className = 'home-action-cards';
+    cards.className = 'flex gap-3 mb-8';
 
     cards.appendChild(this.createActionCard(
       ICON_PLUS,
@@ -199,23 +206,24 @@ export class HomeScreen {
 
     // 最近使ったファイルセクション
     const sectionHeader = document.createElement('div');
-    sectionHeader.className = 'home-section-header';
+    sectionHeader.className = 'flex items-center gap-2 mb-2';
     const h2 = document.createElement('h2');
+    h2.className = 'text-xs font-semibold uppercase tracking-[0.5px] text-[var(--text-secondary)] whitespace-nowrap';
     h2.textContent = t('ui.home_recent_files');
     sectionHeader.appendChild(h2);
     const line = document.createElement('div');
-    line.className = 'home-section-line';
+    line.className = 'flex-1 h-px bg-[var(--border-color)]';
     sectionHeader.appendChild(line);
     inner.appendChild(sectionHeader);
 
     if (this.recentEntries.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'home-no-recent';
+      empty.className = 'text-[13px] text-[var(--text-secondary)] py-8 px-3 text-center';
       empty.textContent = t('ui.home_no_recent');
       inner.appendChild(empty);
     } else {
       const list = document.createElement('div');
-      list.className = 'home-recent-list';
+      list.className = 'flex flex-col';
 
       // tagEntries からタグの検索用マップを作成する
       const tagMap = new Map<string, string[]>();
@@ -225,23 +233,23 @@ export class HomeScreen {
 
       for (const entry of this.recentEntries) {
         const item = document.createElement('div');
-        item.className = 'home-recent-item';
+        item.className = 'group flex items-center py-2 px-3 gap-3 rounded-[6px] cursor-pointer transition-all duration-100 hover:bg-[rgba(128,128,128,0.08)]';
 
         // ファイルアイコン
         const icon = document.createElement('div');
-        icon.className = 'home-recent-icon';
+        icon.className = 'w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] shrink-0 [&>svg]:w-4 [&>svg]:h-4';
         icon.innerHTML = ICON_FILE;
         item.appendChild(icon);
 
         // ファイル情報
         const info = document.createElement('div');
-        info.className = 'home-recent-info';
+        info.className = 'flex-1 min-w-0';
         const name = document.createElement('div');
-        name.className = 'home-recent-name';
+        name.className = 'text-[13px] font-medium text-[var(--text-primary)] whitespace-nowrap overflow-hidden text-ellipsis';
         name.textContent = entry.title;
         info.appendChild(name);
         const pathEl = document.createElement('div');
-        pathEl.className = 'home-recent-path';
+        pathEl.className = 'text-[11px] text-[var(--text-secondary)] whitespace-nowrap overflow-hidden text-ellipsis font-[var(--font-mono)]';
         pathEl.textContent = this.shortenPath(entry.path);
         pathEl.title = entry.path;
         info.appendChild(pathEl);
@@ -251,10 +259,10 @@ export class HomeScreen {
         const tags = tagMap.get(entry.path);
         if (tags && tags.length > 0) {
           const tagsEl = document.createElement('div');
-          tagsEl.className = 'home-recent-tags';
+          tagsEl.className = 'flex gap-1 shrink-0';
           for (const tag of tags.slice(0, 3)) {
             const badge = document.createElement('span');
-            badge.className = 'home-tag-badge';
+            badge.className = 'text-[10px] px-1.5 py-px rounded bg-[var(--link-color-subtle)] text-[var(--link-color)] whitespace-nowrap font-medium';
             badge.textContent = tag;
             tagsEl.appendChild(badge);
           }
@@ -263,13 +271,13 @@ export class HomeScreen {
 
         // 日付
         const dateEl = document.createElement('div');
-        dateEl.className = 'home-recent-date';
+        dateEl.className = 'text-[11px] text-[var(--text-secondary)] shrink-0 whitespace-nowrap';
         dateEl.textContent = this.relativeTime(entry.last_opened);
         item.appendChild(dateEl);
 
         // 削除ボタン
         const removeBtn = document.createElement('button');
-        removeBtn.className = 'home-recent-remove';
+        removeBtn.className = 'opacity-0 group-hover:opacity-100 bg-transparent border-none text-[var(--text-secondary)] cursor-pointer text-sm px-1.5 py-0.5 rounded leading-none transition-all duration-100 shrink-0 hover:text-[var(--danger-color)] hover:bg-[rgba(128,128,128,0.15)]';
         removeBtn.textContent = '\u00d7';
         removeBtn.title = t('ui.home_remove_recent');
         removeBtn.addEventListener('click', (e) => {
@@ -292,19 +300,21 @@ export class HomeScreen {
 
   private createActionCard(icon: string, title: string, desc: string, onClick: () => void): HTMLElement {
     const card = document.createElement('div');
-    card.className = 'home-action-card';
+    card.className = 'flex-1 flex items-center gap-3 px-5 py-4 border border-[var(--border-color)] rounded-lg bg-[var(--bg-secondary)] cursor-pointer transition-all duration-150 hover:border-[var(--link-color)] hover:bg-[var(--link-color-subtle)]';
 
     const iconEl = document.createElement('div');
-    iconEl.className = 'home-action-icon';
+    iconEl.className = 'w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--link-color-subtle)] text-[var(--link-color)] shrink-0 [&>svg]:w-[18px] [&>svg]:h-[18px]';
     iconEl.innerHTML = icon;
     card.appendChild(iconEl);
 
     const text = document.createElement('div');
     text.className = 'home-action-text';
     const h3 = document.createElement('h3');
+    h3.className = 'text-[13px] font-semibold mb-0.5';
     h3.textContent = title;
     text.appendChild(h3);
     const p = document.createElement('p');
+    p.className = 'text-[11px] text-[var(--text-secondary)]';
     p.textContent = desc;
     text.appendChild(p);
     card.appendChild(text);
@@ -320,21 +330,22 @@ export class HomeScreen {
 
     // パネルヘッダー（検索付き）
     const header = document.createElement('div');
-    header.className = 'home-panel-header';
+    header.className = 'flex items-center px-8 pt-4 pb-3 gap-3 border-b border-[var(--border-color)] shrink-0';
     const title = document.createElement('span');
-    title.className = 'home-panel-title';
+    title.className = 'text-[15px] font-semibold text-[var(--text-primary)]';
     title.textContent = t('ui.home_tags_tab');
     header.appendChild(title);
 
     const spacer = document.createElement('div');
-    spacer.className = 'home-panel-spacer';
+    spacer.className = 'flex-1';
     header.appendChild(spacer);
 
     const searchBox = document.createElement('div');
-    searchBox.className = 'home-search-box';
+    searchBox.className = 'flex items-center gap-1.5 px-2.5 py-1.5 border border-[var(--border-color)] rounded-[6px] bg-[var(--bg-primary)] max-w-[260px] w-[260px] transition-colors duration-200 focus-within:border-[var(--link-color)] [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:text-[var(--text-secondary)] [&>svg]:shrink-0';
     searchBox.innerHTML = ICON_SEARCH;
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
+    searchInput.className = 'border-none outline-none bg-transparent text-[var(--text-primary)] text-xs w-full font-[inherit] placeholder:text-[var(--text-secondary)] placeholder:opacity-70';
     searchInput.placeholder = t('ui.tm_search_placeholder');
     searchInput.value = this.tagSearchQuery;
     searchInput.addEventListener('input', () => {
@@ -347,13 +358,13 @@ export class HomeScreen {
 
     // タグフィルターチップ
     const toolbar = document.createElement('div');
-    toolbar.className = 'home-tag-toolbar';
+    toolbar.className = 'flex items-center px-8 py-2 gap-2 border-b border-[var(--border-color)] shrink-0';
     const chips = document.createElement('div');
-    chips.className = 'home-tag-chips';
+    chips.className = 'flex gap-1 flex-1 overflow-x-auto';
 
     // 「すべて」チップ
     const allChip = document.createElement('button');
-    allChip.className = 'home-tag-chip' + (this.activeChips.size === 0 ? ' active' : '');
+    allChip.className = 'text-[11px] px-2.5 py-[3px] rounded-full border border-[var(--border-color)] bg-transparent text-[var(--text-secondary)] cursor-pointer whitespace-nowrap transition-all duration-150 font-[inherit] hover:border-[var(--link-color)] hover:text-[var(--link-color)] home-tag-chip' + (this.activeChips.size === 0 ? ' active' : '');
     allChip.textContent = t('ui.tm_select_all').replace('選択', '');
     // よりシンプルなラベルを使用する
     allChip.textContent = this.activeChips.size === 0 ? '\u2713 ' + t('ui.tm_all_tags') : t('ui.tm_all_tags');
@@ -367,7 +378,7 @@ export class HomeScreen {
     const sorted = [...this.tagCounts].sort((a, b) => b[1] - a[1]);
     for (const [tagName] of sorted) {
       const chip = document.createElement('button');
-      chip.className = 'home-tag-chip' + (this.activeChips.has(tagName) ? ' active' : '');
+      chip.className = 'text-[11px] px-2.5 py-[3px] rounded-full border border-[var(--border-color)] bg-transparent text-[var(--text-secondary)] cursor-pointer whitespace-nowrap transition-all duration-150 font-[inherit] hover:border-[var(--link-color)] hover:text-[var(--link-color)] home-tag-chip' + (this.activeChips.has(tagName) ? ' active' : '');
       chip.textContent = tagName;
       chip.addEventListener('click', () => {
         if (this.activeChips.has(tagName)) {
@@ -384,7 +395,7 @@ export class HomeScreen {
 
     // テーブルラッパー
     const tableWrapper = document.createElement('div');
-    tableWrapper.className = 'home-tag-table-wrapper';
+    tableWrapper.className = 'flex-1 overflow-y-auto px-8 pb-6 home-tag-table-wrapper';
     tableWrapper.id = 'home-tag-table-wrapper';
     this.contentArea.appendChild(tableWrapper);
 
@@ -400,7 +411,7 @@ export class HomeScreen {
 
     if (filtered.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'home-tag-empty';
+      empty.className = 'text-[13px] text-[var(--text-secondary)] py-12 px-8 text-center';
       empty.textContent = this.tagSearchQuery || this.activeChips.size > 0
         ? t('ui.tm_no_results')
         : t('ui.tm_no_files');
@@ -410,7 +421,7 @@ export class HomeScreen {
     }
 
     const table = document.createElement('table');
-    table.className = 'home-tag-table';
+    table.className = 'w-full border-collapse mt-2 home-tag-table';
 
     // ヘッダー
     const thead = document.createElement('thead');
@@ -445,7 +456,7 @@ export class HomeScreen {
 
       // ファイル名
       const tdName = document.createElement('td');
-      tdName.className = 'cell-filename';
+      tdName.className = 'font-medium text-[var(--text-primary)] max-w-[200px] whitespace-nowrap overflow-hidden text-ellipsis';
       const filename = entry.path.split(/[/\\]/).pop() || entry.path;
       if (!exists) {
         tdName.textContent = '⚠ ' + filename;
@@ -456,23 +467,23 @@ export class HomeScreen {
 
       // パス
       const tdPath = document.createElement('td');
-      tdPath.className = 'cell-path';
+      tdPath.className = 'font-[var(--font-mono)] text-[11px] text-[var(--text-secondary)] max-w-[260px] whitespace-nowrap overflow-hidden text-ellipsis';
       tdPath.textContent = this.shortenPath(entry.path);
       tdPath.title = entry.path;
       tr.appendChild(tdPath);
 
       // メモ
       const tdMemo = document.createElement('td');
-      tdMemo.className = 'cell-memo';
+      tdMemo.className = 'max-w-0';
 
       const memoDisplay = document.createElement('span');
-      memoDisplay.className = 'home-memo-display';
+      memoDisplay.className = 'text-xs text-[var(--text-secondary)] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap block hover:text-[var(--text-primary)]';
       memoDisplay.textContent = entry.memo || '';
       memoDisplay.title = entry.memo || '';
 
       const memoInput = document.createElement('input');
       memoInput.type = 'text';
-      memoInput.className = 'home-memo-input';
+      memoInput.className = 'w-full px-1.5 py-0.5 border border-[var(--border-color)] rounded text-xs font-[inherit] bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none focus:border-[var(--link-color)]';
       memoInput.value = entry.memo || '';
       memoInput.maxLength = 100;
       memoInput.placeholder = t('ui.tm_memo_placeholder');
@@ -514,10 +525,10 @@ export class HomeScreen {
       // タグ
       const tdTags = document.createElement('td');
       const tagsDiv = document.createElement('div');
-      tagsDiv.className = 'cell-tags';
+      tagsDiv.className = 'flex gap-1 flex-wrap';
       for (const tag of entry.tags) {
         const badge = document.createElement('span');
-        badge.className = 'home-tag-badge';
+        badge.className = 'text-[10px] px-1.5 py-px rounded bg-[var(--link-color-subtle)] text-[var(--link-color)] whitespace-nowrap font-medium';
         badge.textContent = tag;
         tagsDiv.appendChild(badge);
       }
@@ -527,7 +538,7 @@ export class HomeScreen {
       // アクション
       const tdActions = document.createElement('td');
       const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'cell-actions';
+      actionsDiv.className = 'flex gap-1 whitespace-nowrap justify-end';
 
       // 開くボタン
       const openBtn = this.createIconButton(ICON_OPEN, t('ui.tm_open'), () => {
@@ -565,7 +576,7 @@ export class HomeScreen {
 
   private createIconButton(icon: string, titleText: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
-    btn.className = 'home-btn-icon';
+    btn.className = 'w-7 h-7 inline-flex items-center justify-center rounded border border-transparent bg-transparent text-[var(--text-secondary)] cursor-pointer transition-all duration-150 [&>svg]:w-3.5 [&>svg]:h-3.5 hover:bg-[rgba(128,128,128,0.2)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)] home-btn-icon';
     btn.innerHTML = icon;
     btn.title = titleText;
     btn.addEventListener('click', (e) => {
