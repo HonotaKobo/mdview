@@ -126,7 +126,7 @@ export class TagSidebar {
     this.tagList.innerHTML = '';
     if (tags.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'tag-empty';
+      empty.className = 'text-xs text-[var(--text-secondary)] py-8 text-center';
       empty.textContent = t('ui.tag_empty');
       this.tagList.appendChild(empty);
       this.tagCount.textContent = '';
@@ -134,21 +134,21 @@ export class TagSidebar {
     }
 
     const label = document.createElement('div');
-    label.className = 'tag-list-label';
+    label.className = 'hidden';
     label.textContent = t('ui.tag_list_label');
     this.tagList.appendChild(label);
 
     for (const tag of tags) {
       const item = document.createElement('div');
-      item.className = 'tag-item';
+      item.className = 'group flex items-center justify-between px-4 py-[5px] gap-2 transition-[background] duration-100 hover:bg-[rgba(128,128,128,0.1)]';
 
       const name = document.createElement('span');
-      name.className = 'tag-item-name';
+      name.className = 'flex-1 text-xs text-[var(--text-primary)] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap';
       name.textContent = tag;
       item.appendChild(name);
 
       const del = document.createElement('button');
-      del.className = 'tag-item-remove';
+      del.className = 'opacity-0 cursor-pointer text-[var(--text-secondary)] text-sm px-1 py-0.5 rounded-[3px] border-none bg-transparent transition-[opacity,color,background] duration-100 leading-none group-hover:opacity-100 hover:text-[var(--danger-color)] hover:bg-[rgba(128,128,128,0.15)]';
       del.textContent = '\u00d7';
       del.title = t('ui.tag_delete');
       del.addEventListener('click', () => this.removeTag(tag));

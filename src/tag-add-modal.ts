@@ -9,10 +9,11 @@ export class TagAddModal {
   constructor() {
     this.overlay = document.createElement('div');
     this.overlay.id = 'tag-add-overlay';
+    this.overlay.className = 'tag-add-overlay fixed inset-0 bg-black/30 flex items-end justify-end p-4 z-[2000]';
     this.overlay.style.display = 'none';
     this.overlay.innerHTML = `
-      <div id="tag-add-modal">
-        <input id="tag-add-modal-input" type="text" placeholder="" />
+      <div class="tag-add-modal bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.2)] p-1 w-[360px]">
+        <input id="tag-add-modal-input" class="w-full px-3.5 py-2.5 text-[15px] border-none rounded-md bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none" type="text" placeholder="" />
       </div>
     `;
     document.body.appendChild(this.overlay);

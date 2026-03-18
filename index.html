@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="./src/styles/markdown.css" />
     <link rel="stylesheet" href="./src/styles/editor.css" />
     <link rel="stylesheet" href="./src/styles/home.css" />
+    <link rel="stylesheet" href="./src/styles/tag.css" />
   </head>
   <body>
     <div id="find-bar" style="display: none">
@@ -28,19 +29,19 @@
       <div id="scroll-area">
         <div id="content"></div>
       </div>
-      <div id="tag-sidebar" style="display: none">
-        <div id="tag-sidebar-header">
-          <h2 id="tag-sidebar-title"></h2>
-          <div id="tag-sidebar-file-label"></div>
-          <button id="tag-sidebar-close">&times;</button>
+      <div id="tag-sidebar" class="w-[280px] shrink-0 flex flex-col border-l border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden" style="display: none">
+        <div id="tag-sidebar-header" class="px-4 py-3 shrink-0 relative flex items-center justify-between border-b border-[var(--border-color)]">
+          <h2 id="tag-sidebar-title" class="text-xs font-medium text-[var(--text-primary)] m-0"></h2>
+          <div id="tag-sidebar-file-label" class="hidden"></div>
+          <button id="tag-sidebar-close" class="bg-transparent border-none text-[var(--text-secondary)] cursor-pointer text-base px-1.5 py-0.5 leading-none rounded hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]">&times;</button>
         </div>
-        <div id="tag-add-row">
-          <input id="tag-input" type="text" placeholder="" />
-          <button id="tag-add-btn"></button>
+        <div id="tag-add-row" class="flex gap-1.5 px-4 py-3 border-b border-[var(--border-color)] shrink-0">
+          <input id="tag-input" class="flex-1 px-2.5 py-1.5 text-xs font-[inherit] border border-[var(--border-color)] rounded bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none min-w-0 transition-[border-color] duration-200 placeholder:text-[var(--text-secondary)] focus:border-[var(--link-color)]" type="text" placeholder="" />
+          <button id="tag-add-btn" class="px-2.5 py-[3px] bg-[var(--text-primary)] text-[var(--bg-primary)] border border-[var(--text-primary)] rounded text-[11px] font-[inherit] font-medium cursor-pointer transition-opacity duration-150 whitespace-nowrap hover:opacity-80"></button>
         </div>
-        <div id="tag-sidebar-divider"></div>
-        <div id="tag-list"></div>
-        <div id="tag-count"></div>
+        <div id="tag-sidebar-divider" class="hidden"></div>
+        <div id="tag-list" class="flex-1 overflow-y-auto py-2"></div>
+        <div id="tag-count" class="text-[11px] text-[var(--text-secondary)] px-4 py-2 border-t border-[var(--border-color)] shrink-0"></div>
       </div>
     </div>
     <div id="status-bar">

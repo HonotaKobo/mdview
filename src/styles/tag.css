@@ -1,0 +1,89 @@
+/* tag.css — Tailwind で表現できない残留スタイル (unlayered) */
+
+/* .active トグル — JS の classList 操作 */
+.tag-autocomplete-item.active {
+  background: var(--link-color);
+  color: #ffffff;
+}
+
+.tm-sidebar-sort-btn.active {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  border-color: var(--text-primary);
+}
+
+/* JS classList.toggle */
+.tm-memo-placeholder {
+  font-style: italic;
+  opacity: 0.5;
+}
+
+/* ダークモード shadow */
+:root[data-theme='dark'] .tag-add-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='dark'] .tag-add-modal {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='dark'] .tag-autocomplete {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* スクロールバー */
+.tm-card-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tm-card-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tm-card-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+/* accent-color */
+.tm-checkbox {
+  accent-color: var(--link-color);
+}
+
+.tm-select-all {
+  accent-color: var(--link-color);
+}
+
+/* danger hover */
+.tm-btn-danger:hover {
+  background: var(--danger-color);
+  color: #ffffff;
+}
+
+/* オートコンプリート */
+.tag-autocomplete {
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  right: 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tag-autocomplete-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.tag-autocomplete-item:hover,
+.tag-autocomplete-item.active {
+  background: var(--link-color);
+  color: #ffffff;
+}
