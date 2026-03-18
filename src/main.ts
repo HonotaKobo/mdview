@@ -52,6 +52,13 @@ const windowMode = await invoke<string>('get_window_mode');
 isHome = windowMode === 'home';
 isEditor = !isHome;
 
+// macOSでファイルダブルクリック時にHome→Editorへの切り替えを処理
+listen('file-opened', () => {
+  if (isHome) {
+    location.reload();
+  }
+});
+
 themeManager = new ThemeManager();
 
 updateModal = new UpdateModal();

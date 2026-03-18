@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use clap::Parser;
-use tauri::Manager as _;
+use tauri::{Emitter as _, Manager as _};
 use recent::{RecentState, RecentStore};
 use state::{LastFocusedDoc, WindowMode, WindowState, WindowStates};
 use tags::{TagState, TagStore};
@@ -28,6 +28,77 @@ pub(crate) fn normalize_path(path: &str) -> String {
         }
     }
     path.to_string()
+}
+
+/// ホームウィンドウ ("main") をドキュメントウィンドウに変換する。
+/// 新しいウィンドウの生成・既存ウィンドウの破棄を行わないため、
+/// macOSのウィンドウ状態復元中のコールバックと衝突しない。
+fn convert_home_to_document(app: &tauri::AppHandle, file_path: &str) -> Result<(), String> {
+    let abs_path = std::fs::canonicalize(file_path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(file_path));
+    let abs_str = normalize_path(&abs_path.to_string_lossy());
+
+    let content = std::fs::read_to_string(&abs_path)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+
+    let title = abs_path.file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Untitled".to_string());
+
+    let new_instance_id = file_to_id(file_path);
+
+    // 旧インスタンスのファイルをクリーンアップし、状態を更新
+    {
+        let states = app.state::<WindowStates>();
+        let mut guard = states.lock().unwrap();
+        if let Some(ws) = guard.get_mut("main") {
+            // 旧インスタンスのIPCファイルをクリーンアップ
+            let old_path = ipc::instance_file(&ws.instance_id);
+            std::fs::remove_file(&old_path).ok();
+            std::fs::remove_file(old_path.with_extension("http")).ok();
+
+            // 状態を更新
+            ws.instance_id = new_instance_id.clone();
+            ws.window_mode = WindowMode::Editor;
+            ws.current_content = content.clone();
+            ws.title = title.clone();
+            ws.saved_path = Some(abs_str.clone());
+            ws.content_explicitly_set = true;
+        }
+    }
+
+    // ウィンドウタイトルを更新
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(&format!("{} — tsumugi", title));
+        // フロントエンドがすでにHome画面として初期化済みの場合に備えてイベントを発火
+        let _ = window.emit("file-opened", serde_json::json!({
+            "body": content,
+            "title": title,
+        }));
+    }
+
+    // 新インスタンス用のIPCリスナーを開始
+    ipc::start_listener(new_instance_id.clone(), "main".to_string(), app.clone());
+
+    // HTTPポートファイルを書き込み
+    let http_info = app.state::<http_api::HttpServerInfo>();
+    let port_path = ipc::instance_file(&new_instance_id).with_extension("http");
+    write_port_file(&port_path, &format!("{}:{}", http_info.port, http_info.token));
+
+    // ファイル監視を開始
+    let mut fw = FileWatcher::new();
+    fw.watch(app.clone(), "main".to_string(), abs_str.clone());
+    let watchers = app.state::<FileWatchers>();
+    watchers.lock().unwrap().insert("main".to_string(), fw);
+
+    // 最近使ったファイルに追加
+    let recent = app.state::<RecentState>();
+    let mut store = recent.lock().unwrap();
+    store.add(&abs_str, &title);
+
+    eprintln!("tsumugi: converted home to document (instance: {})", new_instance_id);
+
+    Ok(())
 }
 
 /// 現在のプロセスで新しいドキュメントウィンドウを作成する。
@@ -477,31 +548,32 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(move |_app_handle, event| {
-            // macOSファイル関連付け: 新しいウィンドウでファイルを開く
+            // macOSファイル関連付け: ファイルを開く
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
                         let path_str = path.to_string_lossy().to_string();
-                        let _ = open_document_window(
-                            _app_handle,
-                            Some(path_str),
-                            None,
-                            None,
-                        );
-                    }
-                }
-                {
-                    let states = _app_handle.state::<WindowStates>();
-                    let is_home = {
-                        let guard = states.lock().unwrap();
-                        guard.get("main").map_or(false, |s| {
-                            matches!(s.window_mode, WindowMode::Home)
-                        })
-                    };
-                    if is_home {
-                        if let Some(window) = _app_handle.get_webview_window("main") {
-                            let _ = window.destroy();
+
+                        // "main"ウィンドウがHome画面の場合、新ウィンドウ生成を避けて
+                        // 既存ウィンドウを直接変換する（macOSの状態復元中のクラッシュ回避）
+                        let is_main_home = {
+                            let states = _app_handle.state::<WindowStates>();
+                            let guard = states.lock().unwrap();
+                            guard.get("main").map_or(false, |s| {
+                                matches!(s.window_mode, WindowMode::Home)
+                            })
+                        };
+
+                        if is_main_home {
+                            let _ = convert_home_to_document(_app_handle, &path_str);
+                        } else {
+                            let _ = open_document_window(
+                                _app_handle,
+                                Some(path_str),
+                                None,
+                                None,
+                            );
                         }
                     }
                 }
