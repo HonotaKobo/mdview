@@ -5,7 +5,7 @@ use crate::i18n::I18nState;
 use crate::recent::{RecentEntry, RecentState};
 use crate::state::{WindowMode, WindowStates};
 use crate::tags::{TagEntry, TagState};
-use crate::update_checker::{UpdateInfo, UpdateResult};
+
 
 /// ファイルパスを検証・正規化し、機密性の高いシステムディレクトリへのアクセスをブロックする。
 fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
@@ -219,16 +219,6 @@ pub fn tag_relink(old_path: String, new_path: String, state: tauri::State<'_, Ta
 pub fn tag_set_memo(path: String, memo: Option<String>, state: tauri::State<'_, TagState>) {
     let mut store = state.lock().unwrap();
     store.set_memo(&path, memo);
-}
-
-#[command]
-pub fn check_for_updates() -> Result<UpdateInfo, String> {
-    crate::update_checker::check_update()
-}
-
-#[command]
-pub fn perform_update() -> UpdateResult {
-    crate::update_checker::perform_update()
 }
 
 #[command]

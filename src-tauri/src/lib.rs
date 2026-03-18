@@ -7,7 +7,6 @@ mod menu;
 pub(crate) mod recent;
 mod state;
 mod tags;
-mod update_checker;
 mod watcher;
 
 use std::collections::HashMap;
@@ -319,6 +318,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(initial_states) as WindowStates)
         .manage(Mutex::new(HashMap::<String, FileWatcher>::new()) as FileWatchers)
         .manage(Mutex::new("main".to_string()) as LastFocusedDoc)
@@ -352,8 +352,6 @@ pub fn run() {
             commands::tag_remove_all,
             commands::tag_get_counts,
             commands::get_custom_locale_path,
-            commands::check_for_updates,
-            commands::perform_update,
             commands::restart_app,
             commands::recent_get_all,
             commands::recent_add,
