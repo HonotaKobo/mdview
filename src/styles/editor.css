@@ -1,179 +1,32 @@
 /* === 編集モードのスタイル === */
 
-/* ブロックのラッパー */
-.md-block {
-  position: relative;
-  border-left: 2px solid transparent;
-  padding-left: 6px;
-  margin-left: -8px;
-  transition: border-color 0.15s;
-  border-radius: 2px;
-}
-
-.md-block.editing {
-  border-left-color: var(--link-color);
-}
-
-/* --- プレビュー / ソース切り替え --- */
-.block-source {
-  display: none;
-}
-
-.md-block.editing .block-preview {
-  display: none;
-}
-
-.md-block.editing .block-source {
-  display: block;
-}
-
-/* --- 編集ボタン（ホバー時に表示） --- */
-.block-edit-btn {
-  position: absolute;
-  top: 4px;
-  left: -26px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  line-height: 0;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 10;
-}
-
-.md-block:hover .block-edit-btn {
-  opacity: 1;
-}
-
-.md-block.editing .block-edit-btn {
-  display: none;
-}
-
-.block-edit-btn:hover {
-  color: var(--text-primary);
-}
-
-/* --- テキストエリア --- */
-.block-editor-textarea {
-  display: block;
-  width: 100%;
-  min-height: 1.6em;
-  padding: 8px;
-  margin: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-color);
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.5;
-  resize: none;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.block-editor-textarea:focus {
-  outline: none;
-  border-color: var(--link-color);
-}
-
-/* デリミタラベル (```, $$) */
-.source-label {
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 2px 0;
-  opacity: 0.6;
-  user-select: none;
-}
-
-/* --- 書式設定ツールバー --- */
-.block-editor-toolbar {
-  display: flex;
-  gap: 2px;
-  padding: 4px 0 0;
-}
-
-.toolbar-btn {
-  padding: 2px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.4;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toolbar-btn:hover {
-  color: var(--text-color);
-  background: var(--bg-hover, var(--bg-secondary));
-  border-color: var(--text-secondary);
-}
-
-.toolbar-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--border-color);
-  margin: 0 4px;
-  align-self: center;
-}
-
 /* 編集モード時のbody */
 body.edit-mode #content {
   cursor: default;
   min-height: 100%;
 }
 
-
-/* .editing で .block-preview が非表示のとき、コピーボタンも自動的に非表示になる */
-
-/* --- ブロック間のギャップ（ブロック間の追加ボタン） --- */
-.block-gap {
-  position: relative;
-  height: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.block-add-btn {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+/* エディットモード用テキストエリア */
+.editor-textarea {
+  display: block;
+  width: 100%;
+  min-height: calc(100vh - 100px);
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
 }
 
-.block-gap:hover .block-add-btn {
-  opacity: 1;
-}
-
-.block-add-btn:hover {
-  color: var(--text-color);
-  background: var(--bg-hover, var(--bg-secondary));
-  border-color: var(--text-secondary);
-}
-
-/* 印刷時: 編集モードの表示要素を非表示にする */
+/* 印刷時: エディタのテキストエリアを非表示にする */
 @media print {
-  .block-edit-btn,
-  .block-gap {
+  .editor-textarea {
     display: none !important;
   }
 }

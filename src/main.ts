@@ -85,6 +85,16 @@ editorController.setOnContentChange((markdown) => {
   statusBar.update(markdown);
 });
 
+statusBar.setOnModeChange((mode) => {
+  if (!isEditor) return;
+  if (mode === 'view') editorController.switchToView();
+  else editorController.switchToEdit();
+});
+
+editorController.setOnModeChange((mode) => {
+  statusBar.setActiveTab(mode);
+});
+
 function updateWindowTitle(title: string) {
   getCurrentWindow().setTitle(`${title} — tsumugi`);
   customTitleBar?.setTitle(title);
@@ -350,21 +360,6 @@ listen('menu-action', (event) => {
     case 'tag_edit':
       debounced('tag_edit', () => tagSidebar.toggle());
       break;
-  }
-});
-
-document.getElementById('scroll-area')!.addEventListener('dblclick', (e) => {
-  if (!isEditor) return;
-  const target = e.target as HTMLElement;
-  if (target.id === 'scroll-area' || target.id === 'content') {
-    const content = document.getElementById('content')!;
-    const lastBlock = content.querySelector('.md-block:last-of-type, .block-gap:last-child');
-    if (lastBlock) {
-      const lastBottom = lastBlock.getBoundingClientRect().bottom;
-      if (e.clientY <= lastBottom) return;
-    }
-    e.preventDefault();
-    editorController.addBlockAtEnd();
   }
 });
 

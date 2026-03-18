@@ -6,6 +6,7 @@ export class StatusBar {
   private charCountEl: HTMLElement;
   private wordCountEl: HTMLElement;
   private readTimeEl: HTMLElement;
+  private onModeChangeCb: ((mode: 'view' | 'edit') => void) | null = null;
 
   constructor() {
     this.bar = document.getElementById('status-bar')!;
@@ -14,12 +15,30 @@ export class StatusBar {
     this.readTimeEl = document.getElementById('status-read-time')!;
     this.bar.style.display = 'flex';
 
+    document.getElementById('mode-view')?.addEventListener('click', () => {
+      if (this.onModeChangeCb) this.onModeChangeCb('view');
+    });
+    document.getElementById('mode-edit')?.addEventListener('click', () => {
+      if (this.onModeChangeCb) this.onModeChangeCb('edit');
+    });
+
     document.getElementById('status-tag-add')?.addEventListener('click', () => {
       invoke('execute_menu_action', { id: 'tag_add' });
     });
     document.getElementById('status-tag-edit')?.addEventListener('click', () => {
       invoke('execute_menu_action', { id: 'tag_edit' });
     });
+  }
+
+  /** モード切替タブクリック時のコールバックを設定 */
+  setOnModeChange(cb: (mode: 'view' | 'edit') => void): void {
+    this.onModeChangeCb = cb;
+  }
+
+  /** タブの active 状態を切替 */
+  setActiveTab(mode: 'view' | 'edit'): void {
+    document.getElementById('mode-view')?.classList.toggle('active', mode === 'view');
+    document.getElementById('mode-edit')?.classList.toggle('active', mode === 'edit');
   }
 
   update(markdown: string): void {
