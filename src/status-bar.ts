@@ -12,13 +12,7 @@ export class StatusBar {
     this.charCountEl = document.getElementById('status-chars')!;
     this.wordCountEl = document.getElementById('status-words')!;
     this.readTimeEl = document.getElementById('status-read-time')!;
-
-    const saved = localStorage.getItem('tsumugi-status-bar');
-    if (saved === 'hidden') {
-      this.bar.style.display = 'none';
-    } else {
-      this.bar.style.display = 'flex';
-    }
+    this.bar.style.display = 'flex';
 
     document.getElementById('status-tag-add')?.addEventListener('click', () => {
       invoke('execute_menu_action', { id: 'tag_add' });
@@ -26,20 +20,6 @@ export class StatusBar {
     document.getElementById('status-tag-edit')?.addEventListener('click', () => {
       invoke('execute_menu_action', { id: 'tag_edit' });
     });
-  }
-
-  isVisible(): boolean {
-    return this.bar.style.display !== 'none';
-  }
-
-  toggle(): void {
-    if (this.isVisible()) {
-      this.bar.style.display = 'none';
-      localStorage.setItem('tsumugi-status-bar', 'hidden');
-    } else {
-      this.bar.style.display = 'flex';
-      localStorage.setItem('tsumugi-status-bar', 'visible');
-    }
   }
 
   update(markdown: string): void {

@@ -89,6 +89,14 @@ pub fn sync_content(content: String, window: tauri::Window, states: tauri::State
 }
 
 #[command]
+pub fn set_dirty(dirty: bool, window: tauri::Window, states: tauri::State<'_, WindowStates>) {
+    let mut states = states.lock().unwrap();
+    if let Some(state) = states.get_mut(window.label()) {
+        state.dirty = dirty;
+    }
+}
+
+#[command]
 pub fn get_initial_content(window: tauri::Window, states: tauri::State<'_, WindowStates>) -> (String, String, bool) {
     let states = states.lock().unwrap();
     if let Some(state) = states.get(window.label()) {
@@ -144,6 +152,11 @@ pub fn get_platform() -> String {
 #[command]
 pub fn execute_menu_action(id: String, app: tauri::AppHandle) {
     crate::menu::execute_action(&app, &id);
+}
+
+#[command]
+pub fn set_editor_menu_enabled(enabled: bool, app: tauri::AppHandle) {
+    crate::menu::set_editor_menu_enabled(&app, enabled);
 }
 
 #[command]

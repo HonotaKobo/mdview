@@ -16,7 +16,7 @@ import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
 import { HomeScreen } from './home';
 import { UpdateModal } from './update-modal';
-import { loadTranslations, t } from './i18n';
+import { loadTranslations } from './i18n';
 
 interface ContentUpdate {
   body?: string;
@@ -30,7 +30,6 @@ interface MenuAction {
 
 let currentContent = '';
 let currentTitle = 'Untitled';
-let isDirty = false;
 let customTitleBar: CustomTitleBar | null = null;
 
 let isHome = false;
@@ -76,14 +75,12 @@ findBar.setOnReplace((search, replace, all) => {
   }
   editorController.updateContent(content);
   currentContent = content;
-  isDirty = true;
   invoke('sync_content', { content });
   findBar.search();
 });
 
 editorController.setOnContentChange((markdown) => {
   currentContent = markdown;
-  isDirty = true;
   invoke('sync_content', { content: markdown });
   statusBar.update(markdown);
 });
@@ -107,13 +104,11 @@ async function openFileInNewWindow() {
 async function doSave() {
   currentContent = editorController.getCurrentContent();
   await handleSave(currentContent, currentTitle);
-  isDirty = false;
 }
 
 async function doSaveAs() {
   currentContent = editorController.getCurrentContent();
   await handleSaveAs(currentContent, currentTitle);
-  isDirty = false;
 }
 
 async function copyAsMarkdown() {
@@ -140,7 +135,8 @@ async function reloadCurrentFile() {
     const content = await invoke<string>('read_file', { path: savedPath });
     currentContent = content;
     editorController.updateContent(content);
-    isDirty = false;
+    await invoke('sync_content', { content });
+    invoke('set_dirty', { dirty: false });
   } catch (e) {
     console.error('Reload failed:', e);
   }
@@ -177,6 +173,8 @@ async function loadInitialContent() {
     isEditor = false;
     homeScreen = new HomeScreen();
     await homeScreen.init();
+    // ホーム画面ではエディタ専用メニュー項目を無効化する
+    await invoke('set_editor_menu_enabled', { enabled: false });
   } else {
     isHome = false;
     isEditor = true;
@@ -199,6 +197,7 @@ async function initPlatformUI() {
     if (isHome) {
       customTitleBar.setTitle('');
       customTitleBar.disableMaximize();
+      customTitleBar.setEditorMenuEnabled(false);
     } else if (currentTitle !== 'Untitled') {
       customTitleBar.setTitle(currentTitle);
     }
@@ -220,12 +219,14 @@ listen('content-update', async (event) => {
     updateWindowTitle(currentTitle);
     statusBar.update(currentContent);
     applyTranslations();
+    // エディタ専用メニュー項目を有効化する
+    invoke('set_editor_menu_enabled', { enabled: true });
+    customTitleBar?.setEditorMenuEnabled(true);
     return;
   }
   // 既存のEditor更新ロジック
   if (update.body !== undefined) {
     currentContent = update.body;
-    isDirty = false;
     editorController.updateContent(update.body);
     statusBar.update(update.body);
   }
@@ -263,18 +264,18 @@ listen('menu-action', (event) => {
         if (isEditor) statusBar.update(currentContent);
       })();
       return;
+    case 'file_new_window':
+      debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
+      return;
+    case 'file_open':
+      debounced('file_open', () => openFileInNewWindow());
+      return;
   }
 
   // Editor専用アクション
   if (!isEditor) return;
 
   switch (action) {
-    case 'file_new_window':
-      debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
-      break;
-    case 'file_open':
-      debounced('file_open', () => openFileInNewWindow());
-      break;
     case 'file_save':
       debounced('file_save', () => doSave());
       break;
@@ -330,9 +331,6 @@ listen('menu-action', (event) => {
     case 'edit_find_prev':
       findBar.show();
       findBar.prev();
-      break;
-    case 'view_status_bar':
-      debounced('view_status_bar', () => statusBar.toggle());
       break;
     case 'font_increase':
       debounced('font_increase', () => fontSizeManager.increase());
@@ -509,16 +507,6 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       debounced('font_decrease', () => fontSizeManager.decrease());
       break;
-  }
-});
-
-getCurrentWindow().onCloseRequested(async (event) => {
-  if (isDirty) {
-    event.preventDefault();
-    const confirmed = confirm(t('ui.unsaved_confirm'));
-    if (confirmed) {
-      await getCurrentWindow().destroy();
-    }
   }
 });
 

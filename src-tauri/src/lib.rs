@@ -14,6 +14,7 @@ use std::sync::Mutex;
 
 use clap::Parser;
 use tauri::{Emitter as _, Manager as _};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use recent::{RecentState, RecentStore};
 use state::{LastFocusedDoc, WindowState, WindowStates};
 use tags::{TagState, TagStore};
@@ -59,6 +60,7 @@ fn load_file_into_window(app: &tauri::AppHandle, file_path: &str) -> Result<(), 
             ws.title = title.clone();
             ws.saved_path = Some(abs_str.clone());
             ws.content_explicitly_set = true;
+            ws.dirty = false;
         }
     }
 
@@ -402,11 +404,13 @@ pub fn run() {
             commands::notify_saved,
             commands::get_saved_path,
             commands::sync_content,
+            commands::set_dirty,
             commands::get_initial_content,
             commands::rename_file,
             commands::get_translations,
             commands::get_platform,
             commands::execute_menu_action,
+            commands::set_editor_menu_enabled,
             commands::open_new_window,
             commands::tag_add,
             commands::tag_remove,
@@ -491,6 +495,45 @@ pub fn run() {
                         let app = window.app_handle();
                         let last_focused = app.state::<LastFocusedDoc>();
                         *last_focused.lock().unwrap() = label;
+                    }
+                }
+                // ウィンドウを閉じる前に未保存の変更を確認
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // ドキュメントウィンドウのみ対象
+                    if label != "main" && !label.starts_with("doc-") && !label.starts_with("main-home") {
+                        return;
+                    }
+
+                    // ダーティ状態を確認
+                    let is_dirty = {
+                        let app = window.app_handle();
+                        let states = app.state::<WindowStates>();
+                        let guard = states.lock().unwrap();
+                        guard.get(&label).map_or(false, |s| s.dirty)
+                    };
+
+                    if is_dirty {
+                        api.prevent_close();
+
+                        // 翻訳テキストを取得
+                        let msg = {
+                            let app = window.app_handle();
+                            let i18n_state = app.state::<i18n::I18nState>();
+                            let i18n = i18n_state.lock().unwrap();
+                            i18n.t("ui.unsaved_confirm")
+                        };
+
+                        let window_clone = window.clone();
+                        window.app_handle().dialog()
+                            .message(&msg)
+                            .title("tsumugi")
+                            .kind(MessageDialogKind::Warning)
+                            .buttons(MessageDialogButtons::OkCancel)
+                            .show(move |confirmed| {
+                                if confirmed {
+                                    let _ = window_clone.destroy();
+                                }
+                            });
                     }
                 }
                 // ウィンドウ破棄時のクリーンアップ

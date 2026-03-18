@@ -161,6 +161,17 @@ body {
   color: #ffffff;
 }
 
+.menu-entry.disabled {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.menu-entry.disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
 .entry-check {
   width: 20px;
   text-align: center;

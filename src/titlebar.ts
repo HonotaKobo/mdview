@@ -37,12 +37,23 @@ interface MenuDef {
 
 // --- カスタムタイトルバー ---
 
+// エディタ専用メニュー項目のID一覧
+const EDITOR_ONLY_IDS = new Set([
+  'file_save', 'file_save_as', 'file_reload',
+  'file_export_pdf', 'file_export_html', 'file_print',
+  'edit_copy_markdown', 'edit_copy_html', 'edit_copy_plaintext',
+  'edit_find', 'edit_find_replace', 'edit_find_next', 'edit_find_prev',
+  'tag_add', 'tag_edit',
+  'font_increase', 'font_decrease',
+]);
+
 export class CustomTitleBar {
   private el!: HTMLElement;
   private titleEl!: HTMLElement;
   private openMenuId: string | null = null;
   private translations: Record<string, string> = {};
   private checkStates: Record<string, boolean> = {};
+  private disabledIds: Set<string> = new Set();
   private _maximizeDisabled = false;
 
   async init(): Promise<void> {
@@ -58,7 +69,6 @@ export class CustomTitleBar {
       locale_en: savedLocale === 'en',
       locale_ja: savedLocale === 'ja',
       locale_custom: savedLocale === 'custom',
-      view_status_bar: true,
       view_always_on_top: false,
     };
 
@@ -72,6 +82,24 @@ export class CustomTitleBar {
   setTitle(title: string): void {
     if (this.titleEl) {
       this.titleEl.textContent = title ? `${title} \u2014 tsumugi` : 'tsumugi';
+    }
+  }
+
+  /** エディタ専用メニュー項目の有効/無効を切り替える */
+  setEditorMenuEnabled(enabled: boolean): void {
+    if (enabled) {
+      this.disabledIds.clear();
+    } else {
+      for (const id of EDITOR_ONLY_IDS) {
+        this.disabledIds.add(id);
+      }
+    }
+    // DOM上の disabled クラスを更新する
+    for (const id of EDITOR_ONLY_IDS) {
+      const entry = this.el.querySelector(`.menu-entry[data-action="${id}"]`);
+      if (entry) {
+        entry.classList.toggle('disabled', !enabled);
+      }
     }
   }
 
@@ -161,7 +189,6 @@ export class CustomTitleBar {
             ],
           },
           { type: 'separator' },
-          { type: 'check', id: 'view_status_bar', label: this.t('menu.view_status_bar') },
           { type: 'check', id: 'view_always_on_top', label: this.t('menu.view_always_on_top') },
         ],
       },
@@ -374,7 +401,7 @@ export class CustomTitleBar {
     // アクション項目のクリック（イベント委譲 — DOM 再構築後も動作する）
     this.el.addEventListener('click', (e) => {
       const entry = (e.target as HTMLElement).closest('.menu-entry[data-action]') as HTMLElement | null;
-      if (entry && !entry.classList.contains('has-submenu')) {
+      if (entry && !entry.classList.contains('has-submenu') && !entry.classList.contains('disabled')) {
         const action = entry.dataset.action!;
         this.executeAction(action);
         this.closeAll();
@@ -455,8 +482,6 @@ export class CustomTitleBar {
         this.setThemeCheck(value);
       } else if (action === 'always_on_top_changed') {
         this.setCheck('view_always_on_top', value === true);
-      } else if (action === 'view_status_bar') {
-        this.setCheck('view_status_bar', !this.checkStates['view_status_bar']);
       }
     });
   }
@@ -533,6 +558,11 @@ export class CustomTitleBar {
     }
     // メニュー固有のイベントを再登録する
     this.setupMenuItemEvents();
+    // disabled 状態を再適用する
+    for (const id of this.disabledIds) {
+      const entry = this.el.querySelector(`.menu-entry[data-action="${id}"]`);
+      if (entry) entry.classList.add('disabled');
+    }
   }
 
   private updateMaximizeIcon(maximized: boolean): void {

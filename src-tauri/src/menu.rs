@@ -132,9 +132,6 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
         .item(&font_submenu)
         .item(&lang_submenu)
         .separator()
-        .item(&CheckMenuItemBuilder::with_id("view_status_bar", i18n.t("menu.view_status_bar"))
-            .checked(true)
-            .build(app)?)
         .item(&CheckMenuItemBuilder::with_id("view_always_on_top", i18n.t("menu.view_always_on_top"))
             .build(app)?)
         .build()?;
@@ -214,16 +211,6 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             }
         }
 
-        "view_status_bar" => {
-            if let Some(item) = app.menu().and_then(|m| m.get("view_status_bar")) {
-                if let Some(check) = item.as_check_menuitem() {
-                    let new_state = check.is_checked().unwrap_or(false);
-                    let _ = check.set_checked(new_state);
-                }
-            }
-            let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": "view_status_bar" }));
-        }
-
         "file_home" => {
             open_home_window(app);
         }
@@ -258,7 +245,6 @@ pub fn execute_action(app: &AppHandle, id: &str) {
                 .find(|tid| get_check_state(app, tid))
                 .unwrap_or(&"theme_auto")
                 .to_string();
-            let status_bar = get_check_state(app, "view_status_bar");
             let always_on_top = get_check_state(app, "view_always_on_top");
 
             // 新しいロケールでメニューを再構築
@@ -269,7 +255,6 @@ pub fn execute_action(app: &AppHandle, id: &str) {
 
             // チェック状態を復元
             update_theme_checks(app, &current_theme);
-            set_check_state(app, "view_status_bar", status_bar);
             set_check_state(app, "view_always_on_top", always_on_top);
 
             // I18n状態を更新
@@ -392,6 +377,40 @@ fn set_check_state(app: &AppHandle, id: &str, checked: bool) {
     if let Some(item) = app.menu().and_then(|m| m.get(id)) {
         if let Some(check) = item.as_check_menuitem() {
             let _ = check.set_checked(checked);
+        }
+    }
+}
+
+/// エディタ専用メニュー項目のID一覧
+const EDITOR_ONLY_MENU_IDS: &[&str] = &[
+    "file_save",
+    "file_save_as",
+    "file_reload",
+    "file_export_pdf",
+    "file_export_html",
+    "file_print",
+    "edit_copy_markdown",
+    "edit_copy_html",
+    "edit_copy_plaintext",
+    "edit_find",
+    "edit_find_replace",
+    "edit_find_next",
+    "edit_find_prev",
+    "tag_add",
+    "tag_edit",
+    "font_increase",
+    "font_decrease",
+];
+
+/// エディタ専用メニュー項目の有効/無効を一括で切り替える
+pub fn set_editor_menu_enabled(app: &AppHandle, enabled: bool) {
+    if let Some(menu) = app.menu() {
+        for id in EDITOR_ONLY_MENU_IDS {
+            if let Some(item) = menu.get(*id) {
+                if let Some(menu_item) = item.as_menuitem() {
+                    let _ = menu_item.set_enabled(enabled);
+                }
+            }
         }
     }
 }

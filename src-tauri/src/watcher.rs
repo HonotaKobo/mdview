@@ -43,6 +43,7 @@ impl FileWatcher {
                                 let mut states = states.lock().unwrap();
                                 if let Some(state) = states.get_mut(&label) {
                                     state.current_content = content.clone();
+                                    state.dirty = false;
                                 }
                             }
                             let _ = app_handle.emit_to(
