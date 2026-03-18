@@ -373,6 +373,18 @@ pub fn run() {
 
     let i18n = i18n::I18n::new();
 
+    // macOSのウィンドウ状態復元データを削除する。
+    // 起動時にFinder経由のOpenDocumentsイベントとstate restorationが同時発生すると、
+    // Tao内部のイベントコールバックで再入が起きクラッシュする問題を回避する。
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = dirs::home_dir() {
+            let saved_state = home
+                .join("Library/Saved Application State/com.tsumugi.app.savedState");
+            let _ = std::fs::remove_dir_all(saved_state);
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -536,32 +548,41 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(move |_app_handle, event| {
             // macOSファイル関連付け: ファイルを開く
+            // macOSのstate restorationコールバック中にOpenDocumentsイベントが配送されると、
+            // Tao内部のイベントハンドラで再入が起きクラッシュする。
+            // 別スレッドからrun_on_main_threadでイベントキューにポストすることで、
+            // 現在のコールバックチェーンの外で安全に処理する。
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
-                for url in urls {
-                    if let Ok(path) = url.to_file_path() {
-                        let path_str = path.to_string_lossy().to_string();
+                let urls = urls.clone();
+                let handle = _app_handle.clone();
+                std::thread::spawn(move || {
+                    let h = handle.clone();
+                    let _ = handle.run_on_main_thread(move || {
+                        for url in &urls {
+                            if let Ok(path) = url.to_file_path() {
+                                let path_str = path.to_string_lossy().to_string();
 
-                        // "main"ウィンドウがまだコンテンツ未設定の場合、新ウィンドウ生成を避けて
-                        // 既存ウィンドウにファイルを読み込む（macOSの状態復元中のクラッシュ回避）
-                        let should_reuse_main = {
-                            let states = _app_handle.state::<WindowStates>();
-                            let guard = states.lock().unwrap();
-                            guard.get("main").map_or(false, |s| !s.content_explicitly_set)
-                        };
+                                let should_reuse_main = {
+                                    let states = h.state::<WindowStates>();
+                                    let guard = states.lock().unwrap();
+                                    guard.get("main").map_or(false, |s| !s.content_explicitly_set)
+                                };
 
-                        if should_reuse_main {
-                            let _ = load_file_into_window(_app_handle, &path_str);
-                        } else {
-                            let _ = open_document_window(
-                                _app_handle,
-                                Some(path_str),
-                                None,
-                                None,
-                            );
+                                if should_reuse_main {
+                                    let _ = load_file_into_window(&h, &path_str);
+                                } else {
+                                    let _ = open_document_window(
+                                        &h,
+                                        Some(path_str),
+                                        None,
+                                        None,
+                                    );
+                                }
+                            }
                         }
-                    }
-                }
+                    });
+                });
             }
             match event {
                 tauri::RunEvent::ExitRequested { api, code, .. } => {
