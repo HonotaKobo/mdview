@@ -9,18 +9,19 @@
     <link rel="stylesheet" href="./src/styles/editor.css" />
     <link rel="stylesheet" href="./src/styles/home.css" />
     <link rel="stylesheet" href="./src/styles/tag.css" />
+    <link rel="stylesheet" href="./src/styles/titlebar.css" />
   </head>
   <body>
-    <div id="find-bar" style="display: none">
-      <div id="find-row">
-        <input id="find-input" type="text" placeholder="" />
-        <span id="find-count"></span>
+    <div id="find-bar" class="flex flex-col gap-1 px-3 py-1 bg-[var(--titlebar-bg)] border-b border-[var(--titlebar-border)] shrink-0" style="display: none">
+      <div id="find-row" class="flex items-center gap-1.5">
+        <input id="find-input" class="flex-1 max-w-[300px] py-[3px] px-2 text-[13px] border border-[var(--border-color)] rounded bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none focus:border-[var(--link-color)]" type="text" placeholder="" />
+        <span id="find-count" class="text-xs text-[var(--text-secondary)] min-w-[50px]"></span>
         <button id="find-prev">&#9650;</button>
         <button id="find-next">&#9660;</button>
         <button id="find-close">&times;</button>
       </div>
-      <div id="replace-row" style="display: none">
-        <input id="replace-input" type="text" placeholder="" />
+      <div id="replace-row" class="flex items-center gap-1.5" style="display: none">
+        <input id="replace-input" class="flex-1 max-w-[300px] py-[3px] px-2 text-[13px] border border-[var(--border-color)] rounded bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none focus:border-[var(--link-color)]" type="text" placeholder="" />
         <button id="replace-one"></button>
         <button id="replace-all"></button>
       </div>
@@ -44,18 +45,18 @@
         <div id="tag-count" class="text-[11px] text-[var(--text-secondary)] px-4 py-2 border-t border-[var(--border-color)] shrink-0"></div>
       </div>
     </div>
-    <div id="status-bar">
+    <div id="status-bar" class="flex items-center gap-2.5 py-[3px] px-4 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] shrink-0 text-[11px] text-[var(--text-secondary)] select-none">
       <span id="status-chars"></span>
-      <span class="status-sep">|</span>
+      <span class="text-[var(--border-color)]">|</span>
       <span id="status-words"></span>
-      <span class="status-sep">|</span>
+      <span class="text-[var(--border-color)]">|</span>
       <span id="status-read-time"></span>
-      <span class="status-spacer"></span>
-      <span id="status-tag-add" class="status-action"></span>
-      <span class="status-sep">|</span>
-      <span id="status-tag-edit" class="status-action"></span>
-      <span class="status-sep">|</span>
-      <span id="status-tag-manage" class="status-action"></span>
+      <span class="flex-1"></span>
+      <span id="status-tag-add" class="cursor-pointer px-1.5 rounded-[3px] hover:bg-[rgba(128,128,128,0.2)] hover:text-[var(--text-primary)]"></span>
+      <span class="text-[var(--border-color)]">|</span>
+      <span id="status-tag-edit" class="cursor-pointer px-1.5 rounded-[3px] hover:bg-[rgba(128,128,128,0.2)] hover:text-[var(--text-primary)]"></span>
+      <span class="text-[var(--border-color)]">|</span>
+      <span id="status-tag-manage" class="cursor-pointer px-1.5 rounded-[3px] hover:bg-[rgba(128,128,128,0.2)] hover:text-[var(--text-primary)]"></span>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>

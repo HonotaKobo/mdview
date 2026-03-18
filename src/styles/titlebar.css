@@ -1,0 +1,53 @@
+/* titlebar.css — Tailwind で表現できない残留スタイル (unlayered) */
+
+/* メニュー open 状態 — JS の classList 操作 */
+.menu-top-item.open .menu-top-label {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.menu-top-item.open > .menu-dropdown {
+  display: block;
+}
+
+/* メニュー項目ホバー時の子要素色変更 */
+.menu-entry:hover .entry-accel {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.menu-entry:hover .entry-arrow {
+  color: #ffffff;
+}
+
+/* サブメニュー表示 */
+.has-submenu:hover > .menu-submenu {
+  display: block;
+}
+
+/* 閉じるボタン特殊ホバー */
+.ctrl-close:hover {
+  background: #e81123 !important;
+  color: #ffffff !important;
+}
+
+/* ダークモードのドロップダウン影 */
+:root[data-theme='dark'] .menu-dropdown,
+:root[data-theme='dark'] .menu-submenu {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* 検索バーのボタン共通スタイル */
+#find-bar button {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+#find-bar button:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}

@@ -630,7 +630,7 @@ export class HomeScreen {
       this.statusBar.appendChild(fileCount);
 
       const spacer = document.createElement('div');
-      spacer.className = 'status-spacer';
+      spacer.className = 'flex-1';
       this.statusBar.appendChild(spacer);
 
       const tagCount = document.createElement('span');

@@ -184,23 +184,24 @@ export class CustomTitleBar {
   private build(): HTMLElement {
     const titlebar = document.createElement('div');
     titlebar.id = 'custom-titlebar';
+    titlebar.className = 'flex flex-col bg-[var(--titlebar-bg)] border-b border-[var(--titlebar-border)] select-none shrink-0 text-xs';
 
     // 行1: アイコン + タイトル + ウィンドウ操作ボタン
     const titleRow = document.createElement('div');
-    titleRow.className = 'titlebar-title-row';
+    titleRow.className = 'flex items-center h-8';
 
     const icon = document.createElement('img');
-    icon.className = 'titlebar-icon';
+    icon.className = 'w-4 h-4 mr-2 ml-2.5 shrink-0';
     icon.src = '/app-icon.png';
     icon.alt = 'tsumugi';
     titleRow.appendChild(icon);
 
     const titleDrag = document.createElement('div');
-    titleDrag.className = 'titlebar-title';
+    titleDrag.className = 'flex-1 h-full flex items-center min-w-0 titlebar-title';
     titleDrag.setAttribute('data-tauri-drag-region', '');
 
     this.titleEl = document.createElement('span');
-    this.titleEl.className = 'titlebar-title-text';
+    this.titleEl.className = 'text-xs text-[var(--text-primary)] overflow-hidden text-ellipsis whitespace-nowrap';
     this.titleEl.textContent = 'tsumugi';
     this.titleEl.setAttribute('data-tauri-drag-region', '');
     titleDrag.appendChild(this.titleEl);
@@ -209,7 +210,7 @@ export class CustomTitleBar {
 
     // ウィンドウ操作ボタン
     const controls = document.createElement('div');
-    controls.className = 'titlebar-controls';
+    controls.className = 'flex h-full';
     controls.appendChild(this.createCtrlBtn('tb-minimize', 'minimize'));
     controls.appendChild(this.createCtrlBtn('tb-maximize', 'maximize'));
     controls.appendChild(this.createCtrlBtn('tb-close', 'close'));
@@ -219,18 +220,18 @@ export class CustomTitleBar {
 
     // 行2: メニューバー
     const menuRow = document.createElement('div');
-    menuRow.className = 'titlebar-menu-row';
+    menuRow.className = 'flex items-center h-6';
 
     const menuBar = document.createElement('div');
-    menuBar.className = 'titlebar-menu';
+    menuBar.className = 'flex items-center h-full titlebar-menu';
 
     for (const menu of this.getMenus()) {
       const topItem = document.createElement('div');
-      topItem.className = 'menu-top-item';
+      topItem.className = 'relative h-full flex items-center menu-top-item';
       topItem.dataset.menu = menu.id;
 
       const label = document.createElement('span');
-      label.className = 'menu-top-label';
+      label.className = 'px-2.5 h-full flex items-center cursor-default text-[var(--text-primary)] hover:bg-[rgba(128,128,128,0.15)] menu-top-label';
       label.textContent = menu.label;
       topItem.appendChild(label);
 
@@ -247,12 +248,12 @@ export class CustomTitleBar {
 
   private buildDropdown(items: MenuEntry[]): HTMLElement {
     const dropdown = document.createElement('div');
-    dropdown.className = 'menu-dropdown';
+    dropdown.className = 'hidden absolute top-full left-0 min-w-[240px] bg-[var(--bg-primary)] border border-[var(--border-color)] shadow-[0_4px_12px_rgba(0,0,0,0.12)] z-[1000] py-1 menu-dropdown';
 
     for (const item of items) {
       if (item.type === 'separator') {
         const sep = document.createElement('div');
-        sep.className = 'menu-separator';
+        sep.className = 'h-px my-1 bg-[var(--border-color)]';
         dropdown.appendChild(sep);
       } else if (item.type === 'submenu') {
         dropdown.appendChild(this.buildSubmenuEntry(item));
@@ -265,30 +266,30 @@ export class CustomTitleBar {
 
   private buildSubmenuEntry(item: SubMenuItem): HTMLElement {
     const entry = document.createElement('div');
-    entry.className = 'menu-entry has-submenu';
+    entry.className = 'flex items-center py-[5px] pr-4 pl-2 cursor-default text-[var(--text-primary)] whitespace-nowrap hover:bg-[var(--link-color)] hover:text-white relative menu-entry has-submenu';
 
     // 左揃えを統一するための空のチェック用 span を追加する
     const check = document.createElement('span');
-    check.className = 'entry-check';
+    check.className = 'w-5 text-center text-xs shrink-0 entry-check';
     check.textContent = '';
     entry.appendChild(check);
 
     const label = document.createElement('span');
-    label.className = 'entry-label';
+    label.className = 'flex-1 entry-label';
     label.textContent = item.label;
     entry.appendChild(label);
 
     const arrow = document.createElement('span');
-    arrow.className = 'entry-arrow';
+    arrow.className = 'ml-4 text-[9px] entry-arrow';
     arrow.textContent = '\u25B8'; // ▸
     entry.appendChild(arrow);
 
     const submenu = document.createElement('div');
-    submenu.className = 'menu-submenu';
+    submenu.className = 'hidden absolute top-[-4px] left-full min-w-[160px] bg-[var(--bg-primary)] border border-[var(--border-color)] shadow-[0_4px_12px_rgba(0,0,0,0.12)] z-[1001] py-1 menu-submenu';
     for (const subItem of item.items) {
       if (subItem.type === 'separator') {
         const sep = document.createElement('div');
-        sep.className = 'menu-separator';
+        sep.className = 'h-px my-1 bg-[var(--border-color)]';
         submenu.appendChild(sep);
       } else {
         submenu.appendChild(this.buildMenuEntry(subItem));
@@ -301,12 +302,12 @@ export class CustomTitleBar {
 
   private buildMenuEntry(item: NormalItem | CheckItem): HTMLElement {
     const entry = document.createElement('div');
-    entry.className = 'menu-entry';
+    entry.className = 'flex items-center py-[5px] pr-4 pl-2 cursor-default text-[var(--text-primary)] whitespace-nowrap hover:bg-[var(--link-color)] hover:text-white menu-entry';
     entry.dataset.action = item.id;
 
     // 左揃えを統一するために常にチェック用 span を追加する
     const check = document.createElement('span');
-    check.className = 'entry-check';
+    check.className = 'w-5 text-center text-xs shrink-0 entry-check';
     if (item.type === 'check') {
       check.textContent = this.checkStates[item.id] ? '\u2713' : '';
     } else {
@@ -315,13 +316,13 @@ export class CustomTitleBar {
     entry.appendChild(check);
 
     const label = document.createElement('span');
-    label.className = 'entry-label';
+    label.className = 'flex-1 entry-label';
     label.textContent = item.label;
     entry.appendChild(label);
 
     if (item.type === 'normal' && item.accelerator) {
       const accel = document.createElement('span');
-      accel.className = 'entry-accel';
+      accel.className = 'ml-6 text-[var(--text-secondary)] text-[11px] entry-accel';
       accel.textContent = item.accelerator;
       entry.appendChild(accel);
     }
@@ -331,11 +332,11 @@ export class CustomTitleBar {
 
   private createCtrlBtn(id: string, type: 'minimize' | 'maximize' | 'close'): HTMLElement {
     const btn = document.createElement('button');
-    btn.className = `ctrl-btn ctrl-${type}`;
+    btn.className = `w-[46px] h-full border-none bg-transparent text-[var(--text-primary)] cursor-default flex items-center justify-center p-0 hover:bg-[rgba(128,128,128,0.15)] ctrl-btn ctrl-${type}`;
     btn.id = id;
 
     if (type === 'minimize') {
-      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="1"><path d="M 2 4 L 2 13 L 11 13 L 11 4 Z"/><path d="M 4 2 L 13 2 L 13 12"/></g></svg>';
+      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1"/></svg>';
     } else if (type === 'maximize') {
       btn.innerHTML = this.maximizeSvg();
     } else {
@@ -351,9 +352,7 @@ export class CustomTitleBar {
   }
 
   private restoreSvg(): string {
-    return '<svg width="10" height="10" viewBox="0 0 11 11">'
-      + '<rect x="2" y="0" width="9" height="9" stroke="currentColor" fill="none" stroke-width="1"/>'
-      + '<rect x="0" y="2" width="9" height="9" stroke="currentColor" fill="var(--titlebar-bg)" stroke-width="1"/></svg>';
+    return '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="1"><path d="M 2 4 L 2 13 L 11 13 L 11 4 Z"/><path d="M 4 2 L 13 2 L 13 12"/></g></svg>';
   }
 
   // --- イベント処理 ---
@@ -518,11 +517,11 @@ export class CustomTitleBar {
     menuBar.innerHTML = '';
     for (const menu of this.getMenus()) {
       const topItem = document.createElement('div');
-      topItem.className = 'menu-top-item';
+      topItem.className = 'relative h-full flex items-center menu-top-item';
       topItem.dataset.menu = menu.id;
 
       const label = document.createElement('span');
-      label.className = 'menu-top-label';
+      label.className = 'px-2.5 h-full flex items-center cursor-default text-[var(--text-primary)] hover:bg-[rgba(128,128,128,0.15)] menu-top-label';
       label.textContent = menu.label;
       topItem.appendChild(label);
 
