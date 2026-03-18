@@ -5,6 +5,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  user-select: none;
 }
 
 /* サイドバーナビゲーション */
@@ -106,6 +107,16 @@
 
 .home-inner {
   padding: 32px;
+  padding-bottom: 0;
+  max-width: 900px;
+  flex-shrink: 0;
+}
+
+/* 最近のファイルスクロールラッパー */
+.home-recent-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 32px 24px;
   max-width: 900px;
 }
 
@@ -356,6 +367,7 @@
   font-size: 12px;
   width: 100%;
   font-family: inherit;
+  user-select: text;
 }
 
 .home-search-box input::placeholder {
@@ -534,23 +546,27 @@
 
 /* スクロールバー */
 .home-tab-content::-webkit-scrollbar,
-.home-tag-table-wrapper::-webkit-scrollbar {
+.home-tag-table-wrapper::-webkit-scrollbar,
+.home-recent-wrapper::-webkit-scrollbar {
   width: 8px;
 }
 
 .home-tab-content::-webkit-scrollbar-track,
-.home-tag-table-wrapper::-webkit-scrollbar-track {
+.home-tag-table-wrapper::-webkit-scrollbar-track,
+.home-recent-wrapper::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .home-tab-content::-webkit-scrollbar-thumb,
-.home-tag-table-wrapper::-webkit-scrollbar-thumb {
+.home-tag-table-wrapper::-webkit-scrollbar-thumb,
+.home-recent-wrapper::-webkit-scrollbar-thumb {
   background: rgba(128, 128, 128, 0.3);
   border-radius: 4px;
 }
 
 .home-tab-content::-webkit-scrollbar-thumb:hover,
-.home-tag-table-wrapper::-webkit-scrollbar-thumb:hover {
+.home-tag-table-wrapper::-webkit-scrollbar-thumb:hover,
+.home-recent-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgba(128, 128, 128, 0.5);
 }
 

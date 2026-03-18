@@ -159,10 +159,7 @@ export class HomeScreen {
     header.appendChild(title);
     this.contentArea.appendChild(header);
 
-    // スクロール可能なコンテンツ
-    const scrollArea = document.createElement('div');
-    scrollArea.className = 'home-tab-content';
-
+    // 固定エリア（あいさつ文＋アクションカード＋セクションヘッダー）
     const inner = document.createElement('div');
     inner.className = 'home-inner';
 
@@ -197,7 +194,7 @@ export class HomeScreen {
 
     inner.appendChild(cards);
 
-    // 最近使ったファイルセクション
+    // 最近使ったファイルセクションヘッダー
     const sectionHeader = document.createElement('div');
     sectionHeader.className = 'home-section-header';
     const h2 = document.createElement('h2');
@@ -208,11 +205,17 @@ export class HomeScreen {
     sectionHeader.appendChild(line);
     inner.appendChild(sectionHeader);
 
+    this.contentArea.appendChild(inner);
+
+    // スクロール可能な最近のファイル一覧
+    const recentWrapper = document.createElement('div');
+    recentWrapper.className = 'home-recent-wrapper';
+
     if (this.recentEntries.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'home-no-recent';
       empty.textContent = t('ui.home_no_recent');
-      inner.appendChild(empty);
+      recentWrapper.appendChild(empty);
     } else {
       const list = document.createElement('div');
       list.className = 'home-recent-list';
@@ -283,11 +286,10 @@ export class HomeScreen {
 
         list.appendChild(item);
       }
-      inner.appendChild(list);
+      recentWrapper.appendChild(list);
     }
 
-    scrollArea.appendChild(inner);
-    this.contentArea.appendChild(scrollArea);
+    this.contentArea.appendChild(recentWrapper);
   }
 
   private createActionCard(icon: string, title: string, desc: string, onClick: () => void): HTMLElement {

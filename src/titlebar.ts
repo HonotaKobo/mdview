@@ -335,7 +335,7 @@ export class CustomTitleBar {
     btn.id = id;
 
     if (type === 'minimize') {
-      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="1"><path d="M 2 4 L 2 13 L 11 13 L 11 4 Z"/><path d="M 4 2 L 13 2 L 13 12"/></g></svg>';
+      btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1"/></svg>';
     } else if (type === 'maximize') {
       btn.innerHTML = this.maximizeSvg();
     } else {
@@ -351,9 +351,11 @@ export class CustomTitleBar {
   }
 
   private restoreSvg(): string {
-    return '<svg width="10" height="10" viewBox="0 0 11 11">'
-      + '<rect x="2" y="0" width="9" height="9" stroke="currentColor" fill="none" stroke-width="1"/>'
-      + '<rect x="0" y="2" width="9" height="9" stroke="currentColor" fill="var(--titlebar-bg)" stroke-width="1"/></svg>';
+    return '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">'
+      + '<g stroke="currentColor" stroke-width="1">'
+      + '<path d="M 2 4 L 2 13 L 11 13 L 11 4 Z"/>'
+      + '<path d="M 4 2 L 13 2 L 13 12"/>'
+      + '</g></svg>';
   }
 
   // --- イベント処理 ---
