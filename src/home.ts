@@ -43,6 +43,22 @@ export class HomeScreen {
   private contentArea!: HTMLElement;
   private statusBar!: HTMLElement;
 
+  destroy(): void {
+    const screen = document.getElementById('home-screen');
+    if (screen) screen.remove();
+    const bar = document.getElementById('home-status-bar');
+    if (bar) bar.remove();
+    // エディタ要素を再表示
+    const findBarEl = document.getElementById('find-bar');
+    if (findBarEl) findBarEl.style.display = '';
+    const mainArea = document.getElementById('main-area');
+    if (mainArea) mainArea.style.display = '';
+    const statusBarEl = document.getElementById('status-bar');
+    if (statusBarEl) statusBarEl.style.display = '';
+    // リサイズを再有効化
+    getCurrentWindow().setResizable(true).catch(() => {});
+  }
+
   async init(): Promise<void> {
     // ホーム画面のウィンドウサイズを固定する
     try { await getCurrentWindow().setResizable(false); } catch { /* 権限がない可能性あり */ }

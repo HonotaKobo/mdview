@@ -15,7 +15,7 @@ use std::sync::Mutex;
 use clap::Parser;
 use tauri::{Emitter as _, Manager as _};
 use recent::{RecentState, RecentStore};
-use state::{LastFocusedDoc, WindowMode, WindowState, WindowStates};
+use state::{LastFocusedDoc, WindowState, WindowStates};
 use tags::{TagState, TagStore};
 use watcher::{FileWatcher, FileWatchers};
 
@@ -30,10 +30,10 @@ pub(crate) fn normalize_path(path: &str) -> String {
     path.to_string()
 }
 
-/// ホームウィンドウ ("main") をドキュメントウィンドウに変換する。
-/// 新しいウィンドウの生成・既存ウィンドウの破棄を行わないため、
+/// 既存の "main" ウィンドウにファイルを読み込む。
+/// 新しいウィンドウの生成・破棄を行わないため、
 /// macOSのウィンドウ状態復元中のコールバックと衝突しない。
-fn convert_home_to_document(app: &tauri::AppHandle, file_path: &str) -> Result<(), String> {
+fn load_file_into_window(app: &tauri::AppHandle, file_path: &str) -> Result<(), String> {
     let abs_path = std::fs::canonicalize(file_path)
         .unwrap_or_else(|_| std::path::PathBuf::from(file_path));
     let abs_str = normalize_path(&abs_path.to_string_lossy());
@@ -59,7 +59,6 @@ fn convert_home_to_document(app: &tauri::AppHandle, file_path: &str) -> Result<(
 
             // 状態を更新
             ws.instance_id = new_instance_id.clone();
-            ws.window_mode = WindowMode::Editor;
             ws.current_content = content.clone();
             ws.title = title.clone();
             ws.saved_path = Some(abs_str.clone());
@@ -70,8 +69,8 @@ fn convert_home_to_document(app: &tauri::AppHandle, file_path: &str) -> Result<(
     // ウィンドウタイトルを更新
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_title(&format!("{} — tsumugi", title));
-        // フロントエンドがすでにHome画面として初期化済みの場合に備えてイベントを発火
-        let _ = window.emit("file-opened", serde_json::json!({
+        // フロントエンドにコンテンツ更新を通知
+        let _ = window.emit("content-update", serde_json::json!({
             "body": content,
             "title": title,
         }));
@@ -96,7 +95,7 @@ fn convert_home_to_document(app: &tauri::AppHandle, file_path: &str) -> Result<(
     let mut store = recent.lock().unwrap();
     store.add(&abs_str, &title);
 
-    eprintln!("tsumugi: converted home to document (instance: {})", new_instance_id);
+    eprintln!("tsumugi: loaded file into window (instance: {})", new_instance_id);
 
     Ok(())
 }
@@ -145,9 +144,6 @@ pub(crate) fn open_document_window(
     // ウィンドウ状態を作成
     let mut ws = WindowState::new(instance_id.clone(), doc_title.clone(), content);
     ws.content_explicitly_set = file.is_some() || body.is_some();
-    if file.is_none() && body.is_none() {
-        ws.window_mode = WindowMode::Home;
-    }
     if let Some(ref fp) = file_path {
         ws.saved_path = Some(fp.clone());
     }
@@ -366,12 +362,8 @@ pub fn run() {
     };
 
     let content_explicitly_set = args.body.is_some() || initial_file.is_some();
-    let is_home_mode = initial_file.is_none() && args.body.is_none();
     let mut app_state = WindowState::new(id.clone(), resolved_title, resolved_content);
     app_state.content_explicitly_set = content_explicitly_set;
-    if is_home_mode {
-        app_state.window_mode = WindowMode::Home;
-    }
     if let Some(ref fp) = resolved_file_path {
         app_state.saved_path = Some(fp.clone());
     }
@@ -428,7 +420,6 @@ pub fn run() {
             commands::recent_add,
             commands::recent_remove,
             commands::recent_clear,
-            commands::get_window_mode,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
@@ -555,18 +546,16 @@ pub fn run() {
                     if let Ok(path) = url.to_file_path() {
                         let path_str = path.to_string_lossy().to_string();
 
-                        // "main"ウィンドウがHome画面の場合、新ウィンドウ生成を避けて
-                        // 既存ウィンドウを直接変換する（macOSの状態復元中のクラッシュ回避）
-                        let is_main_home = {
+                        // "main"ウィンドウがまだコンテンツ未設定の場合、新ウィンドウ生成を避けて
+                        // 既存ウィンドウにファイルを読み込む（macOSの状態復元中のクラッシュ回避）
+                        let should_reuse_main = {
                             let states = _app_handle.state::<WindowStates>();
                             let guard = states.lock().unwrap();
-                            guard.get("main").map_or(false, |s| {
-                                matches!(s.window_mode, WindowMode::Home)
-                            })
+                            guard.get("main").map_or(false, |s| !s.content_explicitly_set)
                         };
 
-                        if is_main_home {
-                            let _ = convert_home_to_document(_app_handle, &path_str);
+                        if should_reuse_main {
+                            let _ = load_file_into_window(_app_handle, &path_str);
                         } else {
                             let _ = open_document_window(
                                 _app_handle,

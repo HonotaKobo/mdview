@@ -1,12 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-#[derive(Clone, PartialEq)]
-pub enum WindowMode {
-    Home,
-    Editor,
-}
-
 pub struct WindowState {
     /// IPC instance ID for this window
     pub instance_id: String,
@@ -22,8 +16,6 @@ pub struct WindowState {
     pub path_disclosure: bool,
     /// Whether content was explicitly provided (--body or --file)
     pub content_explicitly_set: bool,
-    /// Window mode: Home screen or Editor
-    pub window_mode: WindowMode,
 }
 
 impl WindowState {
@@ -36,7 +28,6 @@ impl WindowState {
             dirty: false,
             path_disclosure: false,
             content_explicitly_set: false,
-            window_mode: WindowMode::Editor,
         }
     }
 }

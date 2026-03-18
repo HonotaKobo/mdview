@@ -3,7 +3,7 @@ use tauri::command;
 
 use crate::i18n::I18nState;
 use crate::recent::{RecentEntry, RecentState};
-use crate::state::{WindowMode, WindowStates};
+use crate::state::WindowStates;
 use crate::tags::{TagEntry, TagState};
 
 
@@ -313,17 +313,3 @@ pub fn recent_clear(state: tauri::State<'_, RecentState>) {
     store.clear();
 }
 
-// --- ウィンドウモード ---
-
-#[command]
-pub fn get_window_mode(window: tauri::Window, states: tauri::State<'_, WindowStates>) -> String {
-    let states = states.lock().unwrap();
-    if let Some(state) = states.get(window.label()) {
-        match state.window_mode {
-            WindowMode::Home => "home".to_string(),
-            WindowMode::Editor => "editor".to_string(),
-        }
-    } else {
-        "editor".to_string()
-    }
-}

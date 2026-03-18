@@ -34,7 +34,7 @@ let isDirty = false;
 let customTitleBar: CustomTitleBar | null = null;
 
 let isHome = false;
-let isEditor = true;
+let isEditor = false;
 
 let themeManager: ThemeManager;
 let findBar: FindBar;
@@ -46,82 +46,52 @@ let tagSidebar: TagSidebar;
 let updateModal: UpdateModal;
 let homeScreen: HomeScreen | null = null;
 
-// ウィンドウモード判定と初期化
+// 初期化
 (async () => {
-const windowMode = await invoke<string>('get_window_mode');
-isHome = windowMode === 'home';
-isEditor = !isHome;
-
-// macOSでファイルダブルクリック時にHome→Editorへの切り替えを処理
-listen('file-opened', () => {
-  if (isHome) {
-    location.reload();
-  }
-});
 
 themeManager = new ThemeManager();
-
 updateModal = new UpdateModal();
 
-if (isEditor) {
-  findBar = new FindBar();
-  fontSizeManager = new FontSizeManager();
-  editorController = new EditorController(document.getElementById('content')!);
-  statusBar = new StatusBar();
-  tagAddModal = new TagAddModal();
-  tagSidebar = new TagSidebar();
+// エディタコンポーネントを常に初期化（HomeScreen.init()がエディタ要素を非表示にする）
+findBar = new FindBar();
+fontSizeManager = new FontSizeManager();
+editorController = new EditorController(document.getElementById('content')!);
+statusBar = new StatusBar();
+tagAddModal = new TagAddModal();
+tagSidebar = new TagSidebar();
 
-  tagAddModal.onTagAdded(() => {
-    tagSidebar.refresh();
-  });
+tagAddModal.onTagAdded(() => {
+  tagSidebar.refresh();
+});
 
-  findBar.setOnReplace((search, replace, all) => {
-    let content = editorController.getCurrentContent();
-    if (all) {
-      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      content = content.replace(regex, replace);
-    } else {
-      const idx = content.toLowerCase().indexOf(search.toLowerCase());
-      if (idx === -1) return;
-      content = content.slice(0, idx) + replace + content.slice(idx + search.length);
-    }
-    editorController.updateContent(content);
-    currentContent = content;
-    isDirty = true;
-    invoke('sync_content', { content });
-    findBar.search();
-  });
+findBar.setOnReplace((search, replace, all) => {
+  let content = editorController.getCurrentContent();
+  if (all) {
+    const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    content = content.replace(regex, replace);
+  } else {
+    const idx = content.toLowerCase().indexOf(search.toLowerCase());
+    if (idx === -1) return;
+    content = content.slice(0, idx) + replace + content.slice(idx + search.length);
+  }
+  editorController.updateContent(content);
+  currentContent = content;
+  isDirty = true;
+  invoke('sync_content', { content });
+  findBar.search();
+});
 
-  editorController.setOnContentChange((markdown) => {
-    currentContent = markdown;
-    isDirty = true;
-    invoke('sync_content', { content: markdown });
-    statusBar.update(markdown);
-  });
-}
+editorController.setOnContentChange((markdown) => {
+  currentContent = markdown;
+  isDirty = true;
+  invoke('sync_content', { content: markdown });
+  statusBar.update(markdown);
+});
 
 function updateWindowTitle(title: string) {
   getCurrentWindow().setTitle(`${title} — tsumugi`);
   customTitleBar?.setTitle(title);
 }
-
-// Windows でカスタムタイトルバーを初期化する
-async function initPlatformUI() {
-  const platform = await invoke<string>('get_platform');
-  if (platform === 'windows') {
-    customTitleBar = new CustomTitleBar();
-    await customTitleBar.init();
-    if (isHome) {
-      customTitleBar.setTitle('');
-      customTitleBar.disableMaximize();
-    } else if (currentTitle !== 'Untitled') {
-      customTitleBar.setTitle(currentTitle);
-    }
-  }
-}
-initPlatformUI();
-
-
 
 // ファイル選択ダイアログを開き、新しいウィンドウで開く
 async function openFileInNewWindow() {
@@ -197,116 +167,290 @@ function applyTranslations(): void {
   }
 }
 
+// content_explicitly_setを見てHome UIかEditor UIかを動的に決定
 async function loadInitialContent() {
   await loadTranslations();
-  applyTranslations();
+  const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
 
-  if (isHome) {
+  if (!contentSet) {
+    isHome = true;
+    isEditor = false;
     homeScreen = new HomeScreen();
     await homeScreen.init();
+  } else {
+    isHome = false;
+    isEditor = true;
+    currentContent = body;
+    currentTitle = title || 'Untitled';
+    editorController.enterEditMode(body);
+    updateWindowTitle(currentTitle);
+    statusBar.update(body);
+  }
+  applyTranslations();
+}
+await loadInitialContent();
+
+// Windows でカスタムタイトルバーを初期化する（loadInitialContent後に実行し、isHomeが確定済み）
+async function initPlatformUI() {
+  const platform = await invoke<string>('get_platform');
+  if (platform === 'windows') {
+    customTitleBar = new CustomTitleBar();
+    await customTitleBar.init();
+    if (isHome) {
+      customTitleBar.setTitle('');
+      customTitleBar.disableMaximize();
+    } else if (currentTitle !== 'Untitled') {
+      customTitleBar.setTitle(currentTitle);
+    }
+  }
+}
+initPlatformUI();
+
+// content-update リスナー（Home/Editor両対応）
+listen('content-update', async (event) => {
+  const update = event.payload as ContentUpdate;
+  if (isHome && update.body !== undefined) {
+    // Home → Editor遷移
+    isHome = false;
+    isEditor = true;
+    if (homeScreen) { homeScreen.destroy(); homeScreen = null; }
+    currentContent = update.body;
+    currentTitle = update.title || 'Untitled';
+    editorController.enterEditMode(currentContent);
+    updateWindowTitle(currentTitle);
+    statusBar.update(currentContent);
+    applyTranslations();
     return;
   }
-  const [body, title, _contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
-  currentContent = body;
-  currentTitle = title || 'Untitled';
-  editorController.enterEditMode(body);
-  updateWindowTitle(currentTitle);
-  statusBar.update(body);
-}
-loadInitialContent();
+  // 既存のEditor更新ロジック
+  if (update.body !== undefined) {
+    currentContent = update.body;
+    isDirty = false;
+    editorController.updateContent(update.body);
+    statusBar.update(update.body);
+  }
+  if (update.title !== undefined) {
+    currentTitle = update.title;
+    updateWindowTitle(currentTitle);
+  }
+});
 
-if (isHome) {
-  listen('menu-action', async (event) => {
-    const { action } = event.payload as MenuAction;
-    if (action === 'locale_changed') {
-      await loadTranslations();
-      applyTranslations();
-    } else if (action === 'theme_change') {
-      const { value } = event.payload as MenuAction;
+// switch-to-tags-tab リスナー（常に登録）
+listen('switch-to-tags-tab', () => {
+  if (homeScreen) {
+    homeScreen.switchToTagsTab();
+  }
+});
+
+// 統合menu-actionリスナー
+listen('menu-action', (event) => {
+  const { action, value } = event.payload as MenuAction;
+
+  // Home/Editor共通のアクション
+  switch (action) {
+    case 'theme_change':
       if (value === 'dark' || value === 'light' || value === 'auto') {
         themeManager.setTheme(value);
       }
-    } else if (action === 'help_check_updates') {
+      return;
+    case 'help_check_updates':
       debounced('help_check_updates', () => updateModal.checkForUpdates(false));
-    }
-  });
+      return;
+    case 'locale_changed':
+      (async () => {
+        await loadTranslations();
+        applyTranslations();
+        if (isEditor) statusBar.update(currentContent);
+      })();
+      return;
+  }
 
-  listen('switch-to-tags-tab', () => {
-    if (homeScreen) {
-      homeScreen.switchToTagsTab();
-    }
-  });
-}
+  // Editor専用アクション
+  if (!isEditor) return;
 
-if (isEditor) {
-  listen('content-update', async (event) => {
-    const update = event.payload as ContentUpdate;
-    if (update.body !== undefined) {
-      currentContent = update.body;
-      isDirty = false;
-      editorController.updateContent(update.body);
-      statusBar.update(update.body);
-    }
-    if (update.title !== undefined) {
-      currentTitle = update.title;
-      updateWindowTitle(currentTitle);
-    }
-  });
+  switch (action) {
+    case 'file_new_window':
+      debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
+      break;
+    case 'file_open':
+      debounced('file_open', () => openFileInNewWindow());
+      break;
+    case 'file_save':
+      debounced('file_save', () => doSave());
+      break;
+    case 'file_save_as':
+      debounced('file_save_as', () => doSaveAs());
+      break;
+    case 'file_reload':
+      debounced('file_reload', () => reloadCurrentFile());
+      break;
+    case 'file_export_pdf':
+      debounced('file_export_pdf', () => exportAsPdf(currentTitle));
+      break;
+    case 'file_export_html':
+      debounced('file_export_html', () => {
+        currentContent = editorController.getCurrentContent();
+        exportAsHtml(currentTitle, currentContent);
+      });
+      break;
+    case 'file_print':
+      debounced('file_print', () => window.print());
+      break;
+    case 'edit_copy_markdown':
+      debounced('edit_copy_markdown', () => copyAsMarkdown());
+      break;
+    case 'edit_copy_html':
+      debounced('edit_copy_html', () => copyAsHtml());
+      break;
+    case 'edit_copy_plaintext':
+      debounced('edit_copy_plaintext', () => copyAsPlaintext());
+      break;
+    case 'edit_find':
+      debounced('edit_find', () => {
+        if (findBar.isVisible()) {
+          findBar.hide();
+        } else {
+          findBar.show();
+        }
+      });
+      break;
+    case 'edit_find_replace':
+      debounced('edit_find_replace', () => {
+        if (findBar.isReplaceVisible()) {
+          findBar.hide();
+        } else {
+          findBar.showReplace();
+        }
+      });
+      break;
+    case 'edit_find_next':
+      findBar.show();
+      findBar.next();
+      break;
+    case 'edit_find_prev':
+      findBar.show();
+      findBar.prev();
+      break;
+    case 'view_status_bar':
+      debounced('view_status_bar', () => statusBar.toggle());
+      break;
+    case 'font_increase':
+      debounced('font_increase', () => fontSizeManager.increase());
+      break;
+    case 'font_decrease':
+      debounced('font_decrease', () => fontSizeManager.decrease());
+      break;
+    case 'tag_add':
+      debounced('tag_add', () => {
+        if (tagSidebar.isVisible()) {
+          tagSidebar.focusInput();
+        } else {
+          tagAddModal.show();
+        }
+      });
+      break;
+    case 'tag_edit':
+      debounced('tag_edit', () => tagSidebar.toggle());
+      break;
+  }
+});
 
-  // macOS のファイルオープンイベントで設定されたコンテンツを再確認する（競合状態の回避策）
-  setTimeout(async () => {
-    const [body, title, contentSet] = await invoke<[string, string, boolean]>('get_initial_content');
-    if (contentSet && body && body !== currentContent) {
-      currentContent = body;
-      currentTitle = title || 'Untitled';
-      editorController.updateContent(body);
-      updateWindowTitle(currentTitle);
-      statusBar.update(body);
-      isDirty = false;
+document.getElementById('scroll-area')!.addEventListener('dblclick', (e) => {
+  if (!isEditor) return;
+  const target = e.target as HTMLElement;
+  if (target.id === 'scroll-area' || target.id === 'content') {
+    const content = document.getElementById('content')!;
+    const lastBlock = content.querySelector('.md-block:last-of-type, .block-gap:last-child');
+    if (lastBlock) {
+      const lastBottom = lastBlock.getBoundingClientRect().bottom;
+      if (e.clientY <= lastBottom) return;
     }
-  }, 500);
+    e.preventDefault();
+    editorController.addBlockAtEnd();
+  }
+});
 
-  listen('menu-action', (event) => {
-    const { action, value } = event.payload as MenuAction;
+document.addEventListener('dragover', (e) => {
+  if (!isEditor) return;
+  e.preventDefault();
+  e.stopPropagation();
+});
 
-    switch (action) {
-      case 'file_new_window':
-        debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
-        break;
-      case 'file_open':
-        debounced('file_open', () => openFileInNewWindow());
-        break;
-      case 'file_save':
-        debounced('file_save', () => doSave());
-        break;
-      case 'file_save_as':
+document.addEventListener('drop', async (e) => {
+  if (!isEditor) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const file = e.dataTransfer?.files[0];
+  if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt'))) {
+    const text = await file.text();
+    currentContent = text;
+    currentTitle = file.name;
+    editorController.updateContent(text);
+    statusBar.update(text);
+    updateWindowTitle(currentTitle);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!isEditor) return;
+
+  if (e.key === 'Escape') {
+    if (findBar.isVisible()) {
+      findBar.hide();
+    }
+    return;
+  }
+
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+
+  const inTextarea = document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT';
+
+  switch (e.key) {
+    case 'z':
+      if (!inTextarea) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          editorController.redo();
+        } else {
+          editorController.undo();
+        }
+      }
+      break;
+    case 'n':
+      e.preventDefault();
+      debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
+      break;
+    case 'o':
+      e.preventDefault();
+      debounced('file_open', () => openFileInNewWindow());
+      break;
+    case 's':
+      e.preventDefault();
+      if (e.shiftKey) {
         debounced('file_save_as', () => doSaveAs());
-        break;
-      case 'file_reload':
-        debounced('file_reload', () => reloadCurrentFile());
-        break;
-      case 'file_export_pdf':
+      } else {
+        debounced('file_save', () => doSave());
+      }
+      break;
+    case 'r':
+      e.preventDefault();
+      debounced('file_reload', () => reloadCurrentFile());
+      break;
+    case 'e':
+    case 'E':
+      if (e.shiftKey) {
+        e.preventDefault();
         debounced('file_export_pdf', () => exportAsPdf(currentTitle));
-        break;
-      case 'file_export_html':
-        debounced('file_export_html', () => {
-          currentContent = editorController.getCurrentContent();
-          exportAsHtml(currentTitle, currentContent);
-        });
-        break;
-      case 'file_print':
-        debounced('file_print', () => window.print());
-        break;
-      case 'edit_copy_markdown':
-        debounced('edit_copy_markdown', () => copyAsMarkdown());
-        break;
-      case 'edit_copy_html':
-        debounced('edit_copy_html', () => copyAsHtml());
-        break;
-      case 'edit_copy_plaintext':
-        debounced('edit_copy_plaintext', () => copyAsPlaintext());
-        break;
-      case 'edit_find':
+      }
+      break;
+    case 'p':
+      e.preventDefault();
+      debounced('file_print', () => window.print());
+      break;
+    case 'f':
+      if (!inTextarea) {
+        e.preventDefault();
         debounced('edit_find', () => {
           if (findBar.isVisible()) {
             findBar.hide();
@@ -314,8 +458,11 @@ if (isEditor) {
             findBar.show();
           }
         });
-        break;
-      case 'edit_find_replace':
+      }
+      break;
+    case 'h':
+      if (!inTextarea) {
+        e.preventDefault();
         debounced('edit_find_replace', () => {
           if (findBar.isReplaceVisible()) {
             findBar.hide();
@@ -323,30 +470,28 @@ if (isEditor) {
             findBar.showReplace();
           }
         });
-        break;
-      case 'edit_find_next':
-        findBar.show();
-        findBar.next();
-        break;
-      case 'edit_find_prev':
+      }
+      break;
+    case 'g':
+      e.preventDefault();
+      if (e.shiftKey) {
         findBar.show();
         findBar.prev();
-        break;
-      case 'theme_change':
-        if (value === 'dark' || value === 'light' || value === 'auto') {
-          themeManager.setTheme(value);
-        }
-        break;
-      case 'view_status_bar':
-        debounced('view_status_bar', () => statusBar.toggle());
-        break;
-      case 'font_increase':
-        debounced('font_increase', () => fontSizeManager.increase());
-        break;
-      case 'font_decrease':
-        debounced('font_decrease', () => fontSizeManager.decrease());
-        break;
-      case 'tag_add':
+      } else {
+        findBar.show();
+        findBar.next();
+      }
+      break;
+    case 'C':
+    case 'c':
+      if (e.shiftKey && !inTextarea) {
+        e.preventDefault();
+        debounced('edit_copy_markdown', () => copyAsMarkdown());
+      }
+      break;
+    case 't':
+      if (!inTextarea) {
+        e.preventDefault();
         debounced('tag_add', () => {
           if (tagSidebar.isVisible()) {
             tagSidebar.focusInput();
@@ -354,184 +499,27 @@ if (isEditor) {
             tagAddModal.show();
           }
         });
-        break;
-      case 'tag_edit':
-        debounced('tag_edit', () => tagSidebar.toggle());
-        break;
-      case 'help_check_updates':
-        debounced('help_check_updates', () => updateModal.checkForUpdates(false));
-        break;
-      case 'locale_changed':
-        (async () => {
-          await loadTranslations();
-          applyTranslations();
-          statusBar.update(currentContent);
-        })();
-        break;
-    }
-  });
-
-  document.getElementById('scroll-area')!.addEventListener('dblclick', (e) => {
-    const target = e.target as HTMLElement;
-    if (target.id === 'scroll-area' || target.id === 'content') {
-      const content = document.getElementById('content')!;
-      const lastBlock = content.querySelector('.md-block:last-of-type, .block-gap:last-child');
-      if (lastBlock) {
-        const lastBottom = lastBlock.getBoundingClientRect().bottom;
-        if (e.clientY <= lastBottom) return;
       }
+      break;
+    case '=':
       e.preventDefault();
-      editorController.addBlockAtEnd();
+      debounced('font_increase', () => fontSizeManager.increase());
+      break;
+    case '-':
+      e.preventDefault();
+      debounced('font_decrease', () => fontSizeManager.decrease());
+      break;
+  }
+});
+
+getCurrentWindow().onCloseRequested(async (event) => {
+  if (isDirty) {
+    event.preventDefault();
+    const confirmed = confirm(t('ui.unsaved_confirm'));
+    if (confirmed) {
+      await getCurrentWindow().destroy();
     }
-  });
-
-  document.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-
-  document.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer?.files[0];
-    if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt'))) {
-      const text = await file.text();
-      currentContent = text;
-      currentTitle = file.name;
-      editorController.updateContent(text);
-      statusBar.update(text);
-      updateWindowTitle(currentTitle);
-    }
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (findBar.isVisible()) {
-        findBar.hide();
-      }
-      return;
-    }
-
-    const mod = e.metaKey || e.ctrlKey;
-    if (!mod) return;
-
-    const inTextarea = document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT';
-
-    switch (e.key) {
-      case 'z':
-        if (!inTextarea) {
-          e.preventDefault();
-          if (e.shiftKey) {
-            editorController.redo();
-          } else {
-            editorController.undo();
-          }
-        }
-        break;
-      case 'n':
-        e.preventDefault();
-        debounced('file_new_window', () => invoke('open_new_window', { file: null, body: '' }));
-        break;
-      case 'o':
-        e.preventDefault();
-        debounced('file_open', () => openFileInNewWindow());
-        break;
-      case 's':
-        e.preventDefault();
-        if (e.shiftKey) {
-          debounced('file_save_as', () => doSaveAs());
-        } else {
-          debounced('file_save', () => doSave());
-        }
-        break;
-      case 'r':
-        e.preventDefault();
-        debounced('file_reload', () => reloadCurrentFile());
-        break;
-      case 'e':
-      case 'E':
-        if (e.shiftKey) {
-          e.preventDefault();
-          debounced('file_export_pdf', () => exportAsPdf(currentTitle));
-        }
-        break;
-      case 'p':
-        e.preventDefault();
-        debounced('file_print', () => window.print());
-        break;
-      case 'f':
-        if (!inTextarea) {
-          e.preventDefault();
-          debounced('edit_find', () => {
-            if (findBar.isVisible()) {
-              findBar.hide();
-            } else {
-              findBar.show();
-            }
-          });
-        }
-        break;
-      case 'h':
-        if (!inTextarea) {
-          e.preventDefault();
-          debounced('edit_find_replace', () => {
-            if (findBar.isReplaceVisible()) {
-              findBar.hide();
-            } else {
-              findBar.showReplace();
-            }
-          });
-        }
-        break;
-      case 'g':
-        e.preventDefault();
-        if (e.shiftKey) {
-          findBar.show();
-          findBar.prev();
-        } else {
-          findBar.show();
-          findBar.next();
-        }
-        break;
-      case 'C':
-      case 'c':
-        if (e.shiftKey && !inTextarea) {
-          e.preventDefault();
-          debounced('edit_copy_markdown', () => copyAsMarkdown());
-        }
-        break;
-      case 't':
-        if (!inTextarea) {
-          e.preventDefault();
-          debounced('tag_add', () => {
-            if (tagSidebar.isVisible()) {
-              tagSidebar.focusInput();
-            } else {
-              tagAddModal.show();
-            }
-          });
-        }
-        break;
-      case '=':
-        e.preventDefault();
-        debounced('font_increase', () => fontSizeManager.increase());
-        break;
-      case '-':
-        e.preventDefault();
-        debounced('font_decrease', () => fontSizeManager.decrease());
-        break;
-    }
-  });
-
-  getCurrentWindow().onCloseRequested(async (event) => {
-    if (isDirty) {
-      event.preventDefault();
-      const confirmed = confirm(t('ui.unsaved_confirm'));
-      if (confirmed) {
-        await getCurrentWindow().destroy();
-      }
-    }
-  });
-}
+  }
+});
 
 })();

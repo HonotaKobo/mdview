@@ -352,12 +352,12 @@ fn open_about_window(app: &AppHandle) {
 }
 
 fn open_home_window(app: &AppHandle) {
-    // ホームウィンドウが既に存在するか確認
+    // ホームウィンドウ（content_explicitly_setがfalse）が既に存在するか確認
     let home_label = {
         let states = app.state::<crate::state::WindowStates>();
         let states = states.lock().unwrap();
         states.iter().find_map(|(label, s)| {
-            if s.window_mode == crate::state::WindowMode::Home {
+            if !s.content_explicitly_set {
                 Some(label.clone())
             } else {
                 None
@@ -376,12 +376,12 @@ fn open_home_window(app: &AppHandle) {
 }
 
 fn open_tag_manager(app: &AppHandle) {
-    // ホームウィンドウが存在するか確認（Homeモードのメインウィンドウ）
+    // ホームウィンドウ（content_explicitly_setがfalse）が存在するか確認
     let home_label = {
         let states = app.state::<crate::state::WindowStates>();
         let states = states.lock().unwrap();
         states.iter().find_map(|(label, s)| {
-            if s.window_mode == crate::state::WindowMode::Home {
+            if !s.content_explicitly_set {
                 Some(label.clone())
             } else {
                 None
@@ -398,12 +398,12 @@ fn open_tag_manager(app: &AppHandle) {
     } else {
         // 新しいホームウィンドウを作成
         let home_id = format!("home-{:04x}", crate::rand_u16());
-        let mut ws = crate::state::WindowState::new(
+        let ws = crate::state::WindowState::new(
             home_id.clone(),
             "tsumugi".to_string(),
             String::new(),
         );
-        ws.window_mode = crate::state::WindowMode::Home;
+        // content_explicitly_setはデフォルトfalseなのでそのままでOK
 
         let label = "main-home".to_string();
         {
