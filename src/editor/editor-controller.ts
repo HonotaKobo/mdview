@@ -34,7 +34,7 @@ export class EditorController {
   /** 編集モードに入る: コンテンツを解析して編集可能なブロックをレンダリング */
   enterEditMode(content: string): void {
     this.blocks = parseBlocks(content);
-    document.body.classList.add('edit-mode');
+    this.container.classList.add('cursor-default', 'min-h-full');
     this.undoStack = [content];
     this.redoStack = [];
     this.renderAllBlocks();
@@ -43,7 +43,7 @@ export class EditorController {
   /** 編集モードを終了: 現在の markdown コンテンツを返す */
   exitEditMode(): string {
     this.syncActiveBlock();
-    document.body.classList.remove('edit-mode');
+    this.container.classList.remove('cursor-default', 'min-h-full');
     return exportMarkdown(this.blocks);
   }
 
@@ -141,10 +141,10 @@ export class EditorController {
 
   private createGapElement(): HTMLElement {
     const gap = document.createElement('div');
-    gap.className = 'block-gap';
+    gap.className = 'group/gap relative h-2 flex items-center justify-center print:hidden';
 
     const addBtn = document.createElement('button');
-    addBtn.className = 'block-add-btn';
+    addBtn.className = 'absolute w-5 h-5 rounded-full border border-[var(--border-color)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-sm leading-none cursor-pointer opacity-0 transition-opacity duration-150 flex items-center justify-center z-5 group-hover/gap:opacity-100 hover:text-[var(--text-color)] hover:bg-[var(--bg-hover,var(--bg-secondary))] hover:border-[var(--text-secondary)]';
     addBtn.textContent = '+';
     addBtn.title = 'Add block';
     // mousedown 時に textarea がフォーカスを失うのを防止

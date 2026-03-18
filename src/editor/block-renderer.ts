@@ -19,7 +19,7 @@ export function setFootnoteContext(defs: string): void {
  */
 export function renderBlockElement(block: Block): HTMLElement {
   const wrapper = document.createElement('div');
-  wrapper.className = 'md-block';
+  wrapper.className = 'md-block group/block relative border-l-2 border-transparent [&.editing]:border-l-[var(--link-color)] pl-1.5 -ml-2 transition-[border-color] duration-150 rounded-sm';
   wrapper.dataset.blockKey = block.key;
   wrapper.dataset.blockType = block.type;
 
@@ -31,7 +31,7 @@ export function renderBlockElement(block: Block): HTMLElement {
 
   // 編集ボタン（ホバー時に表示）
   const editBtn = document.createElement('button');
-  editBtn.className = 'block-edit-btn';
+  editBtn.className = 'absolute top-1 -left-[26px] bg-transparent border-none rounded text-[var(--text-secondary)] cursor-pointer p-1 leading-none opacity-0 transition-opacity duration-150 z-10 group-hover/block:opacity-100 group-[.editing]/block:hidden hover:text-[var(--text-primary)] print:hidden';
   editBtn.innerHTML = EDIT_ICON;
   editBtn.title = 'Edit';
   editBtn.addEventListener('click', (e) => {
@@ -49,7 +49,7 @@ export function renderBlockElement(block: Block): HTMLElement {
 
   // プレビュー（レンダリング済みmarkdown）
   const preview = document.createElement('div');
-  preview.className = 'block-preview';
+  preview.className = 'block-preview group-[.editing]/block:hidden';
   renderPreview(block, preview);
   wrapper.appendChild(preview);
 
@@ -67,7 +67,7 @@ export function renderBlockElement(block: Block): HTMLElement {
 
   // ソース（textarea + toolbar、デフォルトで非表示）
   const source = document.createElement('div');
-  source.className = 'block-source';
+  source.className = 'block-source hidden group-[.editing]/block:block';
   renderSource(block, source);
   wrapper.appendChild(source);
 
@@ -144,7 +144,7 @@ function renderPreview(block: Block, preview: HTMLElement): void {
 function renderSource(block: Block, source: HTMLElement): void {
   // textarea — fence/mathの場合、区切り文字も編集領域に含める
   const textarea = document.createElement('textarea');
-  textarea.className = 'block-editor-textarea';
+  textarea.className = 'block-editor-textarea block w-full min-h-[1.6em] p-2 m-0 border border-[var(--border-color)] rounded bg-[var(--bg-secondary)] text-[var(--text-color)] font-[var(--font-mono)] text-sm leading-normal resize-none overflow-hidden box-border focus:outline-none focus:border-[var(--link-color)]';
 
   if (block.type === 'fence') {
     textarea.value = '```' + (block.lang || '') + '\n' + block.text + '\n```';
@@ -175,7 +175,7 @@ function autoResize(textarea: HTMLTextAreaElement): void {
 
 function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
   const toolbar = document.createElement('div');
-  toolbar.className = 'block-editor-toolbar';
+  toolbar.className = 'flex gap-0.5 pt-1';
 
   // インライン書式ボタン
   const inlineButtons: { html: string; title: string; prefix: string; suffix: string }[] = [
@@ -193,7 +193,7 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
   for (const btn of inlineButtons) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'toolbar-btn';
+    button.className = 'py-0.5 px-2 border border-[var(--border-color)] rounded-[3px] bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs leading-[1.4] cursor-pointer select-none hover:text-[var(--text-color)] hover:bg-[var(--bg-hover,var(--bg-secondary))] hover:border-[var(--text-secondary)]';
     button.innerHTML = btn.html;
     button.title = btn.title;
     button.addEventListener('mousedown', (e) => {
@@ -205,7 +205,7 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
 
   // 区切り
   const sep = document.createElement('span');
-  sep.className = 'toolbar-sep';
+  sep.className = 'w-px h-[18px] bg-[var(--border-color)] mx-1 self-center';
   toolbar.appendChild(sep);
 
   // 行頭プレフィックスボタン
@@ -221,7 +221,7 @@ function createToolbar(textarea: HTMLTextAreaElement): HTMLElement {
   for (const btn of lineButtons) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'toolbar-btn';
+    button.className = 'py-0.5 px-2 border border-[var(--border-color)] rounded-[3px] bg-[var(--bg-secondary)] text-[var(--text-secondary)] text-xs leading-[1.4] cursor-pointer select-none hover:text-[var(--text-color)] hover:bg-[var(--bg-hover,var(--bg-secondary))] hover:border-[var(--text-secondary)]';
     button.innerHTML = btn.html;
     button.title = btn.title;
     button.addEventListener('mousedown', (e) => {
