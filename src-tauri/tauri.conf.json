@@ -38,6 +38,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["app", "nsis"],
     "icon": [
       "icons/32x32.png",
