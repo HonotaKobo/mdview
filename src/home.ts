@@ -48,9 +48,7 @@ export class HomeScreen {
     if (screen) screen.remove();
     const bar = document.getElementById('home-status-bar');
     if (bar) bar.remove();
-    // エディタ要素を再表示
-    const findBarEl = document.getElementById('find-bar');
-    if (findBarEl) findBarEl.style.display = '';
+    // エディタ要素を再表示（find-barはFindBarクラスが管理するため触らない）
     const mainArea = document.getElementById('main-area');
     if (mainArea) mainArea.style.display = '';
     const statusBarEl = document.getElementById('status-bar');
