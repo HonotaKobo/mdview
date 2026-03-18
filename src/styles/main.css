@@ -65,25 +65,27 @@
   --link-color-subtle-hover: rgba(88, 166, 255, 0.14);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-html,
-body {
-  height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans',
-    Helvetica, Arial, sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
+  html,
+  body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans',
+      Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
 
-body {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 }
 
 /* ==ハイライト== (markdown-it-mark) */
