@@ -26,7 +26,7 @@ pub type RecentState = Mutex<RecentStore>;
 impl RecentStore {
     pub fn load() -> Self {
         let file_path = Self::storage_path();
-        let data = if file_path.exists() {
+        let mut data = if file_path.exists() {
             match std::fs::read_to_string(&file_path) {
                 Ok(json) => serde_json::from_str(&json).unwrap_or(RecentData {
                     version: 1,
