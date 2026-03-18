@@ -317,14 +317,14 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
     const code = block.querySelector('code');
     const source = code ? code.textContent || '' : '';
     const wrapper = document.createElement('div');
-    wrapper.className = 'mermaid-container';
+    wrapper.className = 'mb-4 text-center overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto';
 
     try {
       const id = `mermaid-${mermaidCounter++}`;
       const { svg } = await mermaid.render(id, source);
       wrapper.innerHTML = sanitizeHtml(svg);
     } catch {
-      wrapper.innerHTML = `<pre class="mermaid-error"><code>${escapeHtml(source)}</code></pre>`;
+      wrapper.innerHTML = `<pre class="text-[var(--danger-color)] border-[var(--danger-color)]"><code>${escapeHtml(source)}</code></pre>`;
     }
 
     block.replaceWith(wrapper);
@@ -338,12 +338,12 @@ export function addCopyButtons(container: HTMLElement): void {
   const preBlocks = container.querySelectorAll('pre');
   for (const pre of preBlocks) {
     const wrapper = document.createElement('div');
-    wrapper.className = 'code-block-wrapper';
+    wrapper.className = 'group/code relative';
     pre.parentNode!.insertBefore(wrapper, pre);
     wrapper.appendChild(pre);
 
     const btn = document.createElement('button');
-    btn.className = 'code-copy-btn';
+    btn.className = 'absolute top-2 right-2 p-1 text-xs text-[var(--text-secondary)] bg-transparent border-none rounded cursor-pointer opacity-0 transition-opacity duration-150 leading-[0] z-1 group-hover/code:opacity-100 hover:text-[var(--text-primary)]';
     btn.innerHTML = COPY_ICON;
     btn.addEventListener('click', async () => {
       const code = pre.querySelector('code');
