@@ -93,9 +93,6 @@ pub fn build_menu(app: &AppHandle, i18n: &I18n) -> tauri::Result<tauri::menu::Me
             .build(app)?)
         .item(&MenuItemBuilder::with_id("tag_edit", i18n.t("menu.tag_edit"))
             .build(app)?)
-        .separator()
-        .item(&MenuItemBuilder::with_id("tag_manage", i18n.t("menu.tag_manage"))
-            .build(app)?)
         .build()?;
 
     // --- 表示メニュー ---
@@ -231,11 +228,7 @@ pub fn execute_action(app: &AppHandle, id: &str) {
             open_home_window(app);
         }
 
-        "tag_manage" => {
-            open_tag_manager(app);
-        }
-
-        "help_check_updates" => {
+"help_check_updates" => {
             let _ = app.emit_to(&focused_label as &str, "menu-action", serde_json::json!({ "action": "help_check_updates" }));
         }
 
@@ -375,65 +368,6 @@ fn open_home_window(app: &AppHandle) {
     }
 }
 
-fn open_tag_manager(app: &AppHandle) {
-    // ホームウィンドウ（content_explicitly_setがfalse）が存在するか確認
-    let home_label = {
-        let states = app.state::<crate::state::WindowStates>();
-        let states = states.lock().unwrap();
-        states.iter().find_map(|(label, s)| {
-            if !s.content_explicitly_set {
-                Some(label.clone())
-            } else {
-                None
-            }
-        })
-    };
-
-    if let Some(label) = home_label {
-        // 既存のホームウィンドウにフォーカスし、タグタブに切り替え
-        if let Some(window) = app.get_webview_window(&label) {
-            let _ = window.set_focus();
-            let _ = app.emit_to(&label, "switch-to-tags-tab", ());
-        }
-    } else {
-        // 新しいホームウィンドウを作成
-        let home_id = format!("home-{:04x}", crate::rand_u16());
-        let ws = crate::state::WindowState::new(
-            home_id.clone(),
-            "tsumugi".to_string(),
-            String::new(),
-        );
-        // content_explicitly_setはデフォルトfalseなのでそのままでOK
-
-        let label = "main-home".to_string();
-        {
-            let states = app.state::<crate::state::WindowStates>();
-            states.lock().unwrap().insert(label.clone(), ws);
-        }
-
-        let app = app.clone();
-        std::thread::spawn(move || {
-            #[allow(unused_variables)]
-            if let Ok(window) = tauri::WebviewWindowBuilder::new(
-                &app,
-                &label,
-                tauri::WebviewUrl::App("index.html".into()),
-            )
-            .title("tsumugi")
-            .inner_size(900.0, 700.0)
-            .min_inner_size(400.0, 300.0)
-            .build()
-            {
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = window.set_decorations(false);
-                }
-                // ウィンドウの準備完了後にタグタブに切り替え
-                let _ = app.emit_to(&label as &str, "switch-to-tags-tab", ());
-            }
-        });
-    }
-}
 
 fn update_theme_checks(app: &AppHandle, selected_id: &str) {
     for id in &["theme_dark", "theme_light", "theme_auto"] {

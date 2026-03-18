@@ -43,6 +43,10 @@ impl RecentStore {
                 entries: vec![],
             }
         };
+        // 既存エントリのパスを正規化（\\?\ プレフィックス除去）
+        for entry in &mut data.entries {
+            entry.path = crate::normalize_path(&entry.path);
+        }
         Self {
             data,
             file_path,
@@ -74,6 +78,7 @@ impl RecentStore {
     }
 
     pub fn add(&mut self, path: &str, title: &str) {
+        let path = crate::normalize_path(path);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()

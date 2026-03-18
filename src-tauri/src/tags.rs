@@ -43,6 +43,10 @@ impl TagStore {
                 entries: vec![],
             }
         };
+        // 既存エントリのパスを正規化（\\?\ プレフィックス除去）
+        for entry in &mut data.entries {
+            entry.path = crate::normalize_path(&entry.path);
+        }
         Self { data, file_path }
     }
 

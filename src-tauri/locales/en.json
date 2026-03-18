@@ -37,7 +37,6 @@
     "tag": "Tag",
     "tag_add": "Add Tag",
     "tag_edit": "Edit Tags",
-    "tag_manage": "Manage Tags...",
     "help": "Help",
     "help_check_updates": "Check for Updates...",
     "help_about": "About tsumugi"
@@ -62,7 +61,6 @@
     "status_read_time_short": "< 1 min read",
     "status_tag_add": "Add Tag",
     "status_tag_edit": "Edit Tags",
-    "status_tag_manage": "Manage Tags",
     "tag_sidebar_title": "Tags",
     "tag_input_placeholder": "New tag...",
     "tag_add_action": "Add",
@@ -96,7 +94,6 @@
     "tm_sort_count": "Count",
     "tm_memo_placeholder": "Memo...",
     "tm_memo_header": "Memo",
-    "tm_title": "Tag Manager — tsumugi",
     "home_tab": "Home",
     "home_tags_tab": "Tags",
     "home_greeting": "Welcome",

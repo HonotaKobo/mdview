@@ -26,9 +26,6 @@ export class StatusBar {
     document.getElementById('status-tag-edit')?.addEventListener('click', () => {
       invoke('execute_menu_action', { id: 'tag_edit' });
     });
-    document.getElementById('status-tag-manage')?.addEventListener('click', () => {
-      invoke('execute_menu_action', { id: 'tag_manage' });
-    });
   }
 
   isVisible(): boolean {
@@ -67,9 +64,6 @@ export class StatusBar {
     editEl.textContent = t('ui.status_tag_edit');
     editEl.title = t('menu.tag_edit');
 
-    const manageEl = document.getElementById('status-tag-manage')!;
-    manageEl.textContent = t('ui.status_tag_manage');
-    manageEl.title = t('menu.tag_manage');
   }
 }
 

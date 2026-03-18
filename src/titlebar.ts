@@ -128,8 +128,6 @@ export class CustomTitleBar {
         items: [
           { type: 'normal', id: 'tag_add', label: this.t('menu.tag_add'), accelerator: 'Ctrl+T' },
           { type: 'normal', id: 'tag_edit', label: this.t('menu.tag_edit') },
-          { type: 'separator' },
-          { type: 'normal', id: 'tag_manage', label: this.t('menu.tag_manage') },
         ],
       },
       {
