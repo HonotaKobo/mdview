@@ -1,20 +1,26 @@
 import { renderMarkdown } from '../renderer';
 
 /**
- * EditorController はビューモードとエディットモードを管理する。
+ * EditorController はビューモード、エディットモード、スプリットモードを管理する。
  * ビューモード: renderMarkdown() でレンダリングし、フォーム要素は操作可能。
  * エディットモード: 1つの textarea に raw Markdown 全体を表示して編集。
+ * スプリットモード: 左にエディタ、右にプレビューをリアルタイム表示。
  */
 export class EditorController {
   private container: HTMLElement;
-  private mode: 'view' | 'edit' = 'view';
+  private mode: 'view' | 'edit' | 'split' = 'view';
   private currentContent: string = '';
   private onContentChange: ((markdown: string) => void) | null = null;
-  private onModeChange: ((mode: 'view' | 'edit') => void) | null = null;
+  private onModeChange: ((mode: 'view' | 'edit' | 'split') => void) | null = null;
 
   /** Undo/Redo スタック（markdown スナップショット）*/
   private undoStack: string[] = [];
   private redoStack: string[] = [];
+
+  /** スプリットモードのプレビューコンテナ */
+  private splitPreviewContainer: HTMLElement | null = null;
+  /** スプリットプレビューのデバウンスタイマー */
+  private splitPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -26,7 +32,7 @@ export class EditorController {
   }
 
   /** モード変更時のコールバックを設定 */
-  setOnModeChange(cb: (mode: 'view' | 'edit') => void): void {
+  setOnModeChange(cb: (mode: 'view' | 'edit' | 'split') => void): void {
     this.onModeChange = cb;
   }
 
@@ -62,9 +68,11 @@ export class EditorController {
     this.redoStack = [];
     if (this.mode === 'view') {
       this.renderView();
+    } else if (this.mode === 'split') {
+      this.updateTextarea(content);
+      this.renderSplitPreview();
     } else {
-      const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
-      if (textarea) textarea.value = content;
+      this.updateTextarea(content);
     }
   }
 
@@ -72,6 +80,7 @@ export class EditorController {
   switchToView(): void {
     if (this.mode === 'view') return;
     this.syncFromEdit();
+    this.splitPreviewContainer = null;
     this.mode = 'view';
     // undoスタックにエディット結果を追加（変更がある場合）
     if (this.undoStack.length === 0 || this.undoStack[this.undoStack.length - 1] !== this.currentContent) {
@@ -88,10 +97,22 @@ export class EditorController {
   /** エディットモードに切替 */
   switchToEdit(): void {
     if (this.mode === 'edit') return;
+    this.syncFromEdit();
     this.syncFormInputs();
+    this.splitPreviewContainer = null;
     this.mode = 'edit';
     this.renderEdit();
     if (this.onModeChange) this.onModeChange('edit');
+  }
+
+  /** スプリットモードに切替 */
+  switchToSplit(): void {
+    if (this.mode === 'split') return;
+    this.syncFromEdit();
+    this.syncFormInputs();
+    this.mode = 'split';
+    this.renderSplit();
+    if (this.onModeChange) this.onModeChange('split');
   }
 
   /** 最後の変更を元に戻す */
@@ -104,8 +125,8 @@ export class EditorController {
     if (this.mode === 'view') {
       this.renderView();
     } else {
-      const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
-      if (textarea) textarea.value = prev;
+      this.updateTextarea(prev);
+      if (this.mode === 'split') this.debouncedRenderSplitPreview();
     }
     if (this.onContentChange) this.onContentChange(prev);
   }
@@ -119,8 +140,8 @@ export class EditorController {
     if (this.mode === 'view') {
       this.renderView();
     } else {
-      const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
-      if (textarea) textarea.value = next;
+      this.updateTextarea(next);
+      if (this.mode === 'split') this.debouncedRenderSplitPreview();
     }
     if (this.onContentChange) this.onContentChange(next);
   }
@@ -180,18 +201,110 @@ export class EditorController {
 
   private renderEdit(): void {
     this.container.textContent = '';
+    this.buildEditUI(this.container, false);
+  }
+
+  /** スプリットモードのレンダリング */
+  private renderSplit(): void {
+    this.container.textContent = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'split-wrapper';
+
+    // 左ペイン: エディタ
+    const editPane = document.createElement('div');
+    editPane.className = 'split-pane split-edit-pane';
+    this.buildEditUI(editPane, true);
+
+    // 右ペイン: プレビュー
+    const previewPane = document.createElement('div');
+    previewPane.className = 'split-pane split-preview-pane';
+    this.splitPreviewContainer = previewPane;
+
+    wrapper.appendChild(editPane);
+    wrapper.appendChild(previewPane);
+    this.container.appendChild(wrapper);
+
+    this.renderSplitPreview();
+  }
+
+  /** スプリットプレビューパネルのみ再レンダリング */
+  private renderSplitPreview(): void {
+    if (!this.splitPreviewContainer) return;
+    renderMarkdown(this.currentContent, this.splitPreviewContainer);
+  }
+
+  /** デバウンス付きスプリットプレビュー更新 */
+  private debouncedRenderSplitPreview(): void {
+    if (this.splitPreviewTimer) clearTimeout(this.splitPreviewTimer);
+    this.splitPreviewTimer = setTimeout(() => {
+      this.splitPreviewTimer = null;
+      this.renderSplitPreview();
+    }, 300);
+  }
+
+  /**
+   * エディタUI（行番号 + textarea）を指定コンテナに構築する。
+   * isSplit=true の場合、input イベントでスプリットプレビューも更新する。
+   */
+  private buildEditUI(target: HTMLElement, isSplit: boolean): void {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'editor-wrapper';
+
+    const lineNumbers = document.createElement('div');
+    lineNumbers.className = 'line-numbers';
+
     const textarea = document.createElement('textarea');
     textarea.className = 'editor-textarea';
     textarea.value = this.currentContent;
     textarea.spellcheck = false;
+
     textarea.addEventListener('input', () => {
       this.currentContent = textarea.value;
+      this.updateLineNumbers();
+      if (isSplit) this.debouncedRenderSplitPreview();
       if (this.onContentChange) {
         this.onContentChange(this.currentContent);
       }
     });
-    this.container.appendChild(textarea);
+
+    // スクロール同期（行番号とtextarea間）
+    textarea.addEventListener('scroll', () => {
+      lineNumbers.scrollTop = textarea.scrollTop;
+    });
+
+    wrapper.appendChild(lineNumbers);
+    wrapper.appendChild(textarea);
+    target.appendChild(wrapper);
+
+    this.updateLineNumbers();
     textarea.focus();
+  }
+
+  /** textarea の値を更新し行番号も再描画する共通ヘルパー */
+  private updateTextarea(content: string): void {
+    const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
+    if (textarea) {
+      textarea.value = content;
+      this.updateLineNumbers();
+    }
+  }
+
+  /** 行番号を textarea の内容に合わせて更新 */
+  private updateLineNumbers(): void {
+    const lineNumbers = this.container.querySelector('.line-numbers');
+    const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
+    if (!lineNumbers || !textarea) return;
+
+    const count = textarea.value.split('\n').length;
+    const fragment = document.createDocumentFragment();
+    for (let i = 1; i <= count; i++) {
+      const span = document.createElement('span');
+      span.textContent = String(i);
+      fragment.appendChild(span);
+    }
+    lineNumbers.textContent = '';
+    lineNumbers.appendChild(fragment);
   }
 
   // --- フォーム操作 ---
@@ -214,9 +327,9 @@ export class EditorController {
     });
   }
 
-  /** エディットモードの textarea の値を currentContent に同期 */
+  /** エディット/スプリットモードの textarea の値を currentContent に同期 */
   private syncFromEdit(): void {
-    if (this.mode !== 'edit') return;
+    if (this.mode !== 'edit' && this.mode !== 'split') return;
     const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
     if (textarea) this.currentContent = textarea.value;
   }

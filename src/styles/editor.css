@@ -6,10 +6,37 @@ body.edit-mode #content {
   min-height: 100%;
 }
 
+/* エディタラッパー: 行番号 + textarea を横並び */
+.editor-wrapper {
+  display: flex;
+  min-height: calc(100vh - 100px);
+}
+
+/* 行番号 */
+.line-numbers {
+  flex-shrink: 0;
+  min-width: 3em;
+  padding: 0 8px 0 0;
+  text-align: right;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  user-select: none;
+  overflow: hidden;
+  border-right: 1px solid var(--border-color);
+  margin-right: 12px;
+}
+
+.line-numbers span {
+  display: block;
+}
+
 /* エディットモード用テキストエリア */
 .editor-textarea {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: calc(100vh - 100px);
   padding: 0;
   margin: 0;
@@ -29,4 +56,33 @@ body.edit-mode #content {
   .editor-textarea {
     display: none !important;
   }
+}
+
+/* スプリットラッパー: 左右2ペイン */
+.split-wrapper {
+  display: flex;
+  min-height: calc(100vh - 100px);
+  height: 100%;
+}
+
+.split-pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.split-edit-pane {
+  border-right: 1px solid var(--border-color);
+}
+
+.split-edit-pane .editor-wrapper {
+  min-height: 100%;
+}
+
+.split-preview-pane {
+  padding: 24px 32px;
+}
+
+@media print {
+  .split-wrapper { display: none !important; }
 }

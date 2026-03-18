@@ -88,12 +88,24 @@ editorController.setOnContentChange((markdown) => {
 statusBar.setOnModeChange((mode) => {
   if (!isEditor) return;
   if (mode === 'view') editorController.switchToView();
-  else editorController.switchToEdit();
+  else if (mode === 'edit') editorController.switchToEdit();
+  else editorController.switchToSplit();
 });
 
 editorController.setOnModeChange((mode) => {
   statusBar.setActiveTab(mode);
 });
+
+// リサイズ時にSplitタブの表示/非表示を制御し、狭い画面ではEditに自動切替
+function handleResize(): void {
+  if (!isEditor) return;
+  statusBar.updateSplitTabVisibility();
+  if (window.innerWidth < 800 && statusBar.getActiveMode() === 'split') {
+    editorController.switchToEdit();
+  }
+}
+window.addEventListener('resize', handleResize);
+handleResize();
 
 function updateWindowTitle(title: string) {
   getCurrentWindow().setTitle(`${title} — tsumugi`);

@@ -572,7 +572,14 @@ mark.find-highlight.active {
 
 .mode-tab:last-child {
   border-radius: 0 3px 3px 0;
+}
+
+.mode-tab:not(:first-child) {
   border-left: none;
+}
+
+.mode-tab.mode-tab-end {
+  border-radius: 0 3px 3px 0;
 }
 
 .mode-tab.active {

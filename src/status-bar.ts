@@ -6,7 +6,7 @@ export class StatusBar {
   private charCountEl: HTMLElement;
   private wordCountEl: HTMLElement;
   private readTimeEl: HTMLElement;
-  private onModeChangeCb: ((mode: 'view' | 'edit') => void) | null = null;
+  private onModeChangeCb: ((mode: 'view' | 'edit' | 'split') => void) | null = null;
 
   constructor() {
     this.bar = document.getElementById('status-bar')!;
@@ -21,6 +21,9 @@ export class StatusBar {
     document.getElementById('mode-edit')?.addEventListener('click', () => {
       if (this.onModeChangeCb) this.onModeChangeCb('edit');
     });
+    document.getElementById('mode-split')?.addEventListener('click', () => {
+      if (this.onModeChangeCb) this.onModeChangeCb('split');
+    });
 
     document.getElementById('status-tag-add')?.addEventListener('click', () => {
       invoke('execute_menu_action', { id: 'tag_add' });
@@ -31,14 +34,35 @@ export class StatusBar {
   }
 
   /** モード切替タブクリック時のコールバックを設定 */
-  setOnModeChange(cb: (mode: 'view' | 'edit') => void): void {
+  setOnModeChange(cb: (mode: 'view' | 'edit' | 'split') => void): void {
     this.onModeChangeCb = cb;
   }
 
   /** タブの active 状態を切替 */
-  setActiveTab(mode: 'view' | 'edit'): void {
+  setActiveTab(mode: 'view' | 'edit' | 'split'): void {
     document.getElementById('mode-view')?.classList.toggle('active', mode === 'view');
     document.getElementById('mode-edit')?.classList.toggle('active', mode === 'edit');
+    document.getElementById('mode-split')?.classList.toggle('active', mode === 'split');
+  }
+
+  /** 現在のアクティブモードを返す */
+  getActiveMode(): 'view' | 'edit' | 'split' {
+    if (document.getElementById('mode-split')?.classList.contains('active')) return 'split';
+    if (document.getElementById('mode-edit')?.classList.contains('active')) return 'edit';
+    return 'view';
+  }
+
+  /** 画面幅に応じてSplitタブの表示/非表示を制御 */
+  updateSplitTabVisibility(): void {
+    const splitTab = document.getElementById('mode-split');
+    if (!splitTab) return;
+    const narrow = window.innerWidth < 800;
+    splitTab.style.display = narrow ? 'none' : '';
+    // Splitが非表示の時、Editタブに右端の丸みを付ける
+    const editTab = document.getElementById('mode-edit');
+    if (editTab) {
+      editTab.classList.toggle('mode-tab-end', narrow);
+    }
   }
 
   update(markdown: string): void {
