@@ -30,8 +30,10 @@
     "mermaid": "^11.13.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
     "@tauri-apps/cli": "^2",
     "@types/markdown-it": "^14",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5",
     "vite": "^5"
   }

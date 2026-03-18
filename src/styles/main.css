@@ -1,3 +1,30 @@
+/* Tailwind CSS 4 — preflight は既存CSSと競合するためスキップ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+
+@theme {
+  --color-primary-50:  #f0f5ff;
+  --color-primary-100: #dde8ff;
+  --color-primary-200: #c0d4ff;
+  --color-primary-300: #95b6ff;
+  --color-primary-400: #6492ff;
+  --color-primary-500: #2b70ef;
+  --color-primary-600: #2250df;
+  --color-primary-700: #1a40b5;
+  --color-primary-800: #13318d;
+  --color-primary-900: #0e266a;
+  --color-primary-950: #07194e;
+
+  --color-body: #3d4b5f;
+
+  --font-sans: "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+}
+
+/* === 以下、既存 CSS === */
+
 :root[data-theme='light'] {
   --bg-primary: #ffffff;
   --bg-secondary: #f6f8fa;

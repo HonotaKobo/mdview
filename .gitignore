@@ -8,8 +8,14 @@ src-tauri/target/
 # Auto-generated
 src-tauri/gen/
 
-# Design docs / local docs
-docs/
+# Temp / local docs
+temp/
+
+# Design system (melta UI) — not tracked
+design-system/
+
+# Claude Code
+CLAUDE.md
 
 # Tool/IDE
 .cocoindex_code/
