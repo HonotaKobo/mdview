@@ -21,20 +21,16 @@ use watcher::{FileWatcher, FileWatchers};
 
 /// 正規化されたパスからWindowsの拡張パスプレフィックス (`\\?\`) を除去する。
 pub(crate) fn normalize_path(path: &str) -> String {
-    #[cfg(target_os = "windows")]
-    {
-        if let Some(stripped) = path.strip_prefix(r"\\?\") {
-            return stripped.to_string();
-        }
-    }
-    path.to_string()
+    dunce::simplified(std::path::Path::new(path))
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// 既存の "main" ウィンドウにファイルを読み込む。
 /// 新しいウィンドウの生成・破棄を行わないため、
 /// macOSのウィンドウ状態復元中のコールバックと衝突しない。
 fn load_file_into_window(app: &tauri::AppHandle, file_path: &str) -> Result<(), String> {
-    let abs_path = std::fs::canonicalize(file_path)
+    let abs_path = dunce::canonicalize(file_path)
         .unwrap_or_else(|_| std::path::PathBuf::from(file_path));
     let abs_str = normalize_path(&abs_path.to_string_lossy());
 
@@ -122,7 +118,7 @@ pub(crate) fn open_document_window(
 
     // コンテンツを解決
     let (content, doc_title, file_path) = if let Some(ref f) = file {
-        let abs_path = std::fs::canonicalize(f)
+        let abs_path = dunce::canonicalize(f)
             .unwrap_or_else(|_| std::path::PathBuf::from(f));
         let abs_str = normalize_path(&abs_path.to_string_lossy());
         match std::fs::read_to_string(&abs_path) {
@@ -341,7 +337,7 @@ pub fn run() {
     let (resolved_content, resolved_title, resolved_file_path) = if !initial_content.is_empty() {
         (initial_content.clone(), initial_title.clone(), None)
     } else if let Some(ref file_path) = initial_file {
-        let abs_path = std::fs::canonicalize(file_path)
+        let abs_path = dunce::canonicalize(file_path)
             .unwrap_or_else(|_| std::path::PathBuf::from(file_path));
         let abs_path_str = normalize_path(&abs_path.to_string_lossy());
         match std::fs::read_to_string(&abs_path) {
@@ -593,7 +589,7 @@ fn write_port_file(path: &std::path::Path, content: &str) {
 }
 
 fn file_to_id(file: &str) -> String {
-    let canonical = std::fs::canonicalize(file)
+    let canonical = dunce::canonicalize(file)
         .unwrap_or_else(|_| std::path::PathBuf::from(file));
     let path_str = canonical.to_string_lossy();
     let mut hasher = std::collections::hash_map::DefaultHasher::new();

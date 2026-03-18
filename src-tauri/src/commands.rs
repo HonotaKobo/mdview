@@ -15,12 +15,12 @@ fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
     let p = std::path::Path::new(path);
 
     // 正規パスに解決（シンボリックリンク、.. などを解決）
-    let canonical = std::fs::canonicalize(p).or_else(|_| {
+    let canonical = dunce::canonicalize(p).or_else(|_| {
         // 新規ファイルの場合: 親ディレクトリを正規化
         p.parent()
             .ok_or_else(|| "Invalid path".to_string())
             .and_then(|parent| {
-                std::fs::canonicalize(parent).map_err(|e| format!("Invalid path: {}", e))
+                dunce::canonicalize(parent).map_err(|e| format!("Invalid path: {}", e))
             })
             .map(|cp| cp.join(p.file_name().unwrap_or_default()))
     })?;
@@ -104,7 +104,7 @@ pub fn rename_file(old_path: String, new_path: String, window: tauri::Window, st
     let new_path = validate_path(&new_path)?.to_string_lossy().to_string();
     std::fs::rename(&old_path, &new_path)
         .map_err(|e| format!("Failed to rename: {}", e))?;
-    let abs_path = std::fs::canonicalize(&new_path)
+    let abs_path = dunce::canonicalize(&new_path)
         .unwrap_or_else(|_| std::path::PathBuf::from(&new_path));
     let abs_path_str = crate::normalize_path(&abs_path.to_string_lossy());
     let mut states = states.lock().unwrap();
