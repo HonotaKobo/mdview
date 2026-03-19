@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use clap::Parser;
-use tauri::Manager as _;
+#[allow(unused_imports)]
+use tauri::{Emitter as _, Manager as _};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use recent::{RecentState, RecentStore};
 use state::{LastFocusedDoc, WindowState, WindowStates};
