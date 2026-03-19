@@ -535,6 +535,16 @@ mark.find-highlight.active {
   width: 100%;
 }
 
+body.split-mode #scroll-area {
+  overflow: hidden;
+}
+
+body.split-mode #content {
+  max-width: none;
+  padding: 0;
+  height: 100%;
+}
+
 /* ステータスバー */
 #status-bar {
   display: flex;

@@ -61,7 +61,6 @@ body.edit-mode #content {
 /* スプリットラッパー: 左右2ペイン */
 .split-wrapper {
   display: flex;
-  min-height: calc(100vh - 100px);
   height: 100%;
 }
 
@@ -72,7 +71,8 @@ body.edit-mode #content {
 }
 
 .split-edit-pane {
-  border-right: 1px solid var(--border-color);
+  border-right: none;
+  padding: 24px 32px;
 }
 
 .split-edit-pane .editor-wrapper {
@@ -81,6 +81,19 @@ body.edit-mode #content {
 
 .split-preview-pane {
   padding: 24px 32px;
+}
+
+/* ドラッグリサイザー */
+.split-resizer {
+  width: 6px;
+  cursor: ew-resize;
+  background: var(--border-color);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.split-resizer:hover {
+  background: var(--link-color);
 }
 
 @media print {

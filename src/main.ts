@@ -1,6 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow, LogicalSize, currentMonitor } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { ThemeManager } from './theme';
 import { handleSave, handleSaveAs } from './save';
@@ -92,8 +92,26 @@ statusBar.setOnModeChange((mode) => {
   else editorController.switchToSplit();
 });
 
-editorController.setOnModeChange((mode) => {
+let savedWindowWidth: number | null = null;
+
+editorController.setOnModeChange(async (mode) => {
   statusBar.setActiveTab(mode);
+
+  if (mode === 'split') {
+    // 現在のウィンドウサイズを保存
+    const size = await getCurrentWindow().innerSize();
+    savedWindowWidth = size.width;
+    // スクリーンサイズを考慮して拡張（最大でスクリーン幅の95%）
+    const monitor = await currentMonitor();
+    const screenWidth = monitor?.size.width ?? 1920;
+    const newWidth = Math.min(size.width * 2, Math.floor(screenWidth * 0.95));
+    await getCurrentWindow().setSize(new LogicalSize(newWidth, size.height));
+  } else if (savedWindowWidth !== null) {
+    // 元の幅に復元
+    const size = await getCurrentWindow().innerSize();
+    await getCurrentWindow().setSize(new LogicalSize(savedWindowWidth, size.height));
+    savedWindowWidth = null;
+  }
 });
 
 // リサイズ時にSplitタブの表示/非表示を制御し、狭い画面ではEditに自動切替

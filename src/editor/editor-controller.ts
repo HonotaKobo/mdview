@@ -51,6 +51,7 @@ export class EditorController {
     this.syncFormInputs();
     this.syncFromEdit();
     document.body.classList.remove('edit-mode');
+    document.body.classList.remove('split-mode');
     return this.currentContent;
   }
 
@@ -82,6 +83,7 @@ export class EditorController {
     this.syncFromEdit();
     this.splitPreviewContainer = null;
     this.mode = 'view';
+    document.body.classList.remove('split-mode');
     // undoスタックにエディット結果を追加（変更がある場合）
     if (this.undoStack.length === 0 || this.undoStack[this.undoStack.length - 1] !== this.currentContent) {
       this.undoStack.push(this.currentContent);
@@ -101,6 +103,7 @@ export class EditorController {
     this.syncFormInputs();
     this.splitPreviewContainer = null;
     this.mode = 'edit';
+    document.body.classList.remove('split-mode');
     this.renderEdit();
     if (this.onModeChange) this.onModeChange('edit');
   }
@@ -111,6 +114,7 @@ export class EditorController {
     this.syncFromEdit();
     this.syncFormInputs();
     this.mode = 'split';
+    document.body.classList.add('split-mode');
     this.renderSplit();
     if (this.onModeChange) this.onModeChange('split');
   }
@@ -216,14 +220,43 @@ export class EditorController {
     editPane.className = 'split-pane split-edit-pane';
     this.buildEditUI(editPane, true);
 
+    // リサイザー
+    const resizer = document.createElement('div');
+    resizer.className = 'split-resizer';
+
     // 右ペイン: プレビュー
     const previewPane = document.createElement('div');
     previewPane.className = 'split-pane split-preview-pane';
     this.splitPreviewContainer = previewPane;
 
     wrapper.appendChild(editPane);
+    wrapper.appendChild(resizer);
     wrapper.appendChild(previewPane);
     this.container.appendChild(wrapper);
+
+    // ドラッグリサイズロジック
+    let isResizing = false;
+    resizer.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      e.preventDefault();
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+
+    function onMouseMove(e: MouseEvent) {
+      if (!isResizing) return;
+      const rect = wrapper.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      const clamped = Math.max(0.2, Math.min(0.8, ratio));
+      editPane.style.flex = `${clamped}`;
+      previewPane.style.flex = `${1 - clamped}`;
+    }
+
+    function onMouseUp() {
+      isResizing = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
 
     this.renderSplitPreview();
   }
