@@ -677,7 +677,13 @@ export class HomeScreen {
   // ===== ヘルパー =====
 
   private shortenPath(fullPath: string): string {
-    const home = fullPath.replace(/\\/g, '/');
+    let home = fullPath.replace(/\\/g, '/');
+    // Windows 拡張パスのプレフィックスを除去する
+    if (home.startsWith('//?/UNC/')) {
+      home = '//' + home.substring(8);
+    } else if (home.startsWith('//?/')) {
+      home = home.substring(4);
+    }
     // ~ を使ってパスを短縮する
     const homeDir = home.includes('/Users/')
       ? home.replace(/^\/Users\/[^/]+/, '~')
