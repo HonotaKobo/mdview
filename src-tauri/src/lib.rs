@@ -413,8 +413,14 @@ pub fn run() {
 
             app.manage(i18n::I18nState::new(i18n));
 
+            // PDFコンテンツストアを初期化
+            let pdf_store = std::sync::Arc::new(std::sync::Mutex::new(
+                std::collections::HashMap::<String, String>::new(),
+            ));
+            app.manage(pdf_store.clone());
+
             // 共有HTTPサーバーを起動
-            let (http_port, http_token) = http_api::start_http_server(app.handle().clone());
+            let (http_port, http_token) = http_api::start_http_server(app.handle().clone(), pdf_store);
             app.manage(http_api::HttpServerInfo { port: http_port, token: http_token.clone() });
 
             // 初期ウィンドウ用のHTTPポートファイルを書き込み

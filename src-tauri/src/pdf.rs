@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::command;
+use tauri::{command, Manager as _};
 
 use crate::commands::validate_path;
+use crate::http_api::{HttpServerInfo, PdfContentStore};
 
 /// macOS: Chromiumベースのブラウザを探索する
 #[cfg(target_os = "macos")]
@@ -28,41 +29,36 @@ fn find_browser() -> Option<PathBuf> {
     candidates.iter().map(PathBuf::from).find(|p| p.exists())
 }
 
-/// ファイルパスをfile:// URLに変換する
-fn path_to_file_url(path: &Path) -> String {
-    #[cfg(unix)]
-    {
-        format!("file://{}", path.display())
-    }
-    #[cfg(windows)]
-    {
-        format!(
-            "file:///{}",
-            path.display().to_string().replace('\\', "/")
-        )
-    }
-}
-
 /// ブラウザのheadlessモードでHTMLをPDFに変換する
 fn generate_pdf_with_browser(
     browser: &Path,
-    html_path: &Path,
+    html_url: &str,
     output_path: &Path,
 ) -> Result<(), String> {
     let output_arg = format!("--print-to-pdf={}", output_path.display());
-    let html_url = path_to_file_url(html_path);
+
+    // 既存Edgeとのプロファイル競合を回避するための一時プロファイル
+    let profile_dir = std::env::temp_dir().join("tsumugi-pdf-profile");
+    let user_data_arg = format!("--user-data-dir={}", profile_dir.display());
 
     // --no-pdf-header-footer を使用（新しいChromiumバージョン向け）
-    let _ = Command::new(browser)
+    let result = Command::new(browser)
         .args([
             "--headless=old",
             "--disable-gpu",
             "--no-pdf-header-footer",
+            &user_data_arg,
             &output_arg,
-            &html_url,
+            html_url,
         ])
         .output()
         .map_err(|e| format!("Failed to launch browser: {}", e))?;
+
+    // stderrにネットワークエラーが含まれていたらエラーとして返す
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    if stderr.contains("ERR_") || stderr.contains("net::") {
+        return Err(format!("PDF generation failed: {}", stderr));
+    }
 
     if output_path.exists() {
         return Ok(());
@@ -74,16 +70,21 @@ fn generate_pdf_with_browser(
             "--headless=old",
             "--disable-gpu",
             "--print-to-pdf-no-header",
+            &user_data_arg,
             &output_arg,
-            &html_url,
+            html_url,
         ])
         .output()
         .map_err(|e| format!("Failed to launch browser: {}", e))?;
 
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    if stderr.contains("ERR_") || stderr.contains("net::") {
+        return Err(format!("PDF generation failed: {}", stderr));
+    }
+
     if output_path.exists() {
         Ok(())
     } else {
-        let stderr = String::from_utf8_lossy(&result.stderr);
         Err(format!("PDF generation failed: {}", stderr))
     }
 }
@@ -92,7 +93,7 @@ fn generate_pdf_with_browser(
 #[cfg(target_os = "macos")]
 async fn generate_pdf_with_sidecar(
     app: &tauri::AppHandle,
-    html_path: &Path,
+    html_url: &str,
     output_path: &Path,
 ) -> Result<(), String> {
     use tauri_plugin_shell::ShellExt;
@@ -102,7 +103,7 @@ async fn generate_pdf_with_sidecar(
         .sidecar("tsumugi-pdf")
         .map_err(|e| format!("Failed to find sidecar: {}", e))?
         .args([
-            html_path.to_string_lossy().as_ref(),
+            html_url,
             output_path.to_string_lossy().as_ref(),
         ])
         .output()
@@ -121,16 +122,16 @@ async fn generate_pdf_with_sidecar(
 #[cfg(target_os = "macos")]
 async fn pdf_fallback(
     app: &tauri::AppHandle,
-    html_path: &Path,
+    html_url: &str,
     output_path: &Path,
 ) -> Result<(), String> {
-    generate_pdf_with_sidecar(app, html_path, output_path).await
+    generate_pdf_with_sidecar(app, html_url, output_path).await
 }
 
 #[cfg(not(target_os = "macos"))]
 async fn pdf_fallback(
     _app: &tauri::AppHandle,
-    _html_path: &Path,
+    _html_url: &str,
     _output_path: &Path,
 ) -> Result<(), String> {
     Err("No Chromium-based browser found. Please install Chrome or Edge.".to_string())
@@ -144,22 +145,33 @@ pub async fn export_pdf(
 ) -> Result<(), String> {
     let output = validate_path(&output_path)?;
 
-    // 一時HTMLファイルを作成
-    let temp = tempfile::Builder::new()
-        .suffix(".html")
-        .tempfile()
-        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+    // HTTPサーバー経由でHTMLを配信する
+    let http_info = app.state::<HttpServerInfo>();
+    let port = http_info.port;
 
-    std::fs::write(temp.path(), &html_content)
-        .map_err(|e| format!("Failed to write temp file: {}", e))?;
-
-    // ブラウザでPDF生成を試行
-    if let Some(browser) = find_browser() {
-        return generate_pdf_with_browser(&browser, temp.path(), &output);
+    let token = crate::http_api::generate_token();
+    {
+        let store = app.state::<PdfContentStore>();
+        store.lock().unwrap().insert(token.clone(), html_content);
     }
 
-    // フォールバック（macOS: sidecar / Windows: エラー）
-    pdf_fallback(&app, temp.path(), &output).await
+    let html_url = format!("http://127.0.0.1:{}/pdf-content/{}", port, token);
+
+    // ブラウザでPDF生成を試行
+    let result = if let Some(browser) = find_browser() {
+        generate_pdf_with_browser(&browser, &html_url, &output)
+    } else {
+        // フォールバック（macOS: sidecar / Windows: エラー）
+        pdf_fallback(&app, &html_url, &output).await
+    };
+
+    // 消費されなかったケースのクリーンアップ
+    {
+        let store = app.state::<PdfContentStore>();
+        store.lock().unwrap().remove(&token);
+    }
+
+    result
 }
 
 #[command]

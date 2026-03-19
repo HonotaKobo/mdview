@@ -13,8 +13,11 @@ pub struct HttpServerInfo {
     pub token: String,
 }
 
+/// PDFエクスポート用のワンタイムHTMLコンテンツストア
+pub type PdfContentStore = std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>;
+
 /// CSPRNGを使用してAPI認証用のランダムな16進トークンを生成する。
-fn generate_token() -> String {
+pub fn generate_token() -> String {
     let mut buf = [0u8; 16];
     getrandom::getrandom(&mut buf).expect("failed to generate random token");
     buf.iter().map(|b| format!("{:02x}", b)).collect()
@@ -22,7 +25,7 @@ fn generate_token() -> String {
 
 /// ランダムなlocalhostポートでHTTP APIサーバーを起動する。
 /// (port, token)を返す。呼び出し元がウィンドウごとにポートファイルを書き込む。
-pub fn start_http_server(app: AppHandle) -> (u16, String) {
+pub fn start_http_server(app: AppHandle, pdf_store: PdfContentStore) -> (u16, String) {
     let server = Server::http("127.0.0.1:0").expect("failed to start HTTP API server");
     let port = server.server_addr().to_ip().unwrap().port();
     let token = generate_token();
@@ -31,6 +34,26 @@ pub fn start_http_server(app: AppHandle) -> (u16, String) {
 
     std::thread::spawn(move || {
         for mut request in server.incoming_requests() {
+            // /pdf-content/<token> エンドポイント: Bearer認証の前に処理
+            // ワンタイムトークン自体が認証の役割を果たす
+            let url = request.url().to_string();
+            if let Some(pdf_token) = url.strip_prefix("/pdf-content/") {
+                // クエリ文字列を除去
+                let pdf_token = pdf_token.split('?').next().unwrap_or(pdf_token);
+                let html = pdf_store.lock().unwrap().remove(pdf_token);
+                if let Some(html) = html {
+                    let ct: Header = "Content-Type: text/html; charset=utf-8".parse().unwrap();
+                    let _ = request.respond(
+                        Response::from_string(html).with_header(ct),
+                    );
+                } else {
+                    let _ = request.respond(
+                        Response::from_string("Not Found").with_status_code(404),
+                    );
+                }
+                continue;
+            }
+
             // トークン認証を確認
             let response = if !verify_token(&request, &expected_token) {
                 ipc::IpcResponse {

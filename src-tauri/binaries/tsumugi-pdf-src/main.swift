@@ -22,8 +22,17 @@ class PDFGenerator: NSObject, WKNavigationDelegate {
         webView.navigationDelegate = self
         self.webView = webView
 
-        let htmlURL = URL(fileURLWithPath: htmlPath)
-        webView.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
+        // HTTP URLの場合はURLRequestで読み込み、それ以外はファイルURLとして読み込む
+        if htmlPath.hasPrefix("http://") || htmlPath.hasPrefix("https://") {
+            guard let url = URL(string: htmlPath) else {
+                fputs("Error: Invalid URL: \(htmlPath)\n", stderr)
+                exit(1)
+            }
+            webView.load(URLRequest(url: url))
+        } else {
+            let htmlURL = URL(fileURLWithPath: htmlPath)
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
+        }
 
         // 30秒タイムアウト
         DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
