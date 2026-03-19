@@ -28,78 +28,6 @@ pub(crate) fn normalize_path(path: &str) -> String {
         .into_owned()
 }
 
-/// 既存の "main" ウィンドウにファイルを読み込む。
-/// 新しいウィンドウの生成・破棄を行わないため、
-/// macOSのウィンドウ状態復元中のコールバックと衝突しない。
-#[cfg(target_os = "macos")]
-fn load_file_into_window(app: &tauri::AppHandle, file_path: &str) -> Result<(), String> {
-    let abs_path = dunce::canonicalize(file_path)
-        .unwrap_or_else(|_| std::path::PathBuf::from(file_path));
-    let abs_str = normalize_path(&abs_path.to_string_lossy());
-
-    let content = std::fs::read_to_string(&abs_path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
-
-    let title = abs_path.file_name()
-        .map(|f| f.to_string_lossy().to_string())
-        .unwrap_or_else(|| "Untitled".to_string());
-
-    let new_instance_id = file_to_id(file_path);
-
-    // 旧インスタンスのファイルをクリーンアップし、状態を更新
-    {
-        let states = app.state::<WindowStates>();
-        let mut guard = states.lock().unwrap();
-        if let Some(ws) = guard.get_mut("main") {
-            // 旧インスタンスのIPCファイルをクリーンアップ
-            let old_path = ipc::instance_file(&ws.instance_id);
-            std::fs::remove_file(&old_path).ok();
-            std::fs::remove_file(old_path.with_extension("http")).ok();
-
-            // 状態を更新
-            ws.instance_id = new_instance_id.clone();
-            ws.current_content = content.clone();
-            ws.title = title.clone();
-            ws.saved_path = Some(abs_str.clone());
-            ws.content_explicitly_set = true;
-            ws.dirty = false;
-        }
-    }
-
-    // ウィンドウタイトルを更新
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.set_title(&format!("{} — tsumugi", title));
-        // フロントエンドにコンテンツ更新を通知
-        let _ = window.emit("content-update", serde_json::json!({
-            "body": content,
-            "title": title,
-        }));
-    }
-
-    // 新インスタンス用のIPCリスナーを開始
-    ipc::start_listener(new_instance_id.clone(), "main".to_string(), app.clone());
-
-    // HTTPポートファイルを書き込み
-    let http_info = app.state::<http_api::HttpServerInfo>();
-    let port_path = ipc::instance_file(&new_instance_id).with_extension("http");
-    write_port_file(&port_path, &format!("{}:{}", http_info.port, http_info.token));
-
-    // ファイル監視を開始
-    let mut fw = FileWatcher::new();
-    fw.watch(app.clone(), "main".to_string(), abs_str.clone());
-    let watchers = app.state::<FileWatchers>();
-    watchers.lock().unwrap().insert("main".to_string(), fw);
-
-    // 最近使ったファイルに追加
-    let recent = app.state::<RecentState>();
-    let mut store = recent.lock().unwrap();
-    store.add(&abs_str, &title);
-
-    eprintln!("tsumugi: loaded file into window (instance: {})", new_instance_id);
-
-    Ok(())
-}
-
 /// 現在のプロセスで新しいドキュメントウィンドウを作成する。
 /// 新しいウィンドウの instance_id を返す。
 /// 同じファイルが既に開かれている場合はそのウィンドウをフォーカスし、既存の instance_id を返す。
@@ -639,23 +567,7 @@ pub fn run() {
                         for url in &urls {
                             if let Ok(path) = url.to_file_path() {
                                 let path_str = path.to_string_lossy().to_string();
-
-                                let should_reuse_main = {
-                                    let states = h.state::<WindowStates>();
-                                    let guard = states.lock().unwrap();
-                                    guard.get("main").map_or(false, |s| !s.content_explicitly_set)
-                                };
-
-                                if should_reuse_main {
-                                    let _ = load_file_into_window(&h, &path_str);
-                                } else {
-                                    let _ = open_document_window(
-                                        &h,
-                                        Some(path_str),
-                                        None,
-                                        None,
-                                    );
-                                }
+                                let _ = open_document_window(&h, Some(path_str), None, None);
                             }
                         }
                     });
@@ -750,7 +662,37 @@ fn force_foreground(window: &tauri::WebviewWindow) {
     let _ = window.set_focus();
 }
 
-#[cfg(not(target_os = "windows"))]
+/// macOS版: NSWindow APIを直接呼び、対象ウィンドウだけを手前に表示する。
+/// set_focus() は NSApplication.activateIgnoringOtherApps を呼ぶため、
+/// アプリの全ウィンドウが手前に来てしまう問題を回避する。
+#[cfg(target_os = "macos")]
+fn force_foreground(window: &tauri::WebviewWindow) {
+    use raw_window_handle::HasWindowHandle;
+    let _ = window.unminimize();
+
+    unsafe {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        use raw_window_handle::RawWindowHandle;
+
+        if let Ok(handle) = window.window_handle() {
+            if let RawWindowHandle::AppKit(appkit) = handle.as_raw() {
+                let ns_view = appkit.ns_view.as_ptr() as *const AnyObject;
+                let ns_window: *const AnyObject = msg_send![ns_view, window];
+                if !ns_window.is_null() {
+                    let () = msg_send![ns_window, orderFrontRegardless];
+                    let () = msg_send![ns_window, makeKeyWindow];
+                }
+                return;
+            }
+        }
+    }
+
+    // フォールバック
+    let _ = window.set_focus();
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn force_foreground(window: &tauri::WebviewWindow) {
     let _ = window.unminimize();
     let _ = window.set_focus();

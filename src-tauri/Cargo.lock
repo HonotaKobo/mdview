@@ -4807,7 +4807,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tsumugi"
-version = "0.3.46"
+version = "0.3.47"
 dependencies = [
  "clap",
  "dirs 5.0.1",
@@ -4816,6 +4816,8 @@ dependencies = [
  "libc",
  "notify",
  "notify-debouncer-mini",
+ "objc2",
+ "raw-window-handle",
  "regex",
  "serde",
  "serde_json",
