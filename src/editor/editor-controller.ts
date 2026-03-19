@@ -158,9 +158,11 @@ export class EditorController {
     });
   }
 
-  private attachFormEvents(): void {
+  private attachFormEvents(target?: HTMLElement): void {
+    const container = target || this.container;
+
     // チェックボックス
-    const checkboxes = this.container.querySelectorAll('input[type="checkbox"]');
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach((cb, index) => {
       (cb as HTMLInputElement).removeAttribute('disabled');
       cb.addEventListener('click', (e) => {
@@ -172,7 +174,7 @@ export class EditorController {
     });
 
     // ラジオボタン
-    const radios = this.container.querySelectorAll('input[type="radio"]');
+    const radios = container.querySelectorAll('input[type="radio"]');
     radios.forEach((radio, index) => {
       const groupName = (radio as HTMLInputElement).name;
       const groupIndices: number[] = [];
@@ -191,11 +193,14 @@ export class EditorController {
     });
 
     // テキスト入力
-    const textInputs = this.container.querySelectorAll('input[type="text"].deflist-text-input');
+    const textInputs = container.querySelectorAll('input[type="text"].deflist-text-input');
     textInputs.forEach((input) => {
       input.addEventListener('keydown', (e) => e.stopPropagation());
       input.addEventListener('change', () => {
         this.syncFormInputs();
+        if (this.mode === 'split') {
+          this.updateTextarea(this.currentContent);
+        }
         this.notifyChange();
       });
     });
@@ -238,7 +243,11 @@ export class EditorController {
   /** スプリットプレビューパネルのみ再レンダリング */
   private renderSplitPreview(): void {
     if (!this.splitPreviewContainer) return;
-    renderMarkdown(this.currentContent, this.splitPreviewContainer);
+    renderMarkdown(this.currentContent, this.splitPreviewContainer).then(() => {
+      if (this.splitPreviewContainer) {
+        this.attachFormEvents(this.splitPreviewContainer);
+      }
+    });
   }
 
   /** デバウンス付きスプリットプレビュー更新 */
@@ -359,8 +368,10 @@ export class EditorController {
 
   /** テキスト入力の値を currentContent に同期 */
   private syncFormInputs(): void {
-    if (this.mode !== 'view') return;
-    const textInputs = this.container.querySelectorAll('input[type="text"].deflist-text-input');
+    if (this.mode === 'edit') return;
+    const target = this.mode === 'split' ? this.splitPreviewContainer : this.container;
+    if (!target) return;
+    const textInputs = target.querySelectorAll('input[type="text"].deflist-text-input');
     if (textInputs.length === 0) return;
 
     let count = 0;
@@ -392,7 +403,12 @@ export class EditorController {
       count++;
       return match;
     });
-    this.renderView();
+    if (this.mode === 'split') {
+      this.updateTextarea(this.currentContent);
+      this.renderSplitPreview();
+    } else {
+      this.renderView();
+    }
     this.notifyChange();
   }
 
@@ -405,7 +421,12 @@ export class EditorController {
       }
       return match;
     });
-    this.renderView();
+    if (this.mode === 'split') {
+      this.updateTextarea(this.currentContent);
+      this.renderSplitPreview();
+    } else {
+      this.renderView();
+    }
     this.notifyChange();
   }
 

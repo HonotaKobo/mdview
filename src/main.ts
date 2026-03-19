@@ -205,6 +205,7 @@ async function loadInitialContent() {
     editorController.enterEditMode(body);
     updateWindowTitle(currentTitle);
     statusBar.update(body);
+    statusBar.updateSplitTabVisibility();
   }
   applyTranslations();
 }
@@ -240,6 +241,7 @@ listen('content-update', async (event) => {
     editorController.enterEditMode(currentContent);
     updateWindowTitle(currentTitle);
     statusBar.update(currentContent);
+    statusBar.updateSplitTabVisibility();
     applyTranslations();
     // エディタ専用メニュー項目を有効化する
     invoke('set_editor_menu_enabled', { enabled: true });
