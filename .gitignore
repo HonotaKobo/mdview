@@ -26,3 +26,6 @@ scoop-tsumugi/
 # Environment
 .env
 .env.*
+
+# Claude Code
+CLAUDE.md
