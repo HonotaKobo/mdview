@@ -20,6 +20,16 @@
     "dialog:allow-save",
     "fs:default",
     "opener:default",
-    "updater:default"
+    "updater:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/tsumugi-pdf",
+          "sidecar": true,
+          "args": [{"validator": "\\S+"}, {"validator": "\\S+"}]
+        }
+      ]
+    }
   ]
 }

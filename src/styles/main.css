@@ -1390,4 +1390,20 @@ mark.find-highlight.active {
   .katex-display > .katex {
     overflow-x: visible;
   }
+
+  .code-copy-btn {
+    display: none !important;
+  }
+
+  h1, h2, h3 {
+    break-after: avoid;
+  }
+
+  pre, table, .mermaid-container {
+    break-inside: avoid;
+  }
+
+  img {
+    max-width: 100% !important;
+  }
 }

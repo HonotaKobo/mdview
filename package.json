@@ -16,7 +16,7 @@
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.3.3",
     "highlight.js": "^11",
-    "html2pdf.js": "^0.14.0",
+
     "katex": "^0.16.38",
     "markdown-it": "^14",
     "markdown-it-anchor": "^9",

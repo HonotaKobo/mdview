@@ -8,7 +8,7 @@ use crate::tags::{TagEntry, TagState};
 
 
 /// ファイルパスを検証・正規化し、機密性の高いシステムディレクトリへのアクセスをブロックする。
-fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
+pub(crate) fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
     if path.contains('\0') {
         return Err("Invalid path".to_string());
     }

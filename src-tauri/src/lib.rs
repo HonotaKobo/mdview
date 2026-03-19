@@ -7,6 +7,7 @@ mod menu;
 pub(crate) mod recent;
 mod state;
 mod tags;
+mod pdf;
 mod watcher;
 
 use std::collections::HashMap;
@@ -354,6 +355,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(initial_states) as WindowStates)
         .manage(Mutex::new(HashMap::<String, FileWatcher>::new()) as FileWatchers)
         .manage(Mutex::new("main".to_string()) as LastFocusedDoc)
@@ -394,6 +396,8 @@ pub fn run() {
             commands::recent_add,
             commands::recent_remove,
             commands::recent_clear,
+            pdf::export_pdf,
+            pdf::has_pdf_browser,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;

@@ -34,7 +34,7 @@ export async function exportAsHtml(title: string, markdown: string): Promise<voi
   }
 }
 
-function collectStyles(): string {
+export function collectStyles(): string {
   const css: string[] = [];
   for (const sheet of document.styleSheets) {
     try {
@@ -56,7 +56,7 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function buildDocument(title: string, theme: string, styles: string, body: string): string {
+export function buildDocument(title: string, theme: string, styles: string, body: string): string {
   return `<!DOCTYPE html>
 <html lang="en" data-theme="${theme}">
 <head>
