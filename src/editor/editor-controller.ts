@@ -269,13 +269,14 @@ export class EditorController {
     textarea.addEventListener('input', () => {
       this.currentContent = textarea.value;
       this.updateLineNumbers();
+      this.autoResizeTextarea();
       if (isSplit) this.debouncedRenderSplitPreview();
       if (this.onContentChange) {
         this.onContentChange(this.currentContent);
       }
     });
 
-    // スクロール同期（行番号とtextarea間）
+    // スクロール同期（行番号とtextarea間、フォールバック用）
     textarea.addEventListener('scroll', () => {
       lineNumbers.scrollTop = textarea.scrollTop;
     });
@@ -285,6 +286,14 @@ export class EditorController {
     target.appendChild(wrapper);
 
     this.updateLineNumbers();
+    this.autoResizeTextarea();
+
+    // リサイズ時に折り返しが変わるため行番号を再計算する
+    const ro = new ResizeObserver(() => {
+      this.updateLineNumbers();
+    });
+    ro.observe(textarea);
+
     textarea.focus();
   }
 
@@ -294,22 +303,54 @@ export class EditorController {
     if (textarea) {
       textarea.value = content;
       this.updateLineNumbers();
+      this.autoResizeTextarea();
     }
   }
 
-  /** 行番号を textarea の内容に合わせて更新 */
+  /** textarea をコンテンツに合わせて自動リサイズする */
+  private autoResizeTextarea(): void {
+    const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
+
+  /** 行番号を textarea の内容に合わせて更新（折り返し対応） */
   private updateLineNumbers(): void {
     const lineNumbers = this.container.querySelector('.line-numbers');
     const textarea = this.container.querySelector('.editor-textarea') as HTMLTextAreaElement;
     if (!lineNumbers || !textarea) return;
 
-    const count = textarea.value.split('\n').length;
+    const lines = textarea.value.split('\n');
+    const styles = window.getComputedStyle(textarea);
+    const lineHeight = parseFloat(styles.lineHeight);
+
+    // ミラー要素でtextareaと同じ折り返しを再現し、各行の表示行数を測定する
+    const mirror = document.createElement('div');
+    mirror.style.position = 'absolute';
+    mirror.style.visibility = 'hidden';
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.wordWrap = 'break-word';
+    mirror.style.overflow = 'hidden';
+    for (const prop of ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'padding', 'width', 'borderWidth', 'boxSizing'] as const) {
+      (mirror.style as any)[prop] = (styles as any)[prop];
+    }
+    document.body.appendChild(mirror);
+
     const fragment = document.createDocumentFragment();
-    for (let i = 1; i <= count; i++) {
+    for (let i = 0; i < lines.length; i++) {
+      mirror.textContent = lines[i] || '\u00a0';
+      const visualLines = Math.max(1, Math.round(mirror.offsetHeight / lineHeight));
+
       const span = document.createElement('span');
-      span.textContent = String(i);
+      span.textContent = String(i + 1);
+      if (visualLines > 1) {
+        span.style.height = (lineHeight * visualLines) + 'px';
+      }
       fragment.appendChild(span);
     }
+
+    document.body.removeChild(mirror);
     lineNumbers.textContent = '';
     lineNumbers.appendChild(fragment);
   }

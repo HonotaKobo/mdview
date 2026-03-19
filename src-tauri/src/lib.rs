@@ -30,6 +30,7 @@ pub(crate) fn normalize_path(path: &str) -> String {
 /// 既存の "main" ウィンドウにファイルを読み込む。
 /// 新しいウィンドウの生成・破棄を行わないため、
 /// macOSのウィンドウ状態復元中のコールバックと衝突しない。
+#[cfg(target_os = "macos")]
 fn load_file_into_window(app: &tauri::AppHandle, file_path: &str) -> Result<(), String> {
     let abs_path = dunce::canonicalize(file_path)
         .unwrap_or_else(|_| std::path::PathBuf::from(file_path));

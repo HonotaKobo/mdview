@@ -49,6 +49,7 @@ body.edit-mode #content {
   resize: none;
   outline: none;
   box-sizing: border-box;
+  overflow-y: hidden; /* 内部スクロールを無効化し、外側のスクロールに委ねる */
 }
 
 /* 印刷時: エディタのテキストエリアを非表示にする */
