@@ -665,6 +665,8 @@ fn force_foreground(window: &tauri::WebviewWindow) {
 /// macOS版: NSWindow APIを直接呼び、対象ウィンドウだけを手前に表示する。
 /// set_focus() は NSApplication.activateIgnoringOtherApps を呼ぶため、
 /// アプリの全ウィンドウが手前に来てしまう問題を回避する。
+/// spawn_blocking 等のバックグラウンドスレッドから呼ばれる場合があるため、
+/// performSelectorOnMainThread でメインスレッドにディスパッチする。
 #[cfg(target_os = "macos")]
 fn force_foreground(window: &tauri::WebviewWindow) {
     use raw_window_handle::HasWindowHandle;
@@ -672,7 +674,8 @@ fn force_foreground(window: &tauri::WebviewWindow) {
 
     unsafe {
         use objc2::msg_send;
-        use objc2::runtime::AnyObject;
+        use objc2::runtime::{AnyObject, Bool};
+        use objc2::sel;
         use raw_window_handle::RawWindowHandle;
 
         if let Ok(handle) = window.window_handle() {
@@ -680,8 +683,19 @@ fn force_foreground(window: &tauri::WebviewWindow) {
                 let ns_view = appkit.ns_view.as_ptr() as *const AnyObject;
                 let ns_window: *const AnyObject = msg_send![ns_view, window];
                 if !ns_window.is_null() {
-                    let () = msg_send![ns_window, orderFrontRegardless];
-                    let () = msg_send![ns_window, makeKeyWindow];
+                    let nil: *const AnyObject = std::ptr::null();
+                    let () = msg_send![
+                        ns_window,
+                        performSelectorOnMainThread: sel!(orderFrontRegardless),
+                        withObject: nil,
+                        waitUntilDone: Bool::NO
+                    ];
+                    let () = msg_send![
+                        ns_window,
+                        performSelectorOnMainThread: sel!(makeKeyWindow),
+                        withObject: nil,
+                        waitUntilDone: Bool::NO
+                    ];
                 }
                 return;
             }
