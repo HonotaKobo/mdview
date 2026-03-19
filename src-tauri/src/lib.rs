@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use clap::Parser;
-use tauri::{Emitter as _, Manager as _};
+use tauri::Manager as _;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use recent::{RecentState, RecentStore};
 use state::{LastFocusedDoc, WindowState, WindowStates};
@@ -101,12 +101,41 @@ fn load_file_into_window(app: &tauri::AppHandle, file_path: &str) -> Result<(), 
 
 /// 現在のプロセスで新しいドキュメントウィンドウを作成する。
 /// 新しいウィンドウの instance_id を返す。
+/// 同じファイルが既に開かれている場合はそのウィンドウをフォーカスし、既存の instance_id を返す。
 pub(crate) fn open_document_window(
     app: &tauri::AppHandle,
     file: Option<String>,
     body: Option<String>,
     title: Option<String>,
 ) -> Result<String, String> {
+    // ファイル指定の場合、同じファイルが既に開かれているか確認
+    if let Some(ref f) = file {
+        let abs_path = dunce::canonicalize(f)
+            .unwrap_or_else(|_| std::path::PathBuf::from(f));
+        let abs_str = normalize_path(&abs_path.to_string_lossy());
+
+        let existing = {
+            let states = app.state::<WindowStates>();
+            let guard = states.lock().unwrap();
+            guard.iter().find_map(|(label, state)| {
+                if state.saved_path.as_deref() == Some(&abs_str) {
+                    Some((label.clone(), state.instance_id.clone()))
+                } else {
+                    None
+                }
+            })
+        };
+
+        if let Some((existing_label, existing_id)) = existing {
+            // 既存ウィンドウをフォーカスして手前に表示
+            if let Some(window) = app.get_webview_window(&existing_label) {
+                force_foreground(&window);
+            }
+            eprintln!("tsumugi: file already open in window {} (instance: {})", existing_label, existing_id);
+            return Ok(existing_id);
+        }
+    }
+
     // 一意なラベルを生成
     let label = format!("doc-{:04x}", rand_u16());
 
@@ -166,7 +195,10 @@ pub(crate) fn open_document_window(
     #[cfg(target_os = "windows")]
     let builder = builder.decorations(false);
 
-    let _window = builder.build().map_err(|e| e.to_string())?;
+    let window = builder.build().map_err(|e| e.to_string())?;
+
+    // 新しいウィンドウをフォーカスして手前に表示
+    force_foreground(&window);
 
     // ウィンドウごとの IPC リスナーを開始
     ipc::start_listener(instance_id.clone(), label.clone(), app.clone());
@@ -668,6 +700,59 @@ fn file_to_id(file: &str) -> String {
         .replace('.', "-")
         .replace(' ', "-");
     format!("file-{}-{:016x}", name, hash)
+}
+
+/// ウィンドウを確実に手前に表示する。
+/// Windowsでは SetForegroundWindow のOS制限を AttachThreadInput で回避する。
+#[cfg(target_os = "windows")]
+fn force_foreground(window: &tauri::WebviewWindow) {
+    let _ = window.unminimize();
+
+    let hwnd = match window.hwnd() {
+        Ok(h) => h.0 as isize,
+        Err(_) => {
+            let _ = window.set_focus();
+            return;
+        }
+    };
+
+    unsafe {
+        #[link(name = "user32")]
+        extern "system" {
+            fn GetForegroundWindow() -> isize;
+            fn GetWindowThreadProcessId(hwnd: isize, process_id: *mut u32) -> u32;
+            fn AttachThreadInput(attach: u32, attach_to: u32, fAttach: i32) -> i32;
+            fn SetForegroundWindow(hwnd: isize) -> i32;
+            fn BringWindowToTop(hwnd: isize) -> i32;
+        }
+
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetCurrentThreadId() -> u32;
+        }
+
+        let foreground = GetForegroundWindow();
+        let current_thread = GetCurrentThreadId();
+        let foreground_thread = GetWindowThreadProcessId(foreground, std::ptr::null_mut());
+
+        if current_thread != foreground_thread && foreground_thread != 0 {
+            AttachThreadInput(current_thread, foreground_thread, 1);
+            SetForegroundWindow(hwnd);
+            BringWindowToTop(hwnd);
+            AttachThreadInput(current_thread, foreground_thread, 0);
+        } else {
+            SetForegroundWindow(hwnd);
+            BringWindowToTop(hwnd);
+        }
+    }
+
+    let _ = window.set_focus();
+}
+
+#[cfg(not(target_os = "windows"))]
+fn force_foreground(window: &tauri::WebviewWindow) {
+    let _ = window.unminimize();
+    let _ = window.set_focus();
 }
 
 fn rand_u16() -> u16 {

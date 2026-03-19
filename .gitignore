@@ -16,6 +16,7 @@ docs/
 .DS_Store
 *.swp
 *.swo
+src-tauri/.cargo/
 
 
 # Package manager repos
