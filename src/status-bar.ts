@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { t } from './i18n';
 
+/** スプリットモードの最小ウィンドウ幅（px） */
+export const SPLIT_MIN_WIDTH = 1800;
+
 export class StatusBar {
   private bar: HTMLElement;
   private charCountEl: HTMLElement;
@@ -56,7 +59,7 @@ export class StatusBar {
   updateSplitTabVisibility(): void {
     const splitTab = document.getElementById('mode-split');
     if (!splitTab) return;
-    const narrow = window.innerWidth < 800;
+    const narrow = window.innerWidth < SPLIT_MIN_WIDTH;
     splitTab.style.display = narrow ? 'none' : '';
     // Splitが非表示の時、Editタブに右端の丸みを付ける
     const editTab = document.getElementById('mode-edit');

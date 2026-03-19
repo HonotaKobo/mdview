@@ -51,6 +51,7 @@ export class EditorController {
     this.syncFormInputs();
     this.syncFromEdit();
     document.body.classList.remove('edit-mode');
+    document.body.classList.remove('split-mode');
     return this.currentContent;
   }
 
@@ -81,6 +82,7 @@ export class EditorController {
     if (this.mode === 'view') return;
     this.syncFromEdit();
     this.splitPreviewContainer = null;
+    document.body.classList.remove('split-mode');
     this.mode = 'view';
     // undoスタックにエディット結果を追加（変更がある場合）
     if (this.undoStack.length === 0 || this.undoStack[this.undoStack.length - 1] !== this.currentContent) {
@@ -100,6 +102,7 @@ export class EditorController {
     this.syncFromEdit();
     this.syncFormInputs();
     this.splitPreviewContainer = null;
+    document.body.classList.remove('split-mode');
     this.mode = 'edit';
     this.renderEdit();
     if (this.onModeChange) this.onModeChange('edit');
@@ -110,6 +113,7 @@ export class EditorController {
     if (this.mode === 'split') return;
     this.syncFromEdit();
     this.syncFormInputs();
+    document.body.classList.add('split-mode');
     this.mode = 'split';
     this.renderSplit();
     if (this.onModeChange) this.onModeChange('split');
@@ -219,7 +223,10 @@ export class EditorController {
     // 右ペイン: プレビュー
     const previewPane = document.createElement('div');
     previewPane.className = 'split-pane split-preview-pane';
-    this.splitPreviewContainer = previewPane;
+    const previewContent = document.createElement('div');
+    previewContent.className = 'split-preview-content';
+    previewPane.appendChild(previewContent);
+    this.splitPreviewContainer = previewContent;
 
     wrapper.appendChild(editPane);
     wrapper.appendChild(previewPane);

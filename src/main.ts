@@ -8,7 +8,7 @@ import { FindBar } from './find';
 import { FontSizeManager } from './font-size';
 import { CustomTitleBar } from './titlebar';
 import { EditorController } from './editor/editor-controller';
-import { StatusBar } from './status-bar';
+import { StatusBar, SPLIT_MIN_WIDTH } from './status-bar';
 import { getMarkdownIt, sanitizeHtml } from './renderer';
 import { exportAsPdf } from './pdf-export';
 import { exportAsHtml } from './html-export';
@@ -100,7 +100,7 @@ editorController.setOnModeChange((mode) => {
 function handleResize(): void {
   if (!isEditor) return;
   statusBar.updateSplitTabVisibility();
-  if (window.innerWidth < 800 && statusBar.getActiveMode() === 'split') {
+  if (window.innerWidth < SPLIT_MIN_WIDTH && statusBar.getActiveMode() === 'split') {
     editorController.switchToEdit();
   }
 }
