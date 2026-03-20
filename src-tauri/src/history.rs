@@ -5,9 +5,6 @@ use std::hash::Hasher;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// 最小記録間隔（秒）
-const MIN_RECORD_INTERVAL_SECS: u64 = 10;
-
 /// 30日（秒）
 const CLEANUP_MAX_AGE_SECS: u64 = 30 * 24 * 3600;
 
@@ -61,10 +58,18 @@ pub struct HistoryFileMeta {
     pub has_unsaved: bool,
 }
 
+/// インデックスエントリ（メタ情報のJSON管理用）
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct IndexEntry {
+    file_path: String,
+    entry_count: usize,
+    last_timestamp: u64,
+    has_unsaved: bool,
+}
+
 /// ファイルごとの追跡状態
 struct FileTracker {
     last_recorded_content: String,
-    last_recorded_at: u64,
     delta_count_since_snapshot: u32,
     file_hash: String,
     file_path: Option<String>,
@@ -74,6 +79,7 @@ struct FileTracker {
 pub struct HistoryStore {
     config: HistoryConfig,
     trackers: HashMap<String, FileTracker>,
+    index: HashMap<String, IndexEntry>,
 }
 
 pub type HistoryState = Mutex<HistoryStore>;
@@ -89,9 +95,26 @@ impl HistoryStore {
         } else {
             HistoryConfig::default()
         };
+
+        // インデックスを読み込み。なければJSONLからビルド
+        let idx_path = index_path();
+        let index = if idx_path.exists() {
+            std::fs::read_to_string(&idx_path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_else(build_index_from_jsonl)
+        } else {
+            let idx = build_index_from_jsonl();
+            if !idx.is_empty() {
+                save_index_to_disk(&idx);
+            }
+            idx
+        };
+
         Self {
             config,
             trackers: HashMap::new(),
+            index,
         }
     }
 
@@ -112,6 +135,10 @@ impl HistoryStore {
         if let Ok(json) = serde_json::to_string_pretty(&self.config) {
             std::fs::write(&path, json).ok();
         }
+    }
+
+    fn save_index(&self) {
+        save_index_to_disk(&self.index);
     }
 
     /// 追跡を開始し、初回スナップショットを書き込む
@@ -141,19 +168,37 @@ impl HistoryStore {
         let now = now_secs();
 
         // 初回スナップショットを書き込む
+        let fp_str = file_path.unwrap_or("");
         let entry = HistoryEntry::Snapshot {
             t: now,
-            p: file_path.unwrap_or("").to_string(),
+            p: fp_str.to_string(),
             c: initial_content.to_string(),
             saved: true,
         };
         append_entry(&hash, &entry);
 
+        // インデックスを更新
+        let idx_entry = self
+            .index
+            .entry(hash.clone())
+            .or_insert(IndexEntry {
+                file_path: fp_str.to_string(),
+                entry_count: 0,
+                last_timestamp: 0,
+                has_unsaved: false,
+            });
+        if !fp_str.is_empty() {
+            idx_entry.file_path = fp_str.to_string();
+        }
+        idx_entry.entry_count += 1;
+        idx_entry.last_timestamp = now;
+        idx_entry.has_unsaved = false;
+        self.save_index();
+
         self.trackers.insert(
             label.to_string(),
             FileTracker {
                 last_recorded_content: initial_content.to_string(),
-                last_recorded_at: now,
                 delta_count_since_snapshot: 0,
                 file_hash: hash,
                 file_path: file_path.map(|s| s.to_string()),
@@ -192,29 +237,27 @@ impl HistoryStore {
 
         let snapshot_interval = self.config.snapshot_interval;
 
-        let tracker = match self.trackers.get_mut(label) {
-            Some(t) => t,
+        // トラッカーから必要な値をコピー（借用競合を回避）
+        let (file_hash, last_content, delta_count) = match self.trackers.get(label) {
+            Some(t) => (
+                t.file_hash.clone(),
+                t.last_recorded_content.clone(),
+                t.delta_count_since_snapshot,
+            ),
             None => return,
         };
 
         let now = now_secs();
 
-        // 最小間隔チェック
-        if now - tracker.last_recorded_at < MIN_RECORD_INTERVAL_SECS {
-            return;
-        }
-
         // 変更なしチェック
-        if content == tracker.last_recorded_content {
+        if content == last_content {
             return;
         }
 
         // saved_pathが変わった場合（名前を付けて保存した場合等）、ハッシュを更新
         if let Some(fp) = saved_path {
             let new_hash = path_hash(fp);
-            if new_hash != tracker.file_hash {
-                tracker.file_hash = new_hash;
-                tracker.file_path = Some(fp.to_string());
+            if new_hash != file_hash {
                 // 新しいファイルとして初回スナップショットを書き込む
                 let entry = HistoryEntry::Snapshot {
                     t: now,
@@ -222,43 +265,90 @@ impl HistoryStore {
                     c: content.to_string(),
                     saved: is_saved,
                 };
-                append_entry(&tracker.file_hash, &entry);
-                tracker.last_recorded_content = content.to_string();
-                tracker.last_recorded_at = now;
-                tracker.delta_count_since_snapshot = 0;
+                append_entry(&new_hash, &entry);
+
+                // インデックスを更新
+                let idx_entry = self
+                    .index
+                    .entry(new_hash.clone())
+                    .or_insert(IndexEntry {
+                        file_path: fp.to_string(),
+                        entry_count: 0,
+                        last_timestamp: 0,
+                        has_unsaved: false,
+                    });
+                idx_entry.file_path = fp.to_string();
+                idx_entry.entry_count += 1;
+                idx_entry.last_timestamp = now;
+                idx_entry.has_unsaved = !is_saved;
+                self.save_index();
+
+                if let Some(tracker) = self.trackers.get_mut(label) {
+                    tracker.file_hash = new_hash;
+                    tracker.file_path = Some(fp.to_string());
+                    tracker.last_recorded_content = content.to_string();
+                    tracker.delta_count_since_snapshot = 0;
+                }
                 return;
             }
         }
 
         // 差分を計算
+        let path_str = saved_path.unwrap_or("").to_string();
         let dmp = diff_match_patch_rs::DiffMatchPatch::new();
-        match dmp.diff_main::<diff_match_patch_rs::Compat>(
-            &tracker.last_recorded_content,
-            content,
-        ) {
+        match dmp.diff_main::<diff_match_patch_rs::Compat>(&last_content, content) {
             Ok(diffs) => {
                 match dmp.diff_to_delta(&diffs) {
                     Ok(delta) => {
-                        let path_str = saved_path.unwrap_or("").to_string();
                         let entry = HistoryEntry::Delta {
                             t: now,
                             p: path_str.clone(),
                             d: delta,
                             saved: is_saved,
                         };
-                        append_entry(&tracker.file_hash, &entry);
-                        tracker.delta_count_since_snapshot += 1;
+                        append_entry(&file_hash, &entry);
+                        let new_delta_count = delta_count + 1;
 
                         // スナップショット間隔に達した場合
-                        if tracker.delta_count_since_snapshot >= snapshot_interval {
+                        let wrote_snapshot = if new_delta_count >= snapshot_interval {
                             let snapshot = HistoryEntry::Snapshot {
                                 t: now,
-                                p: path_str,
+                                p: path_str.clone(),
                                 c: content.to_string(),
                                 saved: is_saved,
                             };
-                            append_entry(&tracker.file_hash, &snapshot);
-                            tracker.delta_count_since_snapshot = 0;
+                            append_entry(&file_hash, &snapshot);
+                            true
+                        } else {
+                            false
+                        };
+
+                        // インデックスを更新（delta + スナップショット分をまとめて）
+                        let added = if wrote_snapshot { 2 } else { 1 };
+                        let idx_entry = self
+                            .index
+                            .entry(file_hash.clone())
+                            .or_insert(IndexEntry {
+                                file_path: path_str.clone(),
+                                entry_count: 0,
+                                last_timestamp: 0,
+                                has_unsaved: false,
+                            });
+                        if !path_str.is_empty() {
+                            idx_entry.file_path = path_str;
+                        }
+                        idx_entry.entry_count += added;
+                        idx_entry.last_timestamp = now;
+                        idx_entry.has_unsaved = !is_saved;
+                        self.save_index();
+
+                        // トラッカーを更新
+                        if let Some(tracker) = self.trackers.get_mut(label) {
+                            tracker.delta_count_since_snapshot = if wrote_snapshot {
+                                0
+                            } else {
+                                new_delta_count
+                            };
                         }
                     }
                     Err(e) => {
@@ -271,8 +361,111 @@ impl HistoryStore {
             }
         }
 
-        tracker.last_recorded_content = content.to_string();
-        tracker.last_recorded_at = now;
+        if let Some(tracker) = self.trackers.get_mut(label) {
+            tracker.last_recorded_content = content.to_string();
+        }
+    }
+
+    /// 対象ファイルの未保存チェック（インデックスから取得）
+    pub fn check_unsaved(&self, file_path: &str) -> bool {
+        let hash = path_hash(file_path);
+        self.index.get(&hash).map_or(false, |e| e.has_unsaved)
+    }
+
+    /// 履歴ファイル一覧をインデックスから取得
+    pub fn get_files(&self) -> Vec<HistoryFileMeta> {
+        let mut result: Vec<HistoryFileMeta> = self
+            .index
+            .iter()
+            .map(|(hash, entry)| HistoryFileMeta {
+                file_hash: hash.clone(),
+                file_path: entry.file_path.clone(),
+                entry_count: entry.entry_count,
+                last_timestamp: entry.last_timestamp,
+                has_unsaved: entry.has_unsaved,
+            })
+            .collect();
+        // 最終タイムスタンプの降順でソート
+        result.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+        result
+    }
+
+    /// 履歴ファイルを削除
+    pub fn delete_file(&mut self, file_hash: &str) -> Result<(), String> {
+        let path = history_file_path(file_hash);
+        std::fs::remove_file(&path).map_err(|e| format!("Failed to delete: {}", e))?;
+        self.index.remove(file_hash);
+        self.save_index();
+        Ok(())
+    }
+
+    /// 古いエントリをクリーンアップ
+    pub fn cleanup_old_entries(&mut self) {
+        let dir = storage_dir();
+        if !dir.exists() {
+            return;
+        }
+
+        let cutoff = now_secs().saturating_sub(CLEANUP_MAX_AGE_SECS);
+
+        if let Ok(dir_entries) = std::fs::read_dir(&dir) {
+            for entry in dir_entries.flatten() {
+                let path = entry.path();
+                if path.extension().map_or(true, |e| e != "jsonl") {
+                    continue;
+                }
+
+                let file_hash = path
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    let lines: Vec<&str> = content.lines().collect();
+                    let mut keep_lines = Vec::new();
+                    let mut found_recent_snapshot = false;
+
+                    for line in &lines {
+                        if line.trim().is_empty() {
+                            continue;
+                        }
+                        if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
+                            let t = match &entry {
+                                HistoryEntry::Snapshot { t, .. } => *t,
+                                HistoryEntry::Delta { t, .. } => *t,
+                            };
+                            if t >= cutoff {
+                                keep_lines.push(*line);
+                                if matches!(entry, HistoryEntry::Snapshot { .. }) {
+                                    found_recent_snapshot = true;
+                                }
+                            } else if matches!(entry, HistoryEntry::Snapshot { .. })
+                                && !found_recent_snapshot
+                            {
+                                // ベーススナップショットは保持
+                                keep_lines.push(*line);
+                            }
+                        }
+                    }
+
+                    if keep_lines.len() < lines.len() {
+                        if keep_lines.is_empty() {
+                            std::fs::remove_file(&path).ok();
+                            self.index.remove(&file_hash);
+                        } else {
+                            let new_content = keep_lines.join("\n") + "\n";
+                            std::fs::write(&path, new_content).ok();
+                            // インデックスのentry_countを更新
+                            if let Some(idx_entry) = self.index.get_mut(&file_hash) {
+                                idx_entry.entry_count = keep_lines.len();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        self.save_index();
     }
 }
 
@@ -360,164 +553,15 @@ pub fn restore_at(file_hash: &str, target_timestamp: u64) -> Result<String, Stri
     Ok(restored)
 }
 
-/// 履歴ファイル一覧を取得
-pub fn get_history_files() -> Vec<HistoryFileMeta> {
-    let dir = storage_dir();
-    if !dir.exists() {
-        return vec![];
-    }
-
-    let mut result = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map_or(true, |e| e != "jsonl") {
-                continue;
-            }
-
-            let file_hash = path
-                .file_stem()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_default();
-
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let mut file_path = String::new();
-                let mut entry_count = 0;
-                let mut last_timestamp = 0u64;
-                let mut has_unsaved = false;
-
-                for line in content.lines() {
-                    if line.trim().is_empty() {
-                        continue;
-                    }
-                    if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
-                        entry_count += 1;
-                        match &entry {
-                            HistoryEntry::Snapshot { t, p, saved, .. } => {
-                                if file_path.is_empty() {
-                                    file_path = p.clone();
-                                }
-                                if *t > last_timestamp {
-                                    last_timestamp = *t;
-                                }
-                                has_unsaved = !saved;
-                            }
-                            HistoryEntry::Delta { t, p, saved, .. } => {
-                                if file_path.is_empty() {
-                                    file_path = p.clone();
-                                }
-                                if *t > last_timestamp {
-                                    last_timestamp = *t;
-                                }
-                                has_unsaved = !saved;
-                            }
-                        }
-                    }
-                }
-
-                if entry_count > 0 {
-                    result.push(HistoryFileMeta {
-                        file_hash,
-                        file_path,
-                        entry_count,
-                        last_timestamp,
-                        has_unsaved,
-                    });
-                }
-            }
-        }
-    }
-
-    // 最終タイムスタンプの降順でソート
-    result.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
-    result
-}
-
-/// 対象ファイルの最終エントリが未保存かチェック
-pub fn check_unsaved_history(file_path: &str) -> bool {
-    let hash = path_hash(file_path);
-    let path = history_file_path(&hash);
-    if !path.exists() {
-        return false;
-    }
-
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        for line in content.lines().rev() {
-            if line.trim().is_empty() {
-                continue;
-            }
-            if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
-                return match entry {
-                    HistoryEntry::Snapshot { saved, .. } => !saved,
-                    HistoryEntry::Delta { saved, .. } => !saved,
-                };
-            }
-        }
-    }
-    false
-}
-
-/// 古いエントリをクリーンアップ
-pub fn cleanup_old_entries() {
-    let dir = storage_dir();
-    if !dir.exists() {
-        return;
-    }
-
-    let cutoff = now_secs().saturating_sub(CLEANUP_MAX_AGE_SECS);
-
-    if let Ok(dir_entries) = std::fs::read_dir(&dir) {
-        for entry in dir_entries.flatten() {
-            let path = entry.path();
-            if path.extension().map_or(true, |e| e != "jsonl") {
-                continue;
-            }
-
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let lines: Vec<&str> = content.lines().collect();
-                let mut keep_lines = Vec::new();
-                let mut found_recent_snapshot = false;
-
-                for line in &lines {
-                    if line.trim().is_empty() {
-                        continue;
-                    }
-                    if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
-                        let t = match &entry {
-                            HistoryEntry::Snapshot { t, .. } => *t,
-                            HistoryEntry::Delta { t, .. } => *t,
-                        };
-                        if t >= cutoff {
-                            keep_lines.push(*line);
-                            if matches!(entry, HistoryEntry::Snapshot { .. }) {
-                                found_recent_snapshot = true;
-                            }
-                        } else if matches!(entry, HistoryEntry::Snapshot { .. })
-                            && !found_recent_snapshot
-                        {
-                            // ベーススナップショットは保持
-                            keep_lines.push(*line);
-                        }
-                    }
-                }
-
-                if keep_lines.len() < lines.len() {
-                    if keep_lines.is_empty() {
-                        std::fs::remove_file(&path).ok();
-                    } else {
-                        let new_content = keep_lines.join("\n") + "\n";
-                        std::fs::write(&path, new_content).ok();
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// 履歴ファイルを削除
-pub fn delete_history_file(file_hash: &str) -> Result<(), String> {
-    let path = history_file_path(file_hash);
-    std::fs::remove_file(&path).map_err(|e| format!("Failed to delete: {}", e))
+/// パスのSipHashを計算（lib.rs:file_to_id と同じ方式）
+pub fn path_hash(path: &str) -> String {
+    let canonical =
+        dunce::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let path_str = canonical.to_string_lossy();
+    let mut hasher = DefaultHasher::new();
+    Hasher::write(&mut hasher, path_str.as_bytes());
+    let hash = Hasher::finish(&hasher);
+    format!("{:016x}", hash)
 }
 
 // --- ヘルパー ---
@@ -555,15 +599,8 @@ fn history_file_path(file_hash: &str) -> PathBuf {
     storage_dir().join(format!("{}.jsonl", file_hash))
 }
 
-/// パスのSipHashを計算（lib.rs:file_to_id と同じ方式）
-pub fn path_hash(path: &str) -> String {
-    let canonical =
-        dunce::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
-    let path_str = canonical.to_string_lossy();
-    let mut hasher = DefaultHasher::new();
-    Hasher::write(&mut hasher, path_str.as_bytes());
-    let hash = Hasher::finish(&hasher);
-    format!("{:016x}", hash)
+fn index_path() -> PathBuf {
+    storage_dir().join("index.json")
 }
 
 fn is_network_path(path: &str) -> bool {
@@ -588,4 +625,87 @@ fn append_entry(file_hash: &str, entry: &HistoryEntry) {
             writeln!(file, "{}", json).ok();
         }
     }
+}
+
+fn save_index_to_disk(index: &HashMap<String, IndexEntry>) {
+    let path = index_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    if let Ok(json) = serde_json::to_string(index) {
+        std::fs::write(&path, json).ok();
+    }
+}
+
+/// JSONLファイルからインデックスをビルド（初回マイグレーション用）
+fn build_index_from_jsonl() -> HashMap<String, IndexEntry> {
+    let dir = storage_dir();
+    if !dir.exists() {
+        return HashMap::new();
+    }
+
+    let mut index = HashMap::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map_or(true, |e| e != "jsonl") {
+                continue;
+            }
+
+            let file_hash = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                let mut file_path = String::new();
+                let mut entry_count = 0;
+                let mut last_timestamp = 0u64;
+                let mut has_unsaved = false;
+
+                for line in content.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    if let Ok(he) = serde_json::from_str::<HistoryEntry>(line) {
+                        entry_count += 1;
+                        match &he {
+                            HistoryEntry::Snapshot { t, p, saved, .. } => {
+                                if file_path.is_empty() {
+                                    file_path = p.clone();
+                                }
+                                if *t > last_timestamp {
+                                    last_timestamp = *t;
+                                }
+                                has_unsaved = !saved;
+                            }
+                            HistoryEntry::Delta { t, p, saved, .. } => {
+                                if file_path.is_empty() {
+                                    file_path = p.clone();
+                                }
+                                if *t > last_timestamp {
+                                    last_timestamp = *t;
+                                }
+                                has_unsaved = !saved;
+                            }
+                        }
+                    }
+                }
+
+                if entry_count > 0 {
+                    index.insert(
+                        file_hash,
+                        IndexEntry {
+                            file_path,
+                            entry_count,
+                            last_timestamp,
+                            has_unsaved,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    index
 }

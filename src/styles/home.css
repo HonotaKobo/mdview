@@ -612,6 +612,67 @@
   flex-shrink: 0;
 }
 
+.home-history-select-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.home-history-select-btn:hover {
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--text-primary);
+}
+
+.home-history-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 32px;
+  max-width: 900px;
+}
+
+.home-history-toolbar-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.home-history-toolbar-btn:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--text-primary);
+}
+
+.home-history-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.home-history-toolbar-btn-danger:not(:disabled) {
+  color: #e55;
+  border-color: #e55;
+}
+
+.home-history-toolbar-btn-danger:hover:not(:disabled) {
+  background: rgba(238, 85, 85, 0.1);
+}
+
+.home-history-check {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.home-history-item-selected {
+  background: rgba(128, 128, 128, 0.1);
+}
+
 .home-history-empty {
   font-size: 13px;
   color: var(--text-secondary);

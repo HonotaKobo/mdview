@@ -46,6 +46,8 @@ export class HomeScreen {
   private pathStatus: Map<string, boolean> = new Map();
   private tagSearchQuery = '';
   private activeChips: Set<string> = new Set();
+  private historySelectMode = false;
+  private historySelected: Set<string> = new Set();
 
   // DOM 参照
   private homeTabBtn!: HTMLButtonElement;
@@ -666,7 +668,61 @@ export class HomeScreen {
     title.className = 'home-panel-title';
     title.textContent = t('ui.history_tab');
     header.appendChild(title);
+
+    // 選択モードボタン（履歴がある場合のみ）
+    if (this.historyFiles.length > 0) {
+      const selectBtn = document.createElement('button');
+      selectBtn.className = 'home-history-select-btn';
+      selectBtn.textContent = this.historySelectMode ? t('ui.history_settings_cancel') : t('ui.history_select');
+      selectBtn.addEventListener('click', () => {
+        this.historySelectMode = !this.historySelectMode;
+        if (!this.historySelectMode) this.historySelected.clear();
+        this.renderHistoryTab();
+        this.updateStatusBar();
+      });
+      header.appendChild(selectBtn);
+    }
+
     this.contentArea.appendChild(header);
+
+    // 選択モードツールバー
+    if (this.historySelectMode && this.historyFiles.length > 0) {
+      const toolbar = document.createElement('div');
+      toolbar.className = 'home-history-toolbar';
+
+      const allSelected = this.historySelected.size === this.historyFiles.length;
+      const toggleAllBtn = document.createElement('button');
+      toggleAllBtn.className = 'home-history-toolbar-btn';
+      toggleAllBtn.textContent = allSelected ? t('ui.history_deselect_all') : t('ui.history_select_all');
+      toggleAllBtn.addEventListener('click', () => {
+        if (allSelected) {
+          this.historySelected.clear();
+        } else {
+          for (const f of this.historyFiles) this.historySelected.add(f.file_hash);
+        }
+        this.renderHistoryTab();
+        this.updateStatusBar();
+      });
+      toolbar.appendChild(toggleAllBtn);
+
+      const deleteSelBtn = document.createElement('button');
+      deleteSelBtn.className = 'home-history-toolbar-btn home-history-toolbar-btn-danger';
+      deleteSelBtn.textContent = t('ui.history_delete_selected').replace('{count}', String(this.historySelected.size));
+      deleteSelBtn.disabled = this.historySelected.size === 0;
+      deleteSelBtn.addEventListener('click', async () => {
+        if (this.historySelected.size === 0) return;
+        const hashes = [...this.historySelected];
+        await invoke('history_delete_files', { fileHashes: hashes });
+        this.historyFiles = this.historyFiles.filter(f => !this.historySelected.has(f.file_hash));
+        this.historySelected.clear();
+        this.historySelectMode = false;
+        this.renderHistoryTab();
+        this.updateStatusBar();
+      });
+      toolbar.appendChild(deleteSelBtn);
+
+      this.contentArea.appendChild(toolbar);
+    }
 
     // 履歴一覧ラッパー
     const wrapper = document.createElement('div');
@@ -684,6 +740,27 @@ export class HomeScreen {
       for (const file of this.historyFiles) {
         const item = document.createElement('div');
         item.className = 'home-history-item';
+        if (this.historySelectMode && this.historySelected.has(file.file_hash)) {
+          item.classList.add('home-history-item-selected');
+        }
+
+        // 選択モード: チェックボックス
+        if (this.historySelectMode) {
+          const check = document.createElement('input');
+          check.type = 'checkbox';
+          check.className = 'home-history-check';
+          check.checked = this.historySelected.has(file.file_hash);
+          check.addEventListener('change', () => {
+            if (check.checked) {
+              this.historySelected.add(file.file_hash);
+            } else {
+              this.historySelected.delete(file.file_hash);
+            }
+            this.renderHistoryTab();
+            this.updateStatusBar();
+          });
+          item.appendChild(check);
+        }
 
         // ファイルアイコン
         const icon = document.createElement('div');
@@ -742,32 +819,45 @@ export class HomeScreen {
           item.appendChild(badge);
         }
 
-        // 削除ボタン
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'home-recent-remove';
-        deleteBtn.textContent = '\u00d7';
-        deleteBtn.title = t('ui.history_delete');
-        deleteBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await invoke('history_delete_file', { fileHash: file.file_hash });
-          this.historyFiles = this.historyFiles.filter(f => f.file_hash !== file.file_hash);
-          this.renderHistoryTab();
-          this.updateStatusBar();
-        });
-        item.appendChild(deleteBtn);
+        if (this.historySelectMode) {
+          // 選択モード: 行クリックでトグル
+          item.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+            if (this.historySelected.has(file.file_hash)) {
+              this.historySelected.delete(file.file_hash);
+            } else {
+              this.historySelected.add(file.file_hash);
+            }
+            this.renderHistoryTab();
+            this.updateStatusBar();
+          });
+        } else {
+          // 通常モード: 削除ボタン + クリックで復元
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'home-recent-remove';
+          deleteBtn.textContent = '\u00d7';
+          deleteBtn.title = t('ui.history_delete');
+          deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await invoke('history_delete_file', { fileHash: file.file_hash });
+            this.historyFiles = this.historyFiles.filter(f => f.file_hash !== file.file_hash);
+            this.renderHistoryTab();
+            this.updateStatusBar();
+          });
+          item.appendChild(deleteBtn);
 
-        // クリックで復元内容を一時ウィンドウで表示
-        item.addEventListener('click', async () => {
-          try {
-            const body = await invoke<string>('history_restore_at', {
-              fileHash: file.file_hash,
-              targetTimestamp: 0,
-            });
-            await invoke('open_new_window', { body });
-          } catch (e) {
-            console.error('History restore failed:', e);
-          }
-        });
+          item.addEventListener('click', async () => {
+            try {
+              const body = await invoke<string>('history_restore_at', {
+                fileHash: file.file_hash,
+                targetTimestamp: 0,
+              });
+              await invoke('open_new_window', { body });
+            } catch (e) {
+              console.error('History restore failed:', e);
+            }
+          });
+        }
 
         list.appendChild(item);
       }

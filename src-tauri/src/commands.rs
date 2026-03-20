@@ -121,26 +121,34 @@ pub fn sync_content(
     content: String,
     window: tauri::Window,
     states: tauri::State<'_, WindowStates>,
+) {
+    let mut guard = states.lock().unwrap();
+    if let Some(state) = guard.get_mut(window.label()) {
+        state.current_content = content.clone();
+        state.dirty = content != state.saved_content;
+    }
+}
+
+#[command]
+pub fn record_history(
+    window: tauri::Window,
+    states: tauri::State<'_, WindowStates>,
     history: tauri::State<'_, HistoryState>,
 ) {
-    // WindowStatesのロックを先に取得・解放してからHistoryStateをロック（デッドロック防止）
-    let (saved_path, is_saved) = {
-        let mut guard = states.lock().unwrap();
-        if let Some(state) = guard.get_mut(window.label()) {
-            state.current_content = content.clone();
-            state.dirty = content != state.saved_content;
-            (state.saved_path.clone(), !state.dirty)
+    let (content, saved_path, is_saved) = {
+        let guard = states.lock().unwrap();
+        if let Some(state) = guard.get(window.label()) {
+            (
+                state.current_content.clone(),
+                state.saved_path.clone(),
+                !state.dirty,
+            )
         } else {
             return;
         }
     };
     let mut hs = history.lock().unwrap();
-    hs.record_change(
-        window.label(),
-        &content,
-        saved_path.as_deref(),
-        is_saved,
-    );
+    hs.record_change(window.label(), &content, saved_path.as_deref(), is_saved);
 }
 
 #[command]
@@ -402,8 +410,9 @@ pub fn history_set_config(config: HistoryConfig, state: tauri::State<'_, History
 }
 
 #[command]
-pub fn history_get_files() -> Vec<HistoryFileMeta> {
-    crate::history::get_history_files()
+pub fn history_get_files(history: tauri::State<'_, HistoryState>) -> Vec<HistoryFileMeta> {
+    let hs = history.lock().unwrap();
+    hs.get_files()
 }
 
 #[command]
@@ -412,13 +421,24 @@ pub fn history_restore_at(file_hash: String, target_timestamp: u64) -> Result<St
 }
 
 #[command]
-pub fn history_check_unsaved(path: String) -> bool {
-    crate::history::check_unsaved_history(&path)
+pub fn history_check_unsaved(path: String, history: tauri::State<'_, HistoryState>) -> bool {
+    let hs = history.lock().unwrap();
+    hs.check_unsaved(&path)
 }
 
 #[command]
-pub fn history_delete_file(file_hash: String) -> Result<(), String> {
-    crate::history::delete_history_file(&file_hash)
+pub fn history_delete_file(file_hash: String, history: tauri::State<'_, HistoryState>) -> Result<(), String> {
+    let mut hs = history.lock().unwrap();
+    hs.delete_file(&file_hash)
+}
+
+#[command]
+pub fn history_delete_files(file_hashes: Vec<String>, history: tauri::State<'_, HistoryState>) -> Result<(), String> {
+    let mut hs = history.lock().unwrap();
+    for hash in &file_hashes {
+        hs.delete_file(hash)?;
+    }
+    Ok(())
 }
 
 #[command]

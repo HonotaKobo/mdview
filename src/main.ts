@@ -80,12 +80,26 @@ findBar.setOnReplace((search, replace, all) => {
   currentContent = content;
   invoke('sync_content', { content });
   findBar.search();
+  scheduleHistoryRecord();
 });
+
+// 履歴記録用デバウンス（操作停止後2秒で記録）
+let historyDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleHistoryRecord() {
+  if (historyDebounceTimer !== null) {
+    clearTimeout(historyDebounceTimer);
+  }
+  historyDebounceTimer = setTimeout(() => {
+    invoke('record_history');
+    historyDebounceTimer = null;
+  }, 2000);
+}
 
 editorController.setOnContentChange((markdown) => {
   currentContent = markdown;
   invoke('sync_content', { content: markdown });
   statusBar.update(markdown);
+  scheduleHistoryRecord();
 });
 
 statusBar.setOnModeChange((mode) => {

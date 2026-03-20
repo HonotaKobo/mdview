@@ -383,6 +383,7 @@ pub fn run() {
             commands::notify_saved,
             commands::get_saved_path,
             commands::sync_content,
+            commands::record_history,
             commands::set_dirty,
             commands::get_initial_content,
             commands::rename_file,
@@ -419,6 +420,7 @@ pub fn run() {
             commands::history_restore_at,
             commands::history_check_unsaved,
             commands::history_delete_file,
+            commands::history_delete_files,
             commands::history_get_file_hash,
         ])
         .setup(move |app| {
@@ -489,8 +491,11 @@ pub fn run() {
             }
 
             // バックグラウンドで古い履歴エントリをクリーンアップ
-            std::thread::spawn(|| {
-                history::cleanup_old_entries();
+            let app_handle_for_cleanup = app.handle().clone();
+            std::thread::spawn(move || {
+                let history = app_handle_for_cleanup.state::<HistoryState>();
+                let mut hs = history.lock().unwrap();
+                hs.cleanup_old_entries();
             });
 
             Ok(())
