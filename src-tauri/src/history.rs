@@ -48,6 +48,23 @@ pub enum HistoryEntry {
     },
 }
 
+/// 差分行（未保存デルタ確認モーダル用）
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DiffLine {
+    pub op: String,    // "equal", "delete", "insert"
+    pub text: String,
+}
+
+/// 未保存デルタの差分結果
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UnsavedDiffResult {
+    pub saved_content: String,
+    pub latest_content: String,
+    pub diff_lines: Vec<DiffLine>,
+    pub unsaved_count: usize,
+    pub last_saved_timestamp: u64,
+}
+
 /// 履歴エントリのメタ情報（一覧表示用）
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HistoryEntryMeta {
@@ -505,6 +522,74 @@ impl HistoryStore {
         Ok(())
     }
 
+    /// 未保存エントリを削除（最後のsaved=true以降のsaved=falseを除外）
+    pub fn delete_unsaved_entries(&mut self, file_hash: &str) -> Result<(), String> {
+        let path = history_file_path(file_hash);
+        let content =
+            std::fs::read_to_string(&path).map_err(|e| format!("Failed to read history: {}", e))?;
+
+        let lines: Vec<&str> = content.lines().collect();
+
+        // 最後のsaved=trueエントリのインデックスを特定
+        let mut last_saved_idx: Option<usize> = None;
+        for (i, line) in lines.iter().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
+                let saved = match &entry {
+                    HistoryEntry::Snapshot { saved, .. } => *saved,
+                    HistoryEntry::Delta { saved, .. } => *saved,
+                };
+                if saved {
+                    last_saved_idx = Some(i);
+                }
+            }
+        }
+
+        // saved=trueが一つもない場合は何もしない
+        let last_saved = match last_saved_idx {
+            Some(idx) => idx,
+            None => return Ok(()),
+        };
+
+        // last_saved以降のsaved=falseエントリを除外
+        let mut keep_lines: Vec<&str> = Vec::new();
+        for (i, line) in lines.iter().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if i <= last_saved {
+                keep_lines.push(line);
+            } else {
+                // last_saved以降: saved=trueのみ保持
+                if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
+                    let saved = match &entry {
+                        HistoryEntry::Snapshot { saved, .. } => *saved,
+                        HistoryEntry::Delta { saved, .. } => *saved,
+                    };
+                    if saved {
+                        keep_lines.push(line);
+                    }
+                }
+            }
+        }
+
+        // 再書き込み
+        let new_content = keep_lines.join("\n") + "\n";
+        std::fs::write(&path, new_content)
+            .map_err(|e| format!("Failed to write history: {}", e))?;
+
+        // インデックスを更新
+        if let Some(idx_entry) = self.index.get_mut(file_hash) {
+            idx_entry.entry_count = keep_lines.len();
+            idx_entry.has_unsaved = false;
+        }
+        self.save_index();
+
+        Ok(())
+    }
+
     /// 古いエントリをクリーンアップ
     pub fn cleanup_old_entries(&mut self) {
         let dir = storage_dir();
@@ -732,6 +817,230 @@ fn get_last_state(file_hash: &str) -> Option<(String, u32)> {
     }
 
     current.map(|c| (c, delta_count))
+}
+
+/// 未保存デルタの差分を取得する（JSONLファイルを直接解析）
+pub fn get_unsaved_diff(file_hash: &str) -> Option<UnsavedDiffResult> {
+    let path = history_file_path(file_hash);
+    let raw = std::fs::read_to_string(&path).ok()?;
+
+    let mut entries: Vec<HistoryEntry> = Vec::new();
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(entry) = serde_json::from_str(line) {
+            entries.push(entry);
+        }
+    }
+
+    if entries.is_empty() {
+        return None;
+    }
+
+    // 最後のsaved=trueエントリのインデックスを特定
+    let mut last_saved_idx: Option<usize> = None;
+    for (i, entry) in entries.iter().enumerate() {
+        let saved = match entry {
+            HistoryEntry::Snapshot { saved, .. } => *saved,
+            HistoryEntry::Delta { saved, .. } => *saved,
+        };
+        if saved {
+            last_saved_idx = Some(i);
+        }
+    }
+
+    let last_saved = last_saved_idx?;
+
+    // last_saved以降にsaved=falseエントリがあるか確認
+    let unsaved_count = entries[last_saved + 1..]
+        .iter()
+        .filter(|e| {
+            let saved = match e {
+                HistoryEntry::Snapshot { saved, .. } => *saved,
+                HistoryEntry::Delta { saved, .. } => *saved,
+            };
+            !saved
+        })
+        .count();
+
+    if unsaved_count == 0 {
+        return None;
+    }
+
+    // last_saved_timestamp
+    let last_saved_timestamp = match &entries[last_saved] {
+        HistoryEntry::Snapshot { t, .. } => *t,
+        HistoryEntry::Delta { t, .. } => *t,
+    };
+
+    // saved_content: last_savedまで復元
+    let dmp = diff_match_patch_rs::DiffMatchPatch::new();
+    let mut saved_content = String::new();
+    {
+        // last_saved以前の最後のスナップショットを探す
+        let mut snap_idx = None;
+        for i in (0..=last_saved).rev() {
+            if matches!(entries[i], HistoryEntry::Snapshot { .. }) {
+                snap_idx = Some(i);
+                break;
+            }
+        }
+        if let Some(si) = snap_idx {
+            saved_content = match &entries[si] {
+                HistoryEntry::Snapshot { c, .. } => c.clone(),
+                _ => unreachable!(),
+            };
+            for entry in &entries[si + 1..=last_saved] {
+                match entry {
+                    HistoryEntry::Delta { d, .. } => {
+                        if let Ok(diffs) =
+                            dmp.diff_from_delta::<diff_match_patch_rs::Compat>(&saved_content, d)
+                        {
+                            saved_content =
+                                diff_match_patch_rs::DiffMatchPatch::diff_text_new(&diffs)
+                                    .into_iter()
+                                    .collect();
+                        }
+                    }
+                    HistoryEntry::Snapshot { c, .. } => {
+                        saved_content = c.clone();
+                    }
+                }
+            }
+        }
+    }
+
+    // latest_content: 全エントリ適用後の最新状態
+    let mut latest_content = saved_content.clone();
+    for entry in &entries[last_saved + 1..] {
+        match entry {
+            HistoryEntry::Delta { d, .. } => {
+                if let Ok(diffs) =
+                    dmp.diff_from_delta::<diff_match_patch_rs::Compat>(&latest_content, d)
+                {
+                    latest_content = diff_match_patch_rs::DiffMatchPatch::diff_text_new(&diffs)
+                        .into_iter()
+                        .collect();
+                }
+            }
+            HistoryEntry::Snapshot { c, .. } => {
+                latest_content = c.clone();
+            }
+        }
+    }
+
+    // 行単位diffを生成
+    let saved_lines: Vec<&str> = saved_content.split('\n').collect();
+    let latest_lines: Vec<&str> = latest_content.split('\n').collect();
+
+    let mut diff_lines = Vec::new();
+
+    // diff_mainで文字レベルの差分を取得し、行単位に再構成
+    if let Ok(diffs) =
+        dmp.diff_main::<diff_match_patch_rs::Compat>(&saved_content, &latest_content)
+    {
+        // 行単位に再構成: 削除行と挿入行をまとめて出力
+        // シンプルなアプローチ: 行単位で比較
+        let _ = diffs; // 文字レベルdiffは使わず、行単位で直接比較
+
+        // LCS（最長共通部分列）ベースの行単位diff
+        let lcs = line_lcs(&saved_lines, &latest_lines);
+        let mut si = 0;
+        let mut li = 0;
+        let mut ci = 0;
+
+        while si < saved_lines.len() || li < latest_lines.len() {
+            if ci < lcs.len() && si < saved_lines.len() && li < latest_lines.len()
+                && saved_lines[si] == lcs[ci] && latest_lines[li] == lcs[ci]
+            {
+                diff_lines.push(DiffLine {
+                    op: "equal".to_string(),
+                    text: saved_lines[si].to_string(),
+                });
+                si += 1;
+                li += 1;
+                ci += 1;
+            } else {
+                // 削除行を出力
+                while si < saved_lines.len()
+                    && (ci >= lcs.len() || saved_lines[si] != lcs[ci])
+                {
+                    diff_lines.push(DiffLine {
+                        op: "delete".to_string(),
+                        text: saved_lines[si].to_string(),
+                    });
+                    si += 1;
+                }
+                // 挿入行を出力
+                while li < latest_lines.len()
+                    && (ci >= lcs.len() || latest_lines[li] != lcs[ci])
+                {
+                    diff_lines.push(DiffLine {
+                        op: "insert".to_string(),
+                        text: latest_lines[li].to_string(),
+                    });
+                    li += 1;
+                }
+            }
+        }
+    } else {
+        // diff_mainが失敗した場合のフォールバック
+        for line in &saved_lines {
+            diff_lines.push(DiffLine {
+                op: "delete".to_string(),
+                text: line.to_string(),
+            });
+        }
+        for line in &latest_lines {
+            diff_lines.push(DiffLine {
+                op: "insert".to_string(),
+                text: line.to_string(),
+            });
+        }
+    }
+
+    Some(UnsavedDiffResult {
+        saved_content,
+        latest_content,
+        diff_lines,
+        unsaved_count,
+        last_saved_timestamp,
+    })
+}
+
+/// 行単位LCS（最長共通部分列）を計算
+fn line_lcs<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<&'a str> {
+    let m = a.len();
+    let n = b.len();
+    let mut dp = vec![vec![0u32; n + 1]; m + 1];
+
+    for i in 1..=m {
+        for j in 1..=n {
+            if a[i - 1] == b[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]);
+            }
+        }
+    }
+
+    let mut result = Vec::new();
+    let mut i = m;
+    let mut j = n;
+    while i > 0 && j > 0 {
+        if a[i - 1] == b[j - 1] {
+            result.push(a[i - 1]);
+            i -= 1;
+            j -= 1;
+        } else if dp[i - 1][j] > dp[i][j - 1] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    result.reverse();
+    result
 }
 
 /// パスのSipHashを計算（lib.rs:file_to_id と同じ方式）

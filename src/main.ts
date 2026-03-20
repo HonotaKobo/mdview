@@ -16,7 +16,7 @@ import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
 import { HomeScreen } from './home';
 import { UpdateModal } from './update-modal';
-import { HistorySettingsModal } from './history-settings-modal';
+import { HistorySettingsModal, UnsavedDiffResult } from './history-settings-modal';
 import { loadTranslations } from './i18n';
 
 interface ContentUpdate {
@@ -225,14 +225,23 @@ async function loadInitialContent() {
     statusBar.update(body);
     statusBar.updateSplitTabVisibility();
 
-    // 未保存の変更履歴があればトースト通知を表示
+    // 未保存の変更履歴があれば差分確認モーダルを表示
     const savedPath = await invoke<string | null>('get_saved_path');
     if (savedPath) {
       try {
-        const hasUnsaved = await invoke<boolean>('history_check_unsaved', { path: savedPath });
-        if (hasUnsaved) {
-          const fileHash = await invoke<string>('history_get_file_hash', { path: savedPath });
-          historySettingsModal.showUnsavedNotice(fileHash);
+        const fileHash = await invoke<string>('history_get_file_hash', { path: savedPath });
+        const diff = await invoke<UnsavedDiffResult | null>('history_get_unsaved_diff', { fileHash });
+        if (diff) {
+          historySettingsModal.showUnsavedDiffModal(fileHash, diff, {
+            onDiscard: () => {},
+            onOpenTemp: (content) => { invoke('open_new_window', { body: content }); },
+            onSave: async (content) => {
+              editorController.updateContent(content);
+              currentContent = content;
+              await invoke('sync_content', { content });
+              await doSave();
+            },
+          });
         }
       } catch { /* 履歴チェック失敗は無視 */ }
     }

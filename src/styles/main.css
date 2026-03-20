@@ -631,7 +631,8 @@ mark.find-highlight.active {
 #custom-titlebar ~ #tag-add-overlay,
 #custom-titlebar ~ #update-overlay,
 #custom-titlebar ~ #html-export-overlay,
-#custom-titlebar ~ #history-settings-overlay {
+#custom-titlebar ~ #history-settings-overlay,
+#custom-titlebar ~ #unsaved-diff-overlay {
   top: 57px; /* タイトル行32px + メニュー行24px + ボーダー1px */
 }
 
@@ -1456,6 +1457,72 @@ mark.find-highlight.active {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* 未保存デルタ確認モーダル */
+#unsaved-diff-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+#unsaved-diff-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.unsaved-diff-view {
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 12px;
+  max-height: 50vh;
+}
+
+.diff-line {
+  padding: 0 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diff-line.diff-delete {
+  background: rgba(209, 36, 47, 0.15);
+}
+
+.diff-line.diff-insert {
+  background: rgba(63, 185, 80, 0.15);
+}
+
+.diff-prefix {
+  display: inline-block;
+  width: 1.5em;
+  user-select: none;
+  color: var(--text-secondary);
+}
+
+:root[data-theme='dark'] #unsaved-diff-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='dark'] #unsaved-diff-modal {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* 未保存履歴通知（設定モーダルのオーバーレイを共用） */

@@ -1,6 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { t } from './i18n';
 
+export interface UnsavedDiffResult {
+  saved_content: string;
+  latest_content: string;
+  diff_lines: { op: string; text: string }[];
+  unsaved_count: number;
+  last_saved_timestamp: number;
+}
+
 interface HistoryConfig {
   enabled: boolean;
   snapshot_interval: number;
@@ -162,66 +170,108 @@ export class HistorySettingsModal {
     this.overlay.style.display = 'none';
   }
 
-  /** 未保存の変更履歴がある旨をモーダルで通知する */
-  showUnsavedNotice(fileHash: string): void {
-    // 設定フォームを一時的に隠して通知内容を表示
-    const notice = document.createElement('div');
-    notice.id = 'history-unsaved-notice';
+  /** 未保存デルタの差分を表示するモーダル */
+  showUnsavedDiffModal(
+    fileHash: string,
+    diff: UnsavedDiffResult,
+    callbacks: {
+      onDiscard: () => void;
+      onOpenTemp: (content: string) => void;
+      onSave: (content: string) => void;
+    },
+  ): void {
+    // 独立したオーバーレイを作成
+    const overlay = document.createElement('div');
+    overlay.id = 'unsaved-diff-overlay';
 
-    const msg = document.createElement('div');
-    msg.className = 'update-modal-text';
-    msg.textContent = t('ui.history_unsaved_notice');
-    notice.appendChild(msg);
+    const modal = document.createElement('div');
+    modal.id = 'unsaved-diff-modal';
 
+    // タイトル
+    const title = document.createElement('div');
+    title.className = 'history-settings-title';
+    title.textContent = t('ui.history_unsaved_diff_title');
+    modal.appendChild(title);
+
+    // 説明文
+    const desc = document.createElement('div');
+    desc.className = 'update-modal-text';
+    desc.textContent = t('ui.history_unsaved_diff_desc').replace('{count}', String(diff.unsaved_count));
+    modal.appendChild(desc);
+
+    // 差分表示エリア
+    const diffView = document.createElement('div');
+    diffView.className = 'unsaved-diff-view';
+    for (const line of diff.diff_lines) {
+      const row = document.createElement('div');
+      row.className = `diff-line diff-${line.op}`;
+
+      const prefix = document.createElement('span');
+      prefix.className = 'diff-prefix';
+      if (line.op === 'delete') {
+        prefix.textContent = '-';
+      } else if (line.op === 'insert') {
+        prefix.textContent = '+';
+      } else {
+        prefix.textContent = ' ';
+      }
+      row.appendChild(prefix);
+      row.appendChild(document.createTextNode(line.text));
+      diffView.appendChild(row);
+    }
+    modal.appendChild(diffView);
+
+    // ボタン行
     const actions = document.createElement('div');
     actions.className = 'history-settings-actions';
 
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'update-modal-btn';
-    closeBtn.textContent = t('ui.history_settings_cancel');
-    closeBtn.addEventListener('click', () => {
-      notice.remove();
-      this.modal.style.display = '';
-      this.hide();
-    });
-    actions.appendChild(closeBtn);
+    const close = () => {
+      overlay.remove();
+    };
 
-    const viewBtn = document.createElement('button');
-    viewBtn.className = 'update-modal-btn update-modal-btn-primary';
-    viewBtn.textContent = t('ui.history_unsaved_view');
-    viewBtn.addEventListener('click', async () => {
+    // 反映しない（削除）
+    const discardBtn = document.createElement('button');
+    discardBtn.className = 'update-modal-btn';
+    discardBtn.textContent = t('ui.history_unsaved_discard');
+    discardBtn.addEventListener('click', async () => {
       try {
-        const body = await invoke<string>('history_restore_at', {
-          fileHash,
-          targetTimestamp: 0,
-        });
-        await invoke('open_new_window', { body });
+        await invoke('history_delete_unsaved', { fileHash });
       } catch (e) {
-        console.error('History restore failed:', e);
+        console.error('Failed to delete unsaved entries:', e);
       }
-      notice.remove();
-      this.modal.style.display = '';
-      this.hide();
+      callbacks.onDiscard();
+      close();
     });
-    actions.appendChild(viewBtn);
+    actions.appendChild(discardBtn);
 
-    notice.appendChild(actions);
+    // 一時ファイルで開く
+    const openTempBtn = document.createElement('button');
+    openTempBtn.className = 'update-modal-btn';
+    openTempBtn.textContent = t('ui.history_unsaved_open_temp');
+    openTempBtn.addEventListener('click', () => {
+      callbacks.onOpenTemp(diff.latest_content);
+      close();
+    });
+    actions.appendChild(openTempBtn);
 
-    // 設定フォームを隠して通知を表示
-    this.modal.style.display = 'none';
-    this.overlay.appendChild(notice);
-    this.overlay.style.display = 'flex';
+    // 保存
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'update-modal-btn update-modal-btn-primary';
+    saveBtn.textContent = t('ui.history_unsaved_save');
+    saveBtn.addEventListener('click', () => {
+      callbacks.onSave(diff.latest_content);
+      close();
+    });
+    actions.appendChild(saveBtn);
+
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
 
     // オーバーレイクリックで閉じる
-    const onOverlayClick = (e: MouseEvent) => {
-      if (e.target === this.overlay) {
-        notice.remove();
-        this.modal.style.display = '';
-        this.hide();
-        this.overlay.removeEventListener('click', onOverlayClick);
-      }
-    };
-    this.overlay.addEventListener('click', onOverlayClick);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
   }
 
   applyTranslations(): void {

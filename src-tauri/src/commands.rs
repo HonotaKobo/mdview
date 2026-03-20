@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use tauri::command;
 
-use crate::history::{HistoryConfig, HistoryEntryMeta, HistoryFileMeta, HistoryState};
+use crate::history::{HistoryConfig, HistoryEntryMeta, HistoryFileMeta, HistoryState, UnsavedDiffResult};
 use crate::i18n::I18nState;
 use crate::recent::{RecentEntry, RecentState};
 use crate::state::WindowStates;
@@ -449,5 +449,16 @@ pub fn history_get_file_hash(path: String) -> String {
 #[command]
 pub fn history_get_entries(file_hash: String) -> Result<Vec<HistoryEntryMeta>, String> {
     crate::history::get_entries(&file_hash)
+}
+
+#[command]
+pub fn history_get_unsaved_diff(file_hash: String) -> Option<UnsavedDiffResult> {
+    crate::history::get_unsaved_diff(&file_hash)
+}
+
+#[command]
+pub fn history_delete_unsaved(file_hash: String, history: tauri::State<'_, HistoryState>) -> Result<(), String> {
+    let mut hs = history.lock().unwrap();
+    hs.delete_unsaved_entries(&file_hash)
 }
 
