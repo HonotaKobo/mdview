@@ -16,6 +16,7 @@ import { TagAddModal } from './tag-add-modal';
 import { TagSidebar } from './tag-sidebar';
 import { HomeScreen } from './home';
 import { UpdateModal } from './update-modal';
+import { HistorySettingsModal } from './history-settings-modal';
 import { loadTranslations } from './i18n';
 
 interface ContentUpdate {
@@ -43,6 +44,7 @@ let statusBar: StatusBar;
 let tagAddModal: TagAddModal;
 let tagSidebar: TagSidebar;
 let updateModal: UpdateModal;
+let historySettingsModal: HistorySettingsModal;
 let homeScreen: HomeScreen | null = null;
 
 // 初期化
@@ -50,6 +52,7 @@ let homeScreen: HomeScreen | null = null;
 
 themeManager = new ThemeManager();
 updateModal = new UpdateModal();
+historySettingsModal = new HistorySettingsModal();
 
 // エディタコンポーネントを常に初期化（HomeScreen.init()がエディタ要素を非表示にする）
 findBar = new FindBar();
@@ -180,6 +183,7 @@ function applyTranslations(): void {
     tagAddModal.applyTranslations();
     tagSidebar.applyTranslations();
   }
+  historySettingsModal.applyTranslations();
   if (homeScreen) {
     homeScreen.applyTranslations();
   }
@@ -206,6 +210,18 @@ async function loadInitialContent() {
     updateWindowTitle(currentTitle);
     statusBar.update(body);
     statusBar.updateSplitTabVisibility();
+
+    // 未保存の変更履歴があればトースト通知を表示
+    const savedPath = await invoke<string | null>('get_saved_path');
+    if (savedPath) {
+      try {
+        const hasUnsaved = await invoke<boolean>('history_check_unsaved', { path: savedPath });
+        if (hasUnsaved) {
+          const fileHash = await invoke<string>('history_get_file_hash', { path: savedPath });
+          historySettingsModal.showUnsavedNotice(fileHash);
+        }
+      } catch { /* 履歴チェック失敗は無視 */ }
+    }
   }
   applyTranslations();
 }
@@ -301,6 +317,9 @@ listen('menu-action', (event) => {
       return;
     case 'file_open':
       debounced('file_open', () => openFileInNewWindow());
+      return;
+    case 'file_history_settings':
+      debounced('file_history_settings', () => historySettingsModal.show());
       return;
   }
 

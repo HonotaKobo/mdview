@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use tauri::command;
 
+use crate::history::{HistoryConfig, HistoryFileMeta, HistoryState};
 use crate::i18n::I18nState;
 use crate::recent::{RecentEntry, RecentState};
 use crate::state::WindowStates;
@@ -81,13 +82,19 @@ pub fn notify_saved(
     window: tauri::Window,
     states: tauri::State<'_, WindowStates>,
     recent: tauri::State<'_, RecentState>,
+    history: tauri::State<'_, HistoryState>,
 ) {
-    let mut states = states.lock().unwrap();
-    if let Some(state) = states.get_mut(window.label()) {
-        state.saved_path = Some(path.clone());
-        state.saved_content = state.current_content.clone();
-        state.dirty = false;
-    }
+    let current_content = {
+        let mut guard = states.lock().unwrap();
+        if let Some(state) = guard.get_mut(window.label()) {
+            state.saved_path = Some(path.clone());
+            state.saved_content = state.current_content.clone();
+            state.dirty = false;
+            Some(state.current_content.clone())
+        } else {
+            None
+        }
+    };
     // 最近使ったファイルに追加
     let title = std::path::Path::new(&path)
         .file_name()
@@ -95,6 +102,12 @@ pub fn notify_saved(
         .unwrap_or_else(|| "Untitled".to_string());
     let mut store = recent.lock().unwrap();
     store.add(&path, &title);
+    drop(store);
+    // 保存時の状態を履歴に記録
+    if let Some(content) = current_content {
+        let mut hs = history.lock().unwrap();
+        hs.record_change(window.label(), &content, Some(&path), true);
+    }
 }
 
 #[command]
@@ -104,12 +117,30 @@ pub fn get_saved_path(window: tauri::Window, states: tauri::State<'_, WindowStat
 }
 
 #[command]
-pub fn sync_content(content: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) {
-    let mut states = states.lock().unwrap();
-    if let Some(state) = states.get_mut(window.label()) {
-        state.current_content = content.clone();
-        state.dirty = content != state.saved_content;
-    }
+pub fn sync_content(
+    content: String,
+    window: tauri::Window,
+    states: tauri::State<'_, WindowStates>,
+    history: tauri::State<'_, HistoryState>,
+) {
+    // WindowStatesのロックを先に取得・解放してからHistoryStateをロック（デッドロック防止）
+    let (saved_path, is_saved) = {
+        let mut guard = states.lock().unwrap();
+        if let Some(state) = guard.get_mut(window.label()) {
+            state.current_content = content.clone();
+            state.dirty = content != state.saved_content;
+            (state.saved_path.clone(), !state.dirty)
+        } else {
+            return;
+        }
+    };
+    let mut hs = history.lock().unwrap();
+    hs.record_change(
+        window.label(),
+        &content,
+        saved_path.as_deref(),
+        is_saved,
+    );
 }
 
 #[command]
@@ -354,5 +385,44 @@ pub fn recent_remove(path: String, state: tauri::State<'_, RecentState>) {
 pub fn recent_clear(state: tauri::State<'_, RecentState>) {
     let mut store = state.lock().unwrap();
     store.clear();
+}
+
+// --- 変更履歴 ---
+
+#[command]
+pub fn history_get_config(state: tauri::State<'_, HistoryState>) -> HistoryConfig {
+    let store = state.lock().unwrap();
+    store.config().clone()
+}
+
+#[command]
+pub fn history_set_config(config: HistoryConfig, state: tauri::State<'_, HistoryState>) {
+    let mut store = state.lock().unwrap();
+    store.set_config(config);
+}
+
+#[command]
+pub fn history_get_files() -> Vec<HistoryFileMeta> {
+    crate::history::get_history_files()
+}
+
+#[command]
+pub fn history_restore_at(file_hash: String, target_timestamp: u64) -> Result<String, String> {
+    crate::history::restore_at(&file_hash, target_timestamp)
+}
+
+#[command]
+pub fn history_check_unsaved(path: String) -> bool {
+    crate::history::check_unsaved_history(&path)
+}
+
+#[command]
+pub fn history_delete_file(file_hash: String) -> Result<(), String> {
+    crate::history::delete_history_file(&file_hash)
+}
+
+#[command]
+pub fn history_get_file_hash(path: String) -> String {
+    crate::history::path_hash(&path)
 }
 

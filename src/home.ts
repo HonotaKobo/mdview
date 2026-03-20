@@ -16,6 +16,14 @@ interface TagEntry {
   memo?: string;
 }
 
+interface HistoryFileMeta {
+  file_hash: string;
+  file_path: string;
+  entry_count: number;
+  last_timestamp: number;
+  has_unsaved: boolean;
+}
+
 // SVG アイコン（テンプレート文字列）
 const ICON_HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>';
 const ICON_TAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
@@ -25,14 +33,16 @@ const ICON_FILE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICON_SEARCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
 const ICON_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
 const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
+const ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
 
 export class HomeScreen {
-  private activeTab: 'home' | 'tags' = 'home';
+  private activeTab: 'home' | 'tags' | 'history' = 'home';
 
   // データ
   private recentEntries: RecentEntry[] = [];
   private tagEntries: TagEntry[] = [];
   private tagCounts: [string, number][] = [];
+  private historyFiles: HistoryFileMeta[] = [];
   private pathStatus: Map<string, boolean> = new Map();
   private tagSearchQuery = '';
   private activeChips: Set<string> = new Set();
@@ -40,6 +50,7 @@ export class HomeScreen {
   // DOM 参照
   private homeTabBtn!: HTMLButtonElement;
   private tagsTabBtn!: HTMLButtonElement;
+  private historyTabBtn!: HTMLButtonElement;
   private contentArea!: HTMLElement;
   private statusBar!: HTMLElement;
 
@@ -75,6 +86,15 @@ export class HomeScreen {
     this.activeTab = 'tags';
     this.homeTabBtn.classList.remove('active');
     this.tagsTabBtn.classList.add('active');
+    this.historyTabBtn.classList.remove('active');
+    this.renderActiveTab();
+  }
+
+  switchToHistoryTab(): void {
+    this.activeTab = 'history';
+    this.homeTabBtn.classList.remove('active');
+    this.tagsTabBtn.classList.remove('active');
+    this.historyTabBtn.classList.add('active');
     this.renderActiveTab();
   }
 
@@ -82,6 +102,7 @@ export class HomeScreen {
     // ナビゲーションラベルを再構築する
     this.homeTabBtn.querySelector('span')!.textContent = t('ui.home_tab');
     this.tagsTabBtn.querySelector('span')!.textContent = t('ui.home_tags_tab');
+    this.historyTabBtn.querySelector('span')!.textContent = t('ui.history_tab');
     this.renderActiveTab();
   }
 
@@ -98,6 +119,7 @@ export class HomeScreen {
       this.activeTab = 'home';
       this.homeTabBtn.classList.add('active');
       this.tagsTabBtn.classList.remove('active');
+      this.historyTabBtn.classList.remove('active');
       this.renderActiveTab();
     });
     this.homeTabBtn.classList.add('active');
@@ -107,9 +129,19 @@ export class HomeScreen {
       this.activeTab = 'tags';
       this.tagsTabBtn.classList.add('active');
       this.homeTabBtn.classList.remove('active');
+      this.historyTabBtn.classList.remove('active');
       this.renderActiveTab();
     });
     sidebar.appendChild(this.tagsTabBtn);
+
+    this.historyTabBtn = this.createNavItem(t('ui.history_tab'), ICON_CLOCK, () => {
+      this.activeTab = 'history';
+      this.historyTabBtn.classList.add('active');
+      this.homeTabBtn.classList.remove('active');
+      this.tagsTabBtn.classList.remove('active');
+      this.renderActiveTab();
+    });
+    sidebar.appendChild(this.historyTabBtn);
 
     screen.appendChild(sidebar);
 
@@ -143,6 +175,7 @@ export class HomeScreen {
     this.recentEntries = await invoke<RecentEntry[]>('recent_get_all');
     this.tagEntries = await invoke<TagEntry[]>('tag_get_all');
     this.tagCounts = await invoke<[string, number][]>('tag_get_counts');
+    this.historyFiles = await invoke<HistoryFileMeta[]>('history_get_files');
     const validation = await invoke<[string, boolean][]>('tag_validate_paths');
     this.pathStatus.clear();
     for (const [path, exists] of validation) {
@@ -153,8 +186,10 @@ export class HomeScreen {
   private renderActiveTab(): void {
     if (this.activeTab === 'home') {
       this.renderHomeTab();
-    } else {
+    } else if (this.activeTab === 'tags') {
       this.renderTagsTab();
+    } else {
+      this.renderHistoryTab();
     }
     this.updateStatusBar();
   }
@@ -619,16 +654,138 @@ export class HomeScreen {
     return entries;
   }
 
+  // ===== 履歴タブ =====
+
+  private renderHistoryTab(): void {
+    this.contentArea.textContent = '';
+
+    // パネルヘッダー
+    const header = document.createElement('div');
+    header.className = 'home-panel-header';
+    const title = document.createElement('span');
+    title.className = 'home-panel-title';
+    title.textContent = t('ui.history_tab');
+    header.appendChild(title);
+    this.contentArea.appendChild(header);
+
+    // 履歴一覧ラッパー
+    const wrapper = document.createElement('div');
+    wrapper.className = 'home-history-wrapper';
+
+    if (this.historyFiles.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'home-history-empty';
+      empty.textContent = t('ui.history_no_files');
+      wrapper.appendChild(empty);
+    } else {
+      const list = document.createElement('div');
+      list.className = 'home-history-list';
+
+      for (const file of this.historyFiles) {
+        const item = document.createElement('div');
+        item.className = 'home-history-item';
+
+        // ファイルアイコン
+        const icon = document.createElement('div');
+        icon.className = 'home-recent-icon';
+        icon.textContent = '';
+        const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        iconSvg.setAttribute('viewBox', '0 0 24 24');
+        iconSvg.setAttribute('fill', 'none');
+        iconSvg.setAttribute('stroke', 'currentColor');
+        iconSvg.setAttribute('stroke-width', '2');
+        iconSvg.setAttribute('stroke-linecap', 'round');
+        iconSvg.setAttribute('stroke-linejoin', 'round');
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '10');
+        iconSvg.appendChild(circle);
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        poly.setAttribute('points', '12 6 12 12 16 14');
+        iconSvg.appendChild(poly);
+        icon.appendChild(iconSvg);
+        item.appendChild(icon);
+
+        // ファイル情報
+        const info = document.createElement('div');
+        info.className = 'home-recent-info';
+        const name = document.createElement('div');
+        name.className = 'home-recent-name';
+        const filename = file.file_path.split(/[/\\]/).pop() || file.file_path;
+        name.textContent = filename;
+        info.appendChild(name);
+        const pathEl = document.createElement('div');
+        pathEl.className = 'home-recent-path';
+        pathEl.textContent = this.shortenPath(file.file_path);
+        pathEl.title = file.file_path;
+        info.appendChild(pathEl);
+        item.appendChild(info);
+
+        // エントリ数
+        const entries = document.createElement('div');
+        entries.className = 'home-history-meta';
+        entries.textContent = t('ui.history_entries').replace('{count}', String(file.entry_count));
+        item.appendChild(entries);
+
+        // 最終記録時刻
+        const lastTime = document.createElement('div');
+        lastTime.className = 'home-recent-date';
+        lastTime.textContent = this.relativeTime(file.last_timestamp);
+        item.appendChild(lastTime);
+
+        // 未保存バッジ
+        if (file.has_unsaved) {
+          const badge = document.createElement('span');
+          badge.className = 'home-history-unsaved';
+          badge.textContent = '\u25cf';
+          item.appendChild(badge);
+        }
+
+        // 削除ボタン
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'home-recent-remove';
+        deleteBtn.textContent = '\u00d7';
+        deleteBtn.title = t('ui.history_delete');
+        deleteBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await invoke('history_delete_file', { fileHash: file.file_hash });
+          this.historyFiles = this.historyFiles.filter(f => f.file_hash !== file.file_hash);
+          this.renderHistoryTab();
+          this.updateStatusBar();
+        });
+        item.appendChild(deleteBtn);
+
+        // クリックで復元内容を一時ウィンドウで表示
+        item.addEventListener('click', async () => {
+          try {
+            const body = await invoke<string>('history_restore_at', {
+              fileHash: file.file_hash,
+              targetTimestamp: 0,
+            });
+            await invoke('open_new_window', { body });
+          } catch (e) {
+            console.error('History restore failed:', e);
+          }
+        });
+
+        list.appendChild(item);
+      }
+      wrapper.appendChild(list);
+    }
+
+    this.contentArea.appendChild(wrapper);
+  }
+
   // ===== ステータスバー =====
 
   private updateStatusBar(): void {
+    this.statusBar.textContent = '';
     if (this.activeTab === 'home') {
-      this.statusBar.innerHTML = '';
       const fileCount = document.createElement('span');
       fileCount.textContent = t('ui.tm_count').replace('{count}', String(this.recentEntries.length));
       this.statusBar.appendChild(fileCount);
-    } else {
-      this.statusBar.innerHTML = '';
+    } else if (this.activeTab === 'tags') {
       const filtered = this.getFilteredTagEntries();
       const fileCount = document.createElement('span');
       fileCount.textContent = t('ui.tm_count').replace('{count}', String(filtered.length));
@@ -641,6 +798,10 @@ export class HomeScreen {
       const tagCount = document.createElement('span');
       tagCount.textContent = t('ui.tag_count').replace('{count}', String(this.tagCounts.length));
       this.statusBar.appendChild(tagCount);
+    } else {
+      const fileCount = document.createElement('span');
+      fileCount.textContent = t('ui.tm_count').replace('{count}', String(this.historyFiles.length));
+      this.statusBar.appendChild(fileCount);
     }
   }
 

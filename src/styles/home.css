@@ -570,6 +570,72 @@
   background: rgba(128, 128, 128, 0.5);
 }
 
+/* ===== 履歴タブ ===== */
+
+.home-history-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 32px 24px;
+  max-width: 900px;
+}
+
+.home-history-list {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.home-history-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.1s;
+}
+
+.home-history-item:hover {
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.home-history-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.home-history-unsaved {
+  color: var(--link-color);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.home-history-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 32px 12px;
+  text-align: center;
+}
+
+.home-history-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.home-history-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.home-history-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+  border-radius: 4px;
+}
+
+.home-history-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
+}
+
 /* 印刷時: ホーム画面を非表示にする */
 @media print {
   #home-screen,

@@ -7,6 +7,7 @@
     "file_save": "Save",
     "file_save_as": "Save As...",
     "file_reload": "Reload",
+    "file_history_settings": "Change History Settings...",
     "file_export_pdf": "Export as PDF...",
     "file_export_html": "Export as HTML...",
     "file_print": "Print",
@@ -115,6 +116,21 @@
     "home_time_yesterday": "Yesterday",
     "home_time_days": "{count}d ago",
     "home_time_weeks": "{count}w ago",
-    "home_time_older": "Over a month ago"
+    "home_time_older": "Over a month ago",
+    "history_tab": "History",
+    "history_no_files": "No change history",
+    "history_entries": "{count} entries",
+    "history_last": "Last: {time}",
+    "history_restore": "Restore",
+    "history_delete": "Delete",
+    "history_unsaved_notice": "This file has unsaved change history.",
+    "history_unsaved_view": "View",
+    "history_settings_title": "Change History Settings",
+    "history_settings_enabled": "Record change history",
+    "history_settings_snapshot_interval": "Snapshot interval (delta count)",
+    "history_settings_network_paths": "Include network paths",
+    "history_settings_temp_files": "Include temporary files",
+    "history_settings_save": "Save",
+    "history_settings_cancel": "Cancel"
   }
 }

@@ -516,8 +516,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link 0.2.1",
 ]
 
@@ -829,6 +831,16 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "diff-match-patch-rs"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca58d98a1eef2800e4275a2713334e9a03300d32ca759fb3cc91f597e833db86"
+dependencies = [
+ "chrono",
+ "percent-encoding",
 ]
 
 [[package]]
@@ -4879,9 +4891,10 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tsumugi"
-version = "0.3.54"
+version = "0.3.55"
 dependencies = [
  "clap",
+ "diff-match-patch-rs",
  "dirs 5.0.1",
  "dunce",
  "getrandom 0.2.17",

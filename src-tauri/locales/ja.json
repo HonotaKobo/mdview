@@ -7,6 +7,7 @@
     "file_save": "上書き保存",
     "file_save_as": "名前を付けて保存",
     "file_reload": "再読み込み",
+    "file_history_settings": "変更履歴の設定...",
     "file_export_pdf": "PDFとしてエクスポート...",
     "file_export_html": "HTMLとしてエクスポート...",
     "file_print": "印刷",
@@ -115,6 +116,21 @@
     "home_time_yesterday": "昨日",
     "home_time_days": "{count}日前",
     "home_time_weeks": "{count}週間前",
-    "home_time_older": "1ヶ月以上前"
+    "home_time_older": "1ヶ月以上前",
+    "history_tab": "履歴",
+    "history_no_files": "変更履歴はありません",
+    "history_entries": "{count} 件の記録",
+    "history_last": "最終: {time}",
+    "history_restore": "復元",
+    "history_delete": "削除",
+    "history_unsaved_notice": "このファイルに未保存の変更履歴があります。",
+    "history_unsaved_view": "確認する",
+    "history_settings_title": "変更履歴の設定",
+    "history_settings_enabled": "変更履歴を記録する",
+    "history_settings_snapshot_interval": "スナップショット間隔（デルタ数）",
+    "history_settings_network_paths": "ネットワークパスを含める",
+    "history_settings_temp_files": "一時ファイルを含める",
+    "history_settings_save": "保存",
+    "history_settings_cancel": "キャンセル"
   }
 }

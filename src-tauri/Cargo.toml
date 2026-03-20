@@ -29,6 +29,7 @@ tiny_http = "0.12"
 getrandom = "0.2"
 dunce = "1"
 tauri-plugin-shell = "2"
+diff-match-patch-rs = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+mod history;
 mod http_api;
 mod i18n;
 mod ipc;
@@ -17,6 +18,7 @@ use clap::Parser;
 #[allow(unused_imports)]
 use tauri::{Emitter as _, Manager as _};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult};
+use history::{HistoryState, HistoryStore};
 use recent::{RecentState, RecentStore};
 use state::{LastFocusedDoc, WindowState, WindowStates};
 use tags::{TagState, TagStore};
@@ -105,7 +107,7 @@ pub(crate) fn open_document_window(
     };
 
     // ウィンドウ状態を作成
-    let mut ws = WindowState::new(instance_id.clone(), doc_title.clone(), content);
+    let mut ws = WindowState::new(instance_id.clone(), doc_title.clone(), content.clone());
     ws.content_explicitly_set = file.is_some() || body.is_some();
     if let Some(ref fp) = file_path {
         ws.saved_path = Some(fp.clone());
@@ -156,6 +158,13 @@ pub(crate) fn open_document_window(
         let recent = app.state::<RecentState>();
         let mut store = recent.lock().unwrap();
         store.add(fp, &doc_title);
+    }
+
+    // 履歴追跡を開始
+    {
+        let history = app.state::<HistoryState>();
+        let mut hs = history.lock().unwrap();
+        hs.start_tracking(&label, &content, file_path.as_deref());
     }
 
     eprintln!("tsumugi: new window {} (instance: {})", label, instance_id);
@@ -366,6 +375,7 @@ pub fn run() {
         .manage(Mutex::new("main".to_string()) as LastFocusedDoc)
         .manage(TagState::new(TagStore::load()))
         .manage(RecentState::new(RecentStore::load()))
+        .manage(HistoryState::new(HistoryStore::load()))
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
             commands::save_file,
@@ -403,6 +413,13 @@ pub fn run() {
             commands::recent_clear,
             pdf::export_pdf,
             pdf::has_pdf_browser,
+            commands::history_get_config,
+            commands::history_set_config,
+            commands::history_get_files,
+            commands::history_restore_at,
+            commands::history_check_unsaved,
+            commands::history_delete_file,
+            commands::history_get_file_hash,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
@@ -456,6 +473,25 @@ pub fn run() {
                 let mut store = recent.lock().unwrap();
                 store.add(fp, &title);
             }
+
+            // 初期ウィンドウの履歴追跡を開始
+            {
+                let history = app.state::<HistoryState>();
+                let initial_content = {
+                    let states = app.state::<WindowStates>();
+                    let guard = states.lock().unwrap();
+                    guard.get("main").map(|s| s.current_content.clone())
+                };
+                if let Some(content) = initial_content {
+                    let mut hs = history.lock().unwrap();
+                    hs.start_tracking("main", &content, resolved_file_path_for_setup.as_deref());
+                }
+            }
+
+            // バックグラウンドで古い履歴エントリをクリーンアップ
+            std::thread::spawn(|| {
+                history::cleanup_old_entries();
+            });
 
             Ok(())
         })
@@ -574,6 +610,13 @@ pub fn run() {
                     {
                         let watchers = app.state::<FileWatchers>();
                         watchers.lock().unwrap().remove(&label);
+                    }
+
+                    // 履歴追跡を停止
+                    {
+                        let history = app.state::<HistoryState>();
+                        let mut hs = history.lock().unwrap();
+                        hs.stop_tracking(&label);
                     }
 
                     // ドキュメントウィンドウが残っていなければアプリを終了

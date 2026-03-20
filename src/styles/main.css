@@ -1358,6 +1358,105 @@ mark.find-highlight.active {
   border-color: var(--link-color);
 }
 
+/* 変更履歴設定モーダル */
+#history-settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+#history-settings-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  width: 400px;
+}
+
+:root[data-theme='dark'] #history-settings-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='dark'] #history-settings-modal {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.history-settings-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.history-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.history-settings-row label {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.history-settings-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.history-settings-check-label input[type='checkbox'] {
+  accent-color: var(--link-color);
+}
+
+.history-settings-number {
+  width: 70px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.history-settings-number:focus {
+  border-color: var(--link-color);
+}
+
+.history-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* 未保存履歴通知（設定モーダルのオーバーレイを共用） */
+#history-unsaved-notice {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  width: 400px;
+}
+
+:root[data-theme='dark'] #history-unsaved-notice {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
 /* 印刷用スタイル */
 @media print {
   @page {
