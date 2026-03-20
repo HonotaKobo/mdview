@@ -844,17 +844,13 @@ export class HomeScreen {
           });
         } else {
           // 通常モード: 削除ボタン + クリックで復元
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'home-recent-remove';
-          deleteBtn.textContent = '\u00d7';
-          deleteBtn.title = t('ui.history_delete');
-          deleteBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
+          const deleteBtn = this.createIconButton(ICON_TRASH, t('ui.history_delete'), async () => {
             await invoke('history_delete_file', { fileHash: file.file_hash });
             this.historyFiles = this.historyFiles.filter(f => f.file_hash !== file.file_hash);
             this.renderHistoryTab();
             this.updateStatusBar();
           });
+          deleteBtn.classList.add('danger');
           item.appendChild(deleteBtn);
 
           item.addEventListener('click', () => {
