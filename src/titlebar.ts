@@ -129,6 +129,8 @@ export class CustomTitleBar {
           { type: 'separator' },
           { type: 'normal', id: 'file_reload', label: this.t('menu.file_reload'), accelerator: 'Ctrl+R' },
           { type: 'separator' },
+          { type: 'normal', id: 'file_history_settings', label: this.t('menu.file_history_settings') },
+          { type: 'separator' },
           { type: 'normal', id: 'file_export_pdf', label: this.t('menu.file_export_pdf'), accelerator: 'Ctrl+Shift+E' },
           { type: 'normal', id: 'file_export_html', label: this.t('menu.file_export_html') },
           { type: 'normal', id: 'file_print', label: this.t('menu.file_print'), accelerator: 'Ctrl+P' },
