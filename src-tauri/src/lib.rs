@@ -422,6 +422,7 @@ pub fn run() {
             commands::history_delete_file,
             commands::history_delete_files,
             commands::history_get_file_hash,
+            commands::history_get_entries,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;

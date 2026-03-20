@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use tauri::command;
 
-use crate::history::{HistoryConfig, HistoryFileMeta, HistoryState};
+use crate::history::{HistoryConfig, HistoryEntryMeta, HistoryFileMeta, HistoryState};
 use crate::i18n::I18nState;
 use crate::recent::{RecentEntry, RecentState};
 use crate::state::WindowStates;
@@ -444,5 +444,10 @@ pub fn history_delete_files(file_hashes: Vec<String>, history: tauri::State<'_, 
 #[command]
 pub fn history_get_file_hash(path: String) -> String {
     crate::history::path_hash(&path)
+}
+
+#[command]
+pub fn history_get_entries(file_hash: String) -> Result<Vec<HistoryEntryMeta>, String> {
+    crate::history::get_entries(&file_hash)
 }
 

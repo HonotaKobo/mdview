@@ -24,6 +24,13 @@ interface HistoryFileMeta {
   has_unsaved: boolean;
 }
 
+interface HistoryEntryMeta {
+  entry_type: string;
+  timestamp: number;
+  file_path: string;
+  saved: boolean;
+}
+
 // SVG アイコン（テンプレート文字列）
 const ICON_HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>';
 const ICON_TAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
@@ -48,6 +55,7 @@ export class HomeScreen {
   private activeChips: Set<string> = new Set();
   private historySelectMode = false;
   private historySelected: Set<string> = new Set();
+  private entryModalOverlay: HTMLElement | null = null;
 
   // DOM 参照
   private homeTabBtn!: HTMLButtonElement;
@@ -57,6 +65,7 @@ export class HomeScreen {
   private statusBar!: HTMLElement;
 
   destroy(): void {
+    this.closeEntryModal();
     const screen = document.getElementById('home-screen');
     if (screen) screen.remove();
     const bar = document.getElementById('home-status-bar');
@@ -789,13 +798,15 @@ export class HomeScreen {
         info.className = 'home-recent-info';
         const name = document.createElement('div');
         name.className = 'home-recent-name';
-        const filename = file.file_path.split(/[/\\]/).pop() || file.file_path;
+        const filename = file.file_path
+          ? (file.file_path.split(/[/\\]/).pop() || file.file_path)
+          : t('ui.history_temp_file');
         name.textContent = filename;
         info.appendChild(name);
         const pathEl = document.createElement('div');
         pathEl.className = 'home-recent-path';
-        pathEl.textContent = this.shortenPath(file.file_path);
-        pathEl.title = file.file_path;
+        pathEl.textContent = file.file_path ? this.shortenPath(file.file_path) : '';
+        pathEl.title = file.file_path || '';
         info.appendChild(pathEl);
         item.appendChild(info);
 
@@ -846,16 +857,8 @@ export class HomeScreen {
           });
           item.appendChild(deleteBtn);
 
-          item.addEventListener('click', async () => {
-            try {
-              const body = await invoke<string>('history_restore_at', {
-                fileHash: file.file_hash,
-                targetTimestamp: 0,
-              });
-              await invoke('open_new_window', { body });
-            } catch (e) {
-              console.error('History restore failed:', e);
-            }
+          item.addEventListener('click', () => {
+            this.showEntryModal(file);
           });
         }
 
@@ -917,6 +920,141 @@ export class HomeScreen {
 
   private openFileFromTags(path: string): void {
     invoke('open_new_window', { file: path, closeSelf: true });
+  }
+
+  private async showEntryModal(file: HistoryFileMeta): Promise<void> {
+    this.closeEntryModal();
+
+    let entries: HistoryEntryMeta[];
+    try {
+      entries = await invoke<HistoryEntryMeta[]>('history_get_entries', { fileHash: file.file_hash });
+    } catch (e) {
+      console.error('Failed to get entries:', e);
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'history-entry-overlay';
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeEntryModal();
+    });
+
+    const modal = document.createElement('div');
+    modal.className = 'history-entry-modal';
+
+    // ヘッダー
+    const header = document.createElement('div');
+    header.className = 'history-entry-header';
+    const title = document.createElement('span');
+    title.className = 'history-entry-title';
+    const displayName = file.file_path
+      ? (file.file_path.split(/[/\\]/).pop() || file.file_path)
+      : t('ui.history_temp_file');
+    title.textContent = t('ui.history_entry_modal_title') + ' - ' + displayName;
+    header.appendChild(title);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'home-recent-remove';
+    closeBtn.style.opacity = '1';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => this.closeEntryModal());
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    // 「最新を開く」ボタン
+    const openLatestBtn = document.createElement('button');
+    openLatestBtn.className = 'history-entry-open-latest';
+    openLatestBtn.textContent = t('ui.history_open_latest');
+    openLatestBtn.addEventListener('click', async () => {
+      try {
+        const body = await invoke<string>('history_restore_at', {
+          fileHash: file.file_hash,
+          targetTimestamp: 0,
+        });
+        await invoke('open_new_window', { body });
+      } catch (e) {
+        console.error('History restore failed:', e);
+      }
+    });
+    modal.appendChild(openLatestBtn);
+
+    // エントリ一覧
+    const list = document.createElement('div');
+    list.className = 'history-entry-list';
+
+    for (const entry of entries) {
+      const item = document.createElement('div');
+      item.className = 'history-entry-item';
+
+      // タイプバッジ
+      const typeBadge = document.createElement('span');
+      typeBadge.className = 'history-entry-type' + (entry.entry_type === 'snapshot' ? ' snapshot' : ' delta');
+      typeBadge.textContent = entry.entry_type === 'snapshot'
+        ? t('ui.history_entry_snapshot')
+        : t('ui.history_entry_delta');
+      item.appendChild(typeBadge);
+
+      // 時刻
+      const time = document.createElement('span');
+      time.className = 'history-entry-time';
+      const date = new Date(entry.timestamp * 1000);
+      time.textContent = date.toLocaleString();
+      item.appendChild(time);
+
+      // saved状態
+      const savedBadge = document.createElement('span');
+      savedBadge.className = 'history-entry-saved' + (entry.saved ? ' saved' : ' unsaved');
+      savedBadge.textContent = entry.saved
+        ? t('ui.history_entry_saved')
+        : t('ui.history_entry_unsaved');
+      item.appendChild(savedBadge);
+
+      // ボタン群
+      const actions = document.createElement('div');
+      actions.className = 'history-entry-actions';
+
+      if (entry.saved && entry.file_path) {
+        // 「ファイルを開く」ボタン
+        const openFileBtn = document.createElement('button');
+        openFileBtn.className = 'history-entry-btn';
+        openFileBtn.textContent = t('ui.history_open_file');
+        openFileBtn.addEventListener('click', () => {
+          invoke('open_new_window', { file: entry.file_path });
+        });
+        actions.appendChild(openFileBtn);
+      }
+
+      // 「一時ファイルとして開く」ボタン
+      const openTempBtn = document.createElement('button');
+      openTempBtn.className = 'history-entry-btn secondary';
+      openTempBtn.textContent = t('ui.history_open_as_temp');
+      openTempBtn.addEventListener('click', async () => {
+        try {
+          const body = await invoke<string>('history_restore_at', {
+            fileHash: file.file_hash,
+            targetTimestamp: entry.timestamp,
+          });
+          await invoke('open_new_window', { body });
+        } catch (e) {
+          console.error('History restore failed:', e);
+        }
+      });
+      actions.appendChild(openTempBtn);
+
+      item.appendChild(actions);
+      list.appendChild(item);
+    }
+
+    modal.appendChild(list);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    this.entryModalOverlay = overlay;
+  }
+
+  private closeEntryModal(): void {
+    if (this.entryModalOverlay) {
+      this.entryModalOverlay.remove();
+      this.entryModalOverlay = null;
+    }
   }
 
   private async removeRecent(path: string): Promise<void> {

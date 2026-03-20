@@ -48,6 +48,15 @@ pub enum HistoryEntry {
     },
 }
 
+/// 履歴エントリのメタ情報（一覧表示用）
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HistoryEntryMeta {
+    pub entry_type: String,
+    pub timestamp: u64,
+    pub file_path: String,
+    pub saved: bool,
+}
+
 /// 履歴ファイルのメタ情報
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HistoryFileMeta {
@@ -73,6 +82,7 @@ struct FileTracker {
     delta_count_since_snapshot: u32,
     file_hash: String,
     file_path: Option<String>,
+    has_initial_snapshot: bool,
 }
 
 /// 履歴ストア
@@ -165,10 +175,26 @@ impl HistoryStore {
         }
 
         let hash = path_hash(file_path.unwrap_or(label));
+        let fp_str = file_path.unwrap_or("");
+
+        // 空コンテンツの場合はスナップショットを記録せずトラッカーのみ登録
+        if initial_content.is_empty() {
+            self.trackers.insert(
+                label.to_string(),
+                FileTracker {
+                    last_recorded_content: String::new(),
+                    delta_count_since_snapshot: 0,
+                    file_hash: hash,
+                    file_path: file_path.map(|s| s.to_string()),
+                    has_initial_snapshot: false,
+                },
+            );
+            return;
+        }
+
         let now = now_secs();
 
         // 初回スナップショットを書き込む
-        let fp_str = file_path.unwrap_or("");
         let entry = HistoryEntry::Snapshot {
             t: now,
             p: fp_str.to_string(),
@@ -202,6 +228,7 @@ impl HistoryStore {
                 delta_count_since_snapshot: 0,
                 file_hash: hash,
                 file_path: file_path.map(|s| s.to_string()),
+                has_initial_snapshot: true,
             },
         );
     }
@@ -238,16 +265,57 @@ impl HistoryStore {
         let snapshot_interval = self.config.snapshot_interval;
 
         // トラッカーから必要な値をコピー（借用競合を回避）
-        let (file_hash, last_content, delta_count) = match self.trackers.get(label) {
-            Some(t) => (
-                t.file_hash.clone(),
-                t.last_recorded_content.clone(),
-                t.delta_count_since_snapshot,
-            ),
-            None => return,
-        };
+        let (file_hash, last_content, delta_count, has_initial_snapshot) =
+            match self.trackers.get(label) {
+                Some(t) => (
+                    t.file_hash.clone(),
+                    t.last_recorded_content.clone(),
+                    t.delta_count_since_snapshot,
+                    t.has_initial_snapshot,
+                ),
+                None => return,
+            };
 
         let now = now_secs();
+
+        // 初回スナップショットが未記録の場合
+        if !has_initial_snapshot {
+            if content.is_empty() {
+                return; // まだ空なので何も記録しない
+            }
+            // 初回スナップショットを記録
+            let fp_str = saved_path.unwrap_or("").to_string();
+            let entry = HistoryEntry::Snapshot {
+                t: now,
+                p: fp_str.clone(),
+                c: content.to_string(),
+                saved: is_saved,
+            };
+            append_entry(&file_hash, &entry);
+
+            let idx_entry = self
+                .index
+                .entry(file_hash.clone())
+                .or_insert(IndexEntry {
+                    file_path: fp_str.clone(),
+                    entry_count: 0,
+                    last_timestamp: 0,
+                    has_unsaved: false,
+                });
+            if !fp_str.is_empty() {
+                idx_entry.file_path = fp_str;
+            }
+            idx_entry.entry_count += 1;
+            idx_entry.last_timestamp = now;
+            idx_entry.has_unsaved = !is_saved;
+            self.save_index();
+
+            if let Some(tracker) = self.trackers.get_mut(label) {
+                tracker.has_initial_snapshot = true;
+                tracker.last_recorded_content = content.to_string();
+            }
+            return;
+        }
 
         // 変更なしチェック
         if content == last_content {
@@ -470,6 +538,41 @@ impl HistoryStore {
 }
 
 // --- 独立関数 ---
+
+/// 指定ファイルハッシュのエントリ一覧を取得する
+pub fn get_entries(file_hash: &str) -> Result<Vec<HistoryEntryMeta>, String> {
+    let path = history_file_path(file_hash);
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("Failed to read history: {}", e))?;
+
+    let mut result = Vec::new();
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
+            let meta = match &entry {
+                HistoryEntry::Snapshot { t, p, saved, .. } => HistoryEntryMeta {
+                    entry_type: "snapshot".to_string(),
+                    timestamp: *t,
+                    file_path: p.clone(),
+                    saved: *saved,
+                },
+                HistoryEntry::Delta { t, p, saved, .. } => HistoryEntryMeta {
+                    entry_type: "delta".to_string(),
+                    timestamp: *t,
+                    file_path: p.clone(),
+                    saved: *saved,
+                },
+            };
+            result.push(meta);
+        }
+    }
+
+    // 新しい順にソート
+    result.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    Ok(result)
+}
 
 /// 指定タイムスタンプの時点のコンテンツを復元する
 pub fn restore_at(file_hash: &str, target_timestamp: u64) -> Result<String, String> {
