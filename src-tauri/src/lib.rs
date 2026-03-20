@@ -16,7 +16,7 @@ use std::sync::Mutex;
 use clap::Parser;
 #[allow(unused_imports)]
 use tauri::{Emitter as _, Manager as _};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind, MessageDialogResult};
 use recent::{RecentState, RecentStore};
 use state::{LastFocusedDoc, WindowState, WindowStates};
 use tags::{TagState, TagStore};
@@ -488,23 +488,42 @@ pub fn run() {
                         api.prevent_close();
 
                         // 翻訳テキストを取得
-                        let msg = {
+                        let (msg, btn_save, btn_dont_save, btn_cancel) = {
                             let app = window.app_handle();
                             let i18n_state = app.state::<i18n::I18nState>();
                             let i18n = i18n_state.lock().unwrap();
-                            i18n.t("ui.unsaved_confirm")
+                            (
+                                i18n.t("ui.unsaved_confirm"),
+                                i18n.t("ui.unsaved_save"),
+                                i18n.t("ui.unsaved_dont_save"),
+                                i18n.t("ui.unsaved_cancel"),
+                            )
                         };
 
                         let window_clone = window.clone();
+                        let save_label = btn_save.clone();
+                        let dont_save_label = btn_dont_save.clone();
                         window.app_handle().dialog()
                             .message(&msg)
                             .title("tsumugi")
                             .kind(MessageDialogKind::Warning)
-                            .buttons(MessageDialogButtons::OkCancel)
-                            .show(move |confirmed| {
-                                if confirmed {
+                            .buttons(MessageDialogButtons::YesNoCancelCustom(
+                                btn_save, btn_dont_save, btn_cancel,
+                            ))
+                            .show_with_result(move |result| {
+                                // YesNoCancelCustomではCustom(ボタンラベル)が返る
+                                let is_save = matches!(&result, MessageDialogResult::Yes)
+                                    || matches!(&result, MessageDialogResult::Custom(s) if s == &save_label);
+                                let is_dont_save = matches!(&result, MessageDialogResult::No)
+                                    || matches!(&result, MessageDialogResult::Custom(s) if s == &dont_save_label);
+                                if is_save {
+                                    // 「保存」→ フロントエンドに保存イベントをemitし、保存完了後に閉じる
+                                    let _ = window_clone.emit("save-and-close", ());
+                                } else if is_dont_save {
+                                    // 「保存しない」→ そのまま閉じる
                                     let _ = window_clone.destroy();
                                 }
+                                // それ以外（キャンセル）→ 何もしない
                             });
                     }
                 }

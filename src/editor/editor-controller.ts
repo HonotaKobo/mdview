@@ -300,6 +300,7 @@ export class EditorController {
     // リサイズ時に折り返しが変わるため行番号を再計算する
     const ro = new ResizeObserver(() => {
       this.updateLineNumbers();
+      this.autoResizeTextarea();
     });
     ro.observe(textarea);
 

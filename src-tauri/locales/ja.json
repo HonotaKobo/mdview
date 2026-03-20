@@ -42,7 +42,10 @@
     "help_about": "tsumugiについて"
   },
   "ui": {
-    "unsaved_confirm": "未保存の変更があります。閉じますか？",
+    "unsaved_confirm": "変更を保存しますか？",
+    "unsaved_save": "保存",
+    "unsaved_dont_save": "保存しない",
+    "unsaved_cancel": "キャンセル",
     "untitled": "無題",
     "find_placeholder": "検索...",
     "find_no_results": "一致なし",

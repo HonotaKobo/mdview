@@ -42,7 +42,10 @@
     "help_about": "About tsumugi"
   },
   "ui": {
-    "unsaved_confirm": "You have unsaved changes. Close anyway?",
+    "unsaved_confirm": "Do you want to save the changes?",
+    "unsaved_save": "Save",
+    "unsaved_dont_save": "Don't Save",
+    "unsaved_cancel": "Cancel",
     "untitled": "Untitled",
     "find_placeholder": "Find...",
     "find_no_results": "No results",

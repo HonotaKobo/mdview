@@ -62,6 +62,7 @@ pub fn notify_saved(
     let mut states = states.lock().unwrap();
     if let Some(state) = states.get_mut(window.label()) {
         state.saved_path = Some(path.clone());
+        state.saved_content = state.current_content.clone();
         state.dirty = false;
     }
     // 最近使ったファイルに追加
@@ -83,8 +84,8 @@ pub fn get_saved_path(window: tauri::Window, states: tauri::State<'_, WindowStat
 pub fn sync_content(content: String, window: tauri::Window, states: tauri::State<'_, WindowStates>) {
     let mut states = states.lock().unwrap();
     if let Some(state) = states.get_mut(window.label()) {
-        state.current_content = content;
-        state.dirty = true;
+        state.current_content = content.clone();
+        state.dirty = content != state.saved_content;
     }
 }
 
@@ -93,6 +94,10 @@ pub fn set_dirty(dirty: bool, window: tauri::Window, states: tauri::State<'_, Wi
     let mut states = states.lock().unwrap();
     if let Some(state) = states.get_mut(window.label()) {
         state.dirty = dirty;
+        if !dirty {
+            // dirty=falseにリセットする際、現在のコンテンツを基準値として記録
+            state.saved_content = state.current_content.clone();
+        }
     }
 }
 

@@ -260,6 +260,14 @@ listen('content-update', async (event) => {
   }
 });
 
+// save-and-close リスナー: Rust側から保存→閉じるフローを要求された時
+listen('save-and-close', async () => {
+  if (isEditor) {
+    await doSave();
+  }
+  getCurrentWindow().close();
+});
+
 // switch-to-tags-tab リスナー（常に登録）
 listen('switch-to-tags-tab', () => {
   if (homeScreen) {

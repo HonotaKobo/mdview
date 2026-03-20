@@ -6,6 +6,8 @@ pub struct WindowState {
     pub instance_id: String,
     /// Current markdown source
     pub current_content: String,
+    /// 最後に保存した時点のコンテンツ（dirty判定の基準値）
+    pub saved_content: String,
     /// Document title
     pub title: String,
     /// Path where user saved the file (None if unsaved)
@@ -22,6 +24,7 @@ impl WindowState {
     pub fn new(instance_id: String, title: String, content: String) -> Self {
         Self {
             instance_id,
+            saved_content: content.clone(),
             current_content: content,
             title,
             saved_path: None,
