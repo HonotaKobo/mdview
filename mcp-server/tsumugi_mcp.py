@@ -3,6 +3,7 @@
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,11 +35,16 @@ def _instance_dir() -> Path:
 
 def _read_connection(instance_id: str) -> tuple[str, str]:
     """ポートファイルからURL・トークンを読み取る."""
+    if not re.match(r'^[a-zA-Z0-9_-]+$', instance_id):
+        raise ValueError(f"Invalid instance_id: {instance_id!r}")
     port_file = _instance_dir() / f"{instance_id}.http"
     if not port_file.exists():
         raise FileNotFoundError(f"tsumugi instance '{instance_id}' not found: {port_file}")
     info = port_file.read_text().strip()
-    port, token = info.split(":", 1)
+    port_str, token = info.split(":", 1)
+    port = int(port_str)
+    if not (1 <= port <= 65535):
+        raise ValueError(f"Invalid port number: {port_str}")
     return f"http://127.0.0.1:{port}", token
 
 

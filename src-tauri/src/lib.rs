@@ -78,6 +78,11 @@ pub(crate) fn open_document_window(
         format!("gui-{:04x}", rand_u16())
     };
 
+    // ファイルパスのバリデーション
+    if let Some(ref f) = file {
+        commands::validate_path(f)?;
+    }
+
     // コンテンツを解決
     let (content, doc_title, file_path) = if let Some(ref f) = file {
         let abs_path = dunce::canonicalize(f)
@@ -557,11 +562,12 @@ pub fn run() {
                         });
                     }
 
-                    // IPC ソケットとHTTPポートファイルをクリーンアップ
+                    // IPC ソケット、HTTPポートファイル、トークンファイルをクリーンアップ
                     if let Some(ref id) = instance_id {
                         let path = ipc::instance_file(id);
                         std::fs::remove_file(&path).ok();
                         std::fs::remove_file(path.with_extension("http")).ok();
+                        std::fs::remove_file(path.with_extension("token")).ok();
                     }
 
                     // ファイル監視をクリーンアップ
@@ -609,9 +615,10 @@ pub fn run() {
                     }
                 }
                 tauri::RunEvent::Exit => {
-                    // プライマリソケットをクリーンアップ
+                    // プライマリソケットとトークンファイルをクリーンアップ
                     let primary_path = ipc::instance_file("tsumugi-primary");
                     std::fs::remove_file(&primary_path).ok();
+                    std::fs::remove_file(primary_path.with_extension("token")).ok();
                 }
                 _ => {}
             }

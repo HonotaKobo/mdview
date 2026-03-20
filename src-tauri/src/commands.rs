@@ -27,13 +27,36 @@ pub(crate) fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
 
     // 機密性の高いシステムディレクトリをブロック
     let path_str = canonical.to_string_lossy();
-    let blocked: &[&str] = if cfg!(target_os = "windows") {
-        &["C:\\Windows", "C:\\Program Files"]
+    let mut blocked: Vec<String> = if cfg!(target_os = "windows") {
+        vec![
+            "C:\\Windows".to_string(),
+            "C:\\Program Files".to_string(),
+            "C:\\Program Files (x86)".to_string(),
+        ]
     } else {
-        &["/etc", "/usr", "/bin", "/sbin", "/System"]
+        vec![
+            "/etc".to_string(),
+            "/private/etc".to_string(),
+            "/usr".to_string(),
+            "/bin".to_string(),
+            "/sbin".to_string(),
+            "/System".to_string(),
+        ]
     };
-    for prefix in blocked {
-        if path_str.starts_with(prefix) {
+    // ホームディレクトリ配下の機密パスを追加
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.to_string_lossy();
+        if cfg!(target_os = "windows") {
+            blocked.push(format!("{}\\.ssh", home_str));
+            blocked.push(format!("{}\\.aws", home_str));
+        } else {
+            blocked.push(format!("{}/.ssh", home_str));
+            blocked.push(format!("{}/.aws", home_str));
+            blocked.push(format!("{}/.gnupg", home_str));
+        }
+    }
+    for prefix in &blocked {
+        if path_str.starts_with(prefix.as_str()) {
             return Err(format!("Access denied: {}", prefix));
         }
     }
@@ -241,17 +264,19 @@ pub fn tag_set_memo(path: String, memo: Option<String>, state: tauri::State<'_, 
 
 #[command]
 pub fn restart_app(app: tauri::AppHandle, states: tauri::State<'_, WindowStates>) {
-    // プライマリソケットをクリーンアップ
+    // プライマリソケットとトークンファイルをクリーンアップ
     let primary_path = crate::ipc::instance_file("tsumugi-primary");
     std::fs::remove_file(&primary_path).ok();
+    std::fs::remove_file(primary_path.with_extension("token")).ok();
 
-    // ウィンドウごとのソケットとHTTPポートファイルをクリーンアップ
+    // ウィンドウごとのソケット、HTTPポートファイル、トークンファイルをクリーンアップ
     {
         let states = states.lock().unwrap();
         for (_, state) in states.iter() {
             let path = crate::ipc::instance_file(&state.instance_id);
             std::fs::remove_file(&path).ok();
             std::fs::remove_file(path.with_extension("http")).ok();
+            std::fs::remove_file(path.with_extension("token")).ok();
         }
     }
 

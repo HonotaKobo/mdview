@@ -37,13 +37,24 @@ mod transport {
         let stream = UnixStream::connect(&path)?;
         stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
         stream.set_write_timeout(Some(std::time::Duration::from_secs(5)))?;
-        Ok((stream, None))
+        // トークンファイルが存在すれば読み取る
+        let token_path = path.with_extension("token");
+        let token = std::fs::read_to_string(&token_path).ok();
+        Ok((stream, token))
     }
 
     pub fn bind(id: &str) -> std::io::Result<(Listener, Option<String>)> {
         let path = instance_file(id);
         std::fs::remove_file(&path).ok();
-        Ok((UnixListener::bind(&path)?, None))
+        // トークンを生成してファイルに保存
+        let mut buf = [0u8; 16];
+        getrandom::getrandom(&mut buf).expect("failed to generate IPC token");
+        let token: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
+        let token_path = path.with_extension("token");
+        std::fs::write(&token_path, &token)?;
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&token_path, std::fs::Permissions::from_mode(0o600)).ok();
+        Ok((UnixListener::bind(&path)?, Some(token)))
     }
 }
 

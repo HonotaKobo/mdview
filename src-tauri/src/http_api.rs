@@ -55,7 +55,8 @@ pub fn start_http_server(app: AppHandle, pdf_store: PdfContentStore) -> (u16, St
             }
 
             // トークン認証を確認
-            let response = if !verify_token(&request, &expected_token) {
+            let authorized = verify_token(&request, &expected_token);
+            let response = if !authorized {
                 ipc::IpcResponse {
                     ok: false,
                     value: Some("Unauthorized".to_string()),
@@ -64,7 +65,7 @@ pub fn start_http_server(app: AppHandle, pdf_store: PdfContentStore) -> (u16, St
                 handle_request(&app, &mut request)
             };
 
-            let status = if !verify_token(&request, &expected_token) {
+            let status = if !authorized {
                 401
             } else if response.ok {
                 200
@@ -215,23 +216,24 @@ fn parse_json_lenient<T: serde::de::DeserializeOwned>(body: &str) -> Result<T, S
 
 /// リクエストURLの`?id=`パラメータからウィンドウラベルを解決する。
 /// `id`がWindowStates内のinstance_idに一致する場合、対応するウィンドウラベルを返す。
-/// それ以外の場合は、最後にフォーカスされたドキュメントウィンドウにフォールバックする。
-fn resolve_window_label(app: &AppHandle, url: &str) -> String {
+/// `id`指定時に一致しなければ`Err`を返す。`id`未指定時は最後にフォーカスされたドキュメントを使用する。
+fn resolve_window_label(app: &AppHandle, url: &str) -> Result<String, String> {
     if let Some(id) = parse_query_param(url, "id") {
         let states = app.state::<WindowStates>();
         let states = states.lock().unwrap();
         if let Some((label, _)) = states.iter().find(|(_, s)| s.instance_id == id) {
-            return label.clone();
+            return Ok(label.clone());
         }
         // idをウィンドウラベルとして直接使用を試みる
         if states.contains_key(&id) {
-            return id;
+            return Ok(id);
         }
+        return Err(format!("Window not found for id: {}", id));
     }
     // デフォルトで最後にフォーカスされたドキュメントを使用
     let focused = app.state::<LastFocusedDoc>();
     let label = focused.lock().unwrap().clone();
-    label
+    Ok(label)
 }
 
 fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::IpcResponse {
@@ -242,7 +244,10 @@ fn handle_request(app: &AppHandle, request: &mut tiny_http::Request) -> ipc::Ipc
     let path = url.split('?').next().unwrap_or(&url);
 
     // 対象ウィンドウを解決
-    let window_label = resolve_window_label(app, &url);
+    let window_label = match resolve_window_label(app, &url) {
+        Ok(label) => label,
+        Err(e) => return error_response(&e),
+    };
 
     match (method, path) {
         // パススルー: IpcRequest JSONを直接受け付ける
