@@ -138,12 +138,7 @@
     "history_settings_cancel": "キャンセル",
     "history_temp_file": "一時ファイル",
     "history_entry_modal_title": "ログの詳細",
-    "history_entry_snapshot": "スナップショット",
-    "history_entry_delta": "差分",
-    "history_entry_saved": "保存済み",
-    "history_entry_unsaved": "未保存",
-    "history_open_latest": "最新を開く",
     "history_open_file": "ファイルを開く",
-    "history_open_as_temp": "一時ファイルとして開く"
+    "history_open_as_temp": "一時ファイル"
   }
 }

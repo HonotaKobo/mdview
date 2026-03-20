@@ -175,51 +175,16 @@ impl HistoryStore {
         }
 
         let hash = path_hash(file_path.unwrap_or(label));
-        let fp_str = file_path.unwrap_or("");
 
-        // 空コンテンツの場合はスナップショットを記録せずトラッカーのみ登録
-        if initial_content.is_empty() {
-            self.trackers.insert(
-                label.to_string(),
-                FileTracker {
-                    last_recorded_content: String::new(),
-                    delta_count_since_snapshot: 0,
-                    file_hash: hash,
-                    file_path: file_path.map(|s| s.to_string()),
-                    has_initial_snapshot: false,
-                },
-            );
-            return;
+        // 既存インデックスの has_unsaved をリセット（ディスクから読み込んだ状態）
+        if file_path.is_some() {
+            if let Some(idx_entry) = self.index.get_mut(&hash) {
+                if idx_entry.has_unsaved {
+                    idx_entry.has_unsaved = false;
+                    self.save_index();
+                }
+            }
         }
-
-        let now = now_secs();
-
-        // 初回スナップショットを書き込む
-        let entry = HistoryEntry::Snapshot {
-            t: now,
-            p: fp_str.to_string(),
-            c: initial_content.to_string(),
-            saved: true,
-        };
-        append_entry(&hash, &entry);
-
-        // インデックスを更新
-        let idx_entry = self
-            .index
-            .entry(hash.clone())
-            .or_insert(IndexEntry {
-                file_path: fp_str.to_string(),
-                entry_count: 0,
-                last_timestamp: 0,
-                has_unsaved: false,
-            });
-        if !fp_str.is_empty() {
-            idx_entry.file_path = fp_str.to_string();
-        }
-        idx_entry.entry_count += 1;
-        idx_entry.last_timestamp = now;
-        idx_entry.has_unsaved = false;
-        self.save_index();
 
         self.trackers.insert(
             label.to_string(),
@@ -228,7 +193,7 @@ impl HistoryStore {
                 delta_count_since_snapshot: 0,
                 file_hash: hash,
                 file_path: file_path.map(|s| s.to_string()),
-                has_initial_snapshot: true,
+                has_initial_snapshot: false,
             },
         );
     }
@@ -280,45 +245,115 @@ impl HistoryStore {
 
         // 初回スナップショットが未記録の場合
         if !has_initial_snapshot {
-            if content.is_empty() {
-                return; // まだ空なので何も記録しない
+            if content.is_empty() && last_content.is_empty() {
+                return; // 空→空: 何もしない
             }
-            // 初回スナップショットを記録
+
             let fp_str = saved_path.unwrap_or("").to_string();
-            let entry = HistoryEntry::Snapshot {
-                t: now,
-                p: fp_str.clone(),
-                c: content.to_string(),
-                saved: is_saved,
-            };
-            append_entry(&file_hash, &entry);
 
-            let idx_entry = self
-                .index
-                .entry(file_hash.clone())
-                .or_insert(IndexEntry {
-                    file_path: fp_str.clone(),
-                    entry_count: 0,
-                    last_timestamp: 0,
-                    has_unsaved: false,
-                });
-            if !fp_str.is_empty() {
-                idx_entry.file_path = fp_str;
-            }
-            idx_entry.entry_count += 1;
-            idx_entry.last_timestamp = now;
-            idx_entry.has_unsaved = !is_saved;
-            self.save_index();
+            if last_content.is_empty() {
+                // 新規ファイル（空→非空）: content でスナップショット、return
+                let entry = HistoryEntry::Snapshot {
+                    t: now,
+                    p: fp_str.clone(),
+                    c: content.to_string(),
+                    saved: is_saved,
+                };
+                append_entry(&file_hash, &entry);
 
-            if let Some(tracker) = self.trackers.get_mut(label) {
-                tracker.has_initial_snapshot = true;
-                tracker.last_recorded_content = content.to_string();
+                let idx_entry = self
+                    .index
+                    .entry(file_hash.clone())
+                    .or_insert(IndexEntry {
+                        file_path: fp_str.clone(),
+                        entry_count: 0,
+                        last_timestamp: 0,
+                        has_unsaved: false,
+                    });
+                if !fp_str.is_empty() {
+                    idx_entry.file_path = fp_str;
+                }
+                idx_entry.entry_count += 1;
+                idx_entry.last_timestamp = now;
+                idx_entry.has_unsaved = !is_saved;
+                self.save_index();
+
+                if let Some(tracker) = self.trackers.get_mut(label) {
+                    tracker.has_initial_snapshot = true;
+                    tracker.last_recorded_content = content.to_string();
+                }
+                return;
+            } else {
+                // 既存ファイル初回編集: last_content でスナップショット → return せずデルタ処理へ
+                let entry = HistoryEntry::Snapshot {
+                    t: now,
+                    p: fp_str.clone(),
+                    c: last_content.clone(),
+                    saved: true,
+                };
+                append_entry(&file_hash, &entry);
+
+                let idx_entry = self
+                    .index
+                    .entry(file_hash.clone())
+                    .or_insert(IndexEntry {
+                        file_path: fp_str.clone(),
+                        entry_count: 0,
+                        last_timestamp: 0,
+                        has_unsaved: false,
+                    });
+                if !fp_str.is_empty() {
+                    idx_entry.file_path = fp_str;
+                }
+                idx_entry.entry_count += 1;
+                idx_entry.last_timestamp = now;
+                self.save_index();
+
+                if let Some(tracker) = self.trackers.get_mut(label) {
+                    tracker.has_initial_snapshot = true;
+                }
+                // return しない → 以下のデルタ計算に進む
             }
-            return;
         }
 
         // 変更なしチェック
         if content == last_content {
+            if !is_saved {
+                return;
+            }
+            // 保存イベント: identity delta を saved=true で記録
+            let path_str = saved_path.unwrap_or("").to_string();
+            let dmp = diff_match_patch_rs::DiffMatchPatch::new();
+            if let Ok(diffs) = dmp.diff_main::<diff_match_patch_rs::Compat>(&last_content, content)
+            {
+                if let Ok(delta) = dmp.diff_to_delta(&diffs) {
+                    let entry = HistoryEntry::Delta {
+                        t: now,
+                        p: path_str.clone(),
+                        d: delta,
+                        saved: true,
+                    };
+                    append_entry(&file_hash, &entry);
+
+                    let idx_entry = self
+                        .index
+                        .entry(file_hash.clone())
+                        .or_insert(IndexEntry {
+                            file_path: path_str.clone(),
+                            entry_count: 0,
+                            last_timestamp: 0,
+                            has_unsaved: false,
+                        });
+                    if !path_str.is_empty() {
+                        idx_entry.file_path = path_str;
+                    }
+                    idx_entry.entry_count += 1;
+                    idx_entry.last_timestamp = now;
+                    idx_entry.has_unsaved = false;
+                    self.save_index();
+                }
+            }
+            // delta_count_since_snapshot はインクリメントしない（実質変更なし）
             return;
         }
 

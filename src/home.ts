@@ -956,74 +956,50 @@ export class HomeScreen {
     header.appendChild(closeBtn);
     modal.appendChild(header);
 
-    // 「最新を開く」ボタン
-    const openLatestBtn = document.createElement('button');
-    openLatestBtn.className = 'history-entry-open-latest';
-    openLatestBtn.textContent = t('ui.history_open_latest');
-    openLatestBtn.addEventListener('click', async () => {
-      try {
-        const body = await invoke<string>('history_restore_at', {
-          fileHash: file.file_hash,
-          targetTimestamp: 0,
-        });
-        await invoke('open_new_window', { body });
-      } catch (e) {
-        console.error('History restore failed:', e);
-      }
-    });
-    modal.appendChild(openLatestBtn);
+    // スナップショット除外 + 保存済みは最新1件のみ
+    const deltaEntries = entries.filter(e => e.entry_type !== 'snapshot');
+    const lastSavedIdx = deltaEntries.findIndex(e => e.saved);
+    const visibleEntries = deltaEntries.filter((e, i) =>
+      !e.saved || i === lastSavedIdx
+    );
 
     // エントリ一覧
     const list = document.createElement('div');
     list.className = 'history-entry-list';
 
-    for (const entry of entries) {
-      const item = document.createElement('div');
-      item.className = 'history-entry-item';
+    let selectedIndex: number | null = null;
+    const items: HTMLDivElement[] = [];
 
-      // タイプバッジ
-      const typeBadge = document.createElement('span');
-      typeBadge.className = 'history-entry-type' + (entry.entry_type === 'snapshot' ? ' snapshot' : ' delta');
-      typeBadge.textContent = entry.entry_type === 'snapshot'
-        ? t('ui.history_entry_snapshot')
-        : t('ui.history_entry_delta');
-      item.appendChild(typeBadge);
+    const updateSelection = () => {
+      items.forEach((el, i) => {
+        el.classList.toggle('selected', i === selectedIndex);
+      });
+    };
 
-      // 時刻
-      const time = document.createElement('span');
-      time.className = 'history-entry-time';
-      const date = new Date(entry.timestamp * 1000);
-      time.textContent = date.toLocaleString();
-      item.appendChild(time);
+    // フッターボタン
+    const footer = document.createElement('div');
+    footer.className = 'history-entry-footer';
 
-      // saved状態
-      const savedBadge = document.createElement('span');
-      savedBadge.className = 'history-entry-saved' + (entry.saved ? ' saved' : ' unsaved');
-      savedBadge.textContent = entry.saved
-        ? t('ui.history_entry_saved')
-        : t('ui.history_entry_unsaved');
-      item.appendChild(savedBadge);
-
-      // ボタン群
-      const actions = document.createElement('div');
-      actions.className = 'history-entry-actions';
-
-      if (entry.saved && entry.file_path) {
-        // 「ファイルを開く」ボタン
-        const openFileBtn = document.createElement('button');
-        openFileBtn.className = 'history-entry-btn';
-        openFileBtn.textContent = t('ui.history_open_file');
-        openFileBtn.addEventListener('click', () => {
+    const openFileBtn = document.createElement('button');
+    openFileBtn.className = 'history-entry-footer-btn primary';
+    openFileBtn.textContent = t('ui.history_open_file');
+    openFileBtn.disabled = true;
+    openFileBtn.addEventListener('click', () => {
+      if (selectedIndex !== null) {
+        const entry = visibleEntries[selectedIndex];
+        if (entry.saved && entry.file_path) {
           invoke('open_new_window', { file: entry.file_path });
-        });
-        actions.appendChild(openFileBtn);
+        }
       }
+    });
 
-      // 「一時ファイルとして開く」ボタン
-      const openTempBtn = document.createElement('button');
-      openTempBtn.className = 'history-entry-btn secondary';
-      openTempBtn.textContent = t('ui.history_open_as_temp');
-      openTempBtn.addEventListener('click', async () => {
+    const openTempBtn = document.createElement('button');
+    openTempBtn.className = 'history-entry-footer-btn';
+    openTempBtn.textContent = t('ui.history_open_as_temp');
+    openTempBtn.disabled = true;
+    openTempBtn.addEventListener('click', async () => {
+      if (selectedIndex !== null) {
+        const entry = visibleEntries[selectedIndex];
         try {
           const body = await invoke<string>('history_restore_at', {
             fileHash: file.file_hash,
@@ -1033,14 +1009,54 @@ export class HomeScreen {
         } catch (e) {
           console.error('History restore failed:', e);
         }
-      });
-      actions.appendChild(openTempBtn);
+      }
+    });
 
-      item.appendChild(actions);
+    const updateButtons = () => {
+      if (selectedIndex === null) {
+        openFileBtn.disabled = true;
+        openTempBtn.disabled = true;
+      } else {
+        const entry = visibleEntries[selectedIndex];
+        openFileBtn.disabled = !(entry.saved && entry.file_path);
+        openTempBtn.disabled = false;
+      }
+    };
+
+    for (let i = 0; i < visibleEntries.length; i++) {
+      const entry = visibleEntries[i];
+      const item = document.createElement('div');
+      item.className = 'history-entry-item';
+
+      // 保存済みマーカー（緑ドット）
+      if (entry.saved) {
+        const dot = document.createElement('span');
+        dot.className = 'history-entry-saved-dot';
+        item.appendChild(dot);
+      }
+
+      // 時刻
+      const time = document.createElement('span');
+      time.className = 'history-entry-time';
+      time.textContent = new Date(entry.timestamp * 1000).toLocaleString();
+      item.appendChild(time);
+
+      // クリックで選択
+      item.addEventListener('click', () => {
+        selectedIndex = (selectedIndex === i) ? null : i;
+        updateSelection();
+        updateButtons();
+      });
+
+      items.push(item);
       list.appendChild(item);
     }
 
+    footer.appendChild(openFileBtn);
+    footer.appendChild(openTempBtn);
+
     modal.appendChild(list);
+    modal.appendChild(footer);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
     this.entryModalOverlay = overlay;

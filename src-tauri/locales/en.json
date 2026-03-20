@@ -138,12 +138,7 @@
     "history_settings_cancel": "Cancel",
     "history_temp_file": "Temporary file",
     "history_entry_modal_title": "History Details",
-    "history_entry_snapshot": "Snapshot",
-    "history_entry_delta": "Delta",
-    "history_entry_saved": "Saved",
-    "history_entry_unsaved": "Unsaved",
-    "history_open_latest": "Open Latest",
     "history_open_file": "Open File",
-    "history_open_as_temp": "Open as Temporary File"
+    "history_open_as_temp": "Temporary File"
   }
 }
