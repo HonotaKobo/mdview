@@ -133,6 +133,7 @@
     "history_settings_enabled": "ログを記録する",
     "history_settings_snapshot_interval": "スナップショット間隔（デルタ数）",
     "history_settings_network_paths": "ネットワークパスを含める",
+    "history_settings_network_paths_note": "ネットワークドライブでは外部からの変更を検知できないことがあり、ログが正確に記録されない場合があります",
     "history_settings_temp_files": "一時ファイルを含める",
     "history_settings_save": "保存",
     "history_settings_cancel": "キャンセル",

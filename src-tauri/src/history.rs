@@ -186,14 +186,20 @@ impl HistoryStore {
             }
         }
 
+        // 履歴から最新の状態を取得し、初回スナップショットが必要か判定
+        let (has_initial, delta_count) = match get_last_state(&hash) {
+            Some((last_state, dc)) if last_state == initial_content => (true, dc),
+            _ => (false, 0),
+        };
+
         self.trackers.insert(
             label.to_string(),
             FileTracker {
                 last_recorded_content: initial_content.to_string(),
-                delta_count_since_snapshot: 0,
+                delta_count_since_snapshot: delta_count,
                 file_hash: hash,
                 file_path: file_path.map(|s| s.to_string()),
-                has_initial_snapshot: false,
+                has_initial_snapshot: has_initial,
             },
         );
     }
@@ -321,39 +327,36 @@ impl HistoryStore {
             if !is_saved {
                 return;
             }
-            // 保存イベント: identity delta を saved=true で記録
+            // 保存イベント: スナップショットを記録
             let path_str = saved_path.unwrap_or("").to_string();
-            let dmp = diff_match_patch_rs::DiffMatchPatch::new();
-            if let Ok(diffs) = dmp.diff_main::<diff_match_patch_rs::Compat>(&last_content, content)
-            {
-                if let Ok(delta) = dmp.diff_to_delta(&diffs) {
-                    let entry = HistoryEntry::Delta {
-                        t: now,
-                        p: path_str.clone(),
-                        d: delta,
-                        saved: true,
-                    };
-                    append_entry(&file_hash, &entry);
+            let entry = HistoryEntry::Snapshot {
+                t: now,
+                p: path_str.clone(),
+                c: content.to_string(),
+                saved: true,
+            };
+            append_entry(&file_hash, &entry);
 
-                    let idx_entry = self
-                        .index
-                        .entry(file_hash.clone())
-                        .or_insert(IndexEntry {
-                            file_path: path_str.clone(),
-                            entry_count: 0,
-                            last_timestamp: 0,
-                            has_unsaved: false,
-                        });
-                    if !path_str.is_empty() {
-                        idx_entry.file_path = path_str;
-                    }
-                    idx_entry.entry_count += 1;
-                    idx_entry.last_timestamp = now;
-                    idx_entry.has_unsaved = false;
-                    self.save_index();
-                }
+            let idx_entry = self
+                .index
+                .entry(file_hash.clone())
+                .or_insert(IndexEntry {
+                    file_path: path_str.clone(),
+                    entry_count: 0,
+                    last_timestamp: 0,
+                    has_unsaved: false,
+                });
+            if !path_str.is_empty() {
+                idx_entry.file_path = path_str;
             }
-            // delta_count_since_snapshot はインクリメントしない（実質変更なし）
+            idx_entry.entry_count += 1;
+            idx_entry.last_timestamp = now;
+            idx_entry.has_unsaved = false;
+            self.save_index();
+
+            if let Some(tracker) = self.trackers.get_mut(label) {
+                tracker.delta_count_since_snapshot = 0;
+            }
             return;
         }
 
@@ -412,8 +415,8 @@ impl HistoryStore {
                         append_entry(&file_hash, &entry);
                         let new_delta_count = delta_count + 1;
 
-                        // スナップショット間隔に達した場合
-                        let wrote_snapshot = if new_delta_count >= snapshot_interval {
+                        // スナップショット間隔に達した場合、または保存時
+                        let wrote_snapshot = if new_delta_count >= snapshot_interval || is_saved {
                             let snapshot = HistoryEntry::Snapshot {
                                 t: now,
                                 p: path_str.clone(),
@@ -689,6 +692,46 @@ pub fn restore_at(file_hash: &str, target_timestamp: u64) -> Result<String, Stri
     }
 
     Ok(restored)
+}
+
+/// 履歴ファイルから最新の状態と最後のスナップショットからのデルタ数を取得
+fn get_last_state(file_hash: &str) -> Option<(String, u32)> {
+    let path = history_file_path(file_hash);
+    let raw = std::fs::read_to_string(&path).ok()?;
+
+    let mut current: Option<String> = None;
+    let mut delta_count: u32 = 0;
+    let dmp = diff_match_patch_rs::DiffMatchPatch::new();
+
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(entry) = serde_json::from_str::<HistoryEntry>(line) {
+            match entry {
+                HistoryEntry::Snapshot { c, .. } => {
+                    current = Some(c);
+                    delta_count = 0;
+                }
+                HistoryEntry::Delta { d, .. } => {
+                    if let Some(ref cur) = current {
+                        if let Ok(diffs) =
+                            dmp.diff_from_delta::<diff_match_patch_rs::Compat>(cur, &d)
+                        {
+                            current = Some(
+                                diff_match_patch_rs::DiffMatchPatch::diff_text_new(&diffs)
+                                    .into_iter()
+                                    .collect(),
+                            );
+                            delta_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    current.map(|c| (c, delta_count))
 }
 
 /// パスのSipHashを計算（lib.rs:file_to_id と同じ方式）

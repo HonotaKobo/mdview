@@ -133,6 +133,7 @@
     "history_settings_enabled": "Record change history",
     "history_settings_snapshot_interval": "Snapshot interval (delta count)",
     "history_settings_network_paths": "Include network paths",
+    "history_settings_network_paths_note": "Changes made externally on network drives may not be detected, which can result in inaccurate logs",
     "history_settings_temp_files": "Include temporary files",
     "history_settings_save": "Save",
     "history_settings_cancel": "Cancel",

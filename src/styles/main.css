@@ -1428,6 +1428,13 @@ mark.find-highlight.active {
   accent-color: var(--link-color);
 }
 
+.history-settings-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: -4px 0 4px 24px;
+  line-height: 1.4;
+}
+
 .history-settings-number {
   width: 70px;
   padding: 4px 8px;

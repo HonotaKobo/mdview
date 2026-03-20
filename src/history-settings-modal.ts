@@ -20,6 +20,7 @@ export class HistorySettingsModal {
   private enabledLabel!: HTMLElement;
   private intervalLabel!: HTMLElement;
   private networkLabel!: HTMLElement;
+  private networkNote!: HTMLElement;
   private tempLabel!: HTMLElement;
   private saveBtn!: HTMLButtonElement;
   private cancelBtn!: HTMLButtonElement;
@@ -79,6 +80,12 @@ export class HistorySettingsModal {
       (el) => { this.networkLabel = el; },
       t('ui.history_settings_network_paths'),
     ));
+
+    // ネットワークパスの注意文
+    this.networkNote = document.createElement('div');
+    this.networkNote.className = 'history-settings-note';
+    this.networkNote.textContent = t('ui.history_settings_network_paths_note');
+    this.modal.appendChild(this.networkNote);
 
     // 一時ファイル
     this.modal.appendChild(this.createCheckRow(
@@ -222,6 +229,7 @@ export class HistorySettingsModal {
     this.enabledLabel.textContent = t('ui.history_settings_enabled');
     this.intervalLabel.textContent = t('ui.history_settings_snapshot_interval');
     this.networkLabel.textContent = t('ui.history_settings_network_paths');
+    this.networkNote.textContent = t('ui.history_settings_network_paths_note');
     this.tempLabel.textContent = t('ui.history_settings_temp_files');
     this.saveBtn.textContent = t('ui.history_settings_save');
     this.cancelBtn.textContent = t('ui.history_settings_cancel');
