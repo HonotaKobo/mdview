@@ -712,6 +712,11 @@
   z-index: 1000;
 }
 
+/* Windows: カスタムタイトルバー・メニューバーをオーバーレイ対象外にする */
+#custom-titlebar ~ .history-entry-overlay {
+  top: 57px;
+}
+
 .history-entry-modal {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
