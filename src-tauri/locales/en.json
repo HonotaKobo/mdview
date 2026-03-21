@@ -145,6 +145,12 @@
     "history_temp_file": "Temporary file",
     "history_entry_modal_title": "History Details",
     "history_open_file": "Open File",
-    "history_open_as_temp": "Temporary File"
+    "history_open_as_temp": "Temporary File",
+    "history_label_saved": "Saved",
+    "history_label_log": "Log",
+    "history_diff_btn": "Diff",
+    "history_diff_title": "Diff Details",
+    "history_diff_loading": "Loading...",
+    "history_diff_close": "Close"
   }
 }

@@ -441,7 +441,7 @@ document.addEventListener('drop', async (e) => {
   if (file && (file.name.endsWith('.md') || file.name.endsWith('.markdown') || file.name.endsWith('.txt'))) {
     const text = await file.text();
     currentContent = text;
-    currentTitle = file.name;
+    currentTitle = file.name.replace(/\.[^.]+$/, '');
     editorController.updateContent(text);
     statusBar.update(text);
     updateWindowTitle(currentTitle);

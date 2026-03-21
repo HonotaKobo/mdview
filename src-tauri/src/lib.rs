@@ -93,7 +93,7 @@ pub(crate) fn open_document_window(
         match std::fs::read_to_string(&abs_path) {
             Ok(c) => {
                 let t = abs_path
-                    .file_name()
+                    .file_stem()
                     .map(|f| f.to_string_lossy().to_string())
                     .unwrap_or_else(|| "Untitled".to_string());
                 (c, t, Some(abs_str))
@@ -322,7 +322,7 @@ pub fn run() {
         match std::fs::read_to_string(&abs_path) {
             Ok(content) => {
                 let title = abs_path
-                    .file_name()
+                    .file_stem()
                     .map(|f| f.to_string_lossy().to_string())
                     .unwrap_or_else(|| "Untitled".to_string());
                 (content, title, Some(abs_path_str))
@@ -425,6 +425,8 @@ pub fn run() {
             commands::history_get_entries,
             commands::history_get_unsaved_diff,
             commands::history_delete_unsaved,
+            commands::history_get_entry_previews,
+            commands::history_get_entry_diff,
         ])
         .setup(move |app| {
             let menu = menu::build_menu(app.handle(), &i18n)?;
@@ -471,7 +473,7 @@ pub fn run() {
 
                 // 最近使ったファイルに追加
                 let title = std::path::Path::new(fp)
-                    .file_name()
+                    .file_stem()
                     .map(|f| f.to_string_lossy().to_string())
                     .unwrap_or_else(|| "Untitled".to_string());
                 let recent = app.state::<RecentState>();

@@ -31,6 +31,22 @@ interface HistoryEntryMeta {
   saved: boolean;
 }
 
+interface DiffLine {
+  op: string;
+  text: string;
+}
+
+interface EntryDiffPreview {
+  timestamp: number;
+  preview_lines: DiffLine[];
+  total_changes: number;
+}
+
+interface EntryFullDiff {
+  timestamp: number;
+  diff_lines: DiffLine[];
+}
+
 // SVG アイコン（テンプレート文字列）
 const ICON_HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>';
 const ICON_TAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
@@ -56,6 +72,7 @@ export class HomeScreen {
   private historySelectMode = false;
   private historySelected: Set<string> = new Set();
   private entryModalOverlay: HTMLElement | null = null;
+  private diffModalOverlay: HTMLElement | null = null;
 
   // DOM 参照
   private homeTabBtn!: HTMLButtonElement;
@@ -65,6 +82,7 @@ export class HomeScreen {
   private statusBar!: HTMLElement;
 
   destroy(): void {
+    this.closeDiffModal();
     this.closeEntryModal();
     const screen = document.getElementById('home-screen');
     if (screen) screen.remove();
@@ -921,12 +939,23 @@ export class HomeScreen {
   private async showEntryModal(file: HistoryFileMeta): Promise<void> {
     this.closeEntryModal();
 
+    // エントリとプレビューを並列取得
     let entries: HistoryEntryMeta[];
+    let previews: EntryDiffPreview[];
     try {
-      entries = await invoke<HistoryEntryMeta[]>('history_get_entries', { fileHash: file.file_hash });
+      [entries, previews] = await Promise.all([
+        invoke<HistoryEntryMeta[]>('history_get_entries', { fileHash: file.file_hash }),
+        invoke<EntryDiffPreview[]>('history_get_entry_previews', { fileHash: file.file_hash }),
+      ]);
     } catch (e) {
       console.error('Failed to get entries:', e);
       return;
+    }
+
+    // プレビューをtimestampでマップ化
+    const previewMap = new Map<number, EntryDiffPreview>();
+    for (const p of previews) {
+      previewMap.set(p.timestamp, p);
     }
 
     const overlay = document.createElement('div');
@@ -1028,18 +1057,49 @@ export class HomeScreen {
       const item = document.createElement('div');
       item.className = 'history-entry-item';
 
-      // 保存済みマーカー（緑ドット）
+      // ラベルバッジ（保存 / ログ）
+      const label = document.createElement('span');
       if (entry.saved) {
-        const dot = document.createElement('span');
-        dot.className = 'history-entry-saved-dot';
-        item.appendChild(dot);
+        label.className = 'history-entry-label saved';
+        label.textContent = t('ui.history_label_saved');
+      } else {
+        label.className = 'history-entry-label log';
+        label.textContent = t('ui.history_label_log');
       }
+      item.appendChild(label);
 
       // 時刻
       const time = document.createElement('span');
       time.className = 'history-entry-time';
       time.textContent = new Date(entry.timestamp * 1000).toLocaleString();
       item.appendChild(time);
+
+      // ログ行のみ: 差分ボタン
+      if (!entry.saved) {
+        const diffBtn = document.createElement('button');
+        diffBtn.className = 'history-entry-diff-btn';
+        diffBtn.textContent = t('ui.history_diff_btn');
+        diffBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.showEntryDiffModal(file.file_hash, entry.timestamp);
+        });
+        item.appendChild(diffBtn);
+
+        // プレビュー行
+        const preview = previewMap.get(entry.timestamp);
+        if (preview && preview.preview_lines.length > 0) {
+          const previewDiv = document.createElement('div');
+          previewDiv.className = 'history-entry-preview';
+          for (const line of preview.preview_lines) {
+            const lineEl = document.createElement('div');
+            lineEl.className = `history-entry-preview-line ${line.op}`;
+            const prefix = line.op === 'delete' ? '-' : '+';
+            lineEl.textContent = prefix + ' ' + line.text;
+            previewDiv.appendChild(lineEl);
+          }
+          item.appendChild(previewDiv);
+        }
+      }
 
       // クリックで選択
       item.addEventListener('click', () => {
@@ -1063,9 +1123,103 @@ export class HomeScreen {
   }
 
   private closeEntryModal(): void {
+    this.closeDiffModal();
     if (this.entryModalOverlay) {
       this.entryModalOverlay.remove();
       this.entryModalOverlay = null;
+    }
+  }
+
+  private async showEntryDiffModal(fileHash: string, timestamp: number): Promise<void> {
+    this.closeDiffModal();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'history-diff-overlay';
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeDiffModal();
+    });
+
+    const modal = document.createElement('div');
+    modal.className = 'history-diff-modal';
+
+    // ヘッダー
+    const header = document.createElement('div');
+    header.className = 'history-entry-header';
+    const title = document.createElement('span');
+    title.className = 'history-entry-title';
+    title.textContent = t('ui.history_diff_title');
+    header.appendChild(title);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'home-recent-remove';
+    closeBtn.style.opacity = '1';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.addEventListener('click', () => this.closeDiffModal());
+    header.appendChild(closeBtn);
+    modal.appendChild(header);
+
+    // ローディング表示
+    const content = document.createElement('div');
+    content.className = 'history-diff-content';
+    content.textContent = t('ui.history_diff_loading');
+    content.style.padding = '24px';
+    content.style.textAlign = 'center';
+    content.style.color = 'var(--text-secondary)';
+    modal.appendChild(content);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    this.diffModalOverlay = overlay;
+
+    // 差分データを取得
+    try {
+      const diff = await invoke<EntryFullDiff>('history_get_entry_diff', {
+        fileHash,
+        targetTimestamp: timestamp,
+      });
+
+      // ローディングを差分表示に置換
+      content.textContent = '';
+      content.style.padding = '';
+      content.style.textAlign = '';
+      content.style.color = '';
+
+      for (const line of diff.diff_lines) {
+        const row = document.createElement('div');
+        row.className = `diff-line diff-${line.op}`;
+
+        const prefix = document.createElement('span');
+        prefix.className = 'diff-prefix';
+        if (line.op === 'delete') {
+          prefix.textContent = '-';
+        } else if (line.op === 'insert') {
+          prefix.textContent = '+';
+        } else {
+          prefix.textContent = ' ';
+        }
+        row.appendChild(prefix);
+        row.appendChild(document.createTextNode(line.text || ''));
+        content.appendChild(row);
+      }
+
+      // フッター
+      const footer = document.createElement('div');
+      footer.className = 'history-entry-footer';
+      const closeFooterBtn = document.createElement('button');
+      closeFooterBtn.className = 'history-entry-footer-btn';
+      closeFooterBtn.textContent = t('ui.history_diff_close');
+      closeFooterBtn.addEventListener('click', () => this.closeDiffModal());
+      footer.appendChild(closeFooterBtn);
+      modal.appendChild(footer);
+    } catch (e) {
+      content.textContent = String(e);
+      content.style.color = 'var(--danger-color)';
+    }
+  }
+
+  private closeDiffModal(): void {
+    if (this.diffModalOverlay) {
+      this.diffModalOverlay.remove();
+      this.diffModalOverlay = null;
     }
   }
 

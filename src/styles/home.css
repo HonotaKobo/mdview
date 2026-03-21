@@ -754,7 +754,8 @@
 
 .history-entry-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 8px;
   border-radius: 4px;
@@ -771,16 +772,140 @@
   outline-offset: -2px;
 }
 
-.history-entry-saved-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #3fb950;
+/* ラベルバッジ（保存 / ログ） */
+.history-entry-label {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+  line-height: 1.6;
+}
+
+.history-entry-label.saved {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+:root[data-theme='light'] .history-entry-label.saved {
+  background: rgba(26, 127, 55, 0.12);
+  color: #1a7f37;
+}
+
+.history-entry-label.log {
+  background: rgba(128, 128, 128, 0.15);
+  color: var(--text-secondary);
+}
+
+/* 差分プレビュー行 */
+.history-entry-preview {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+
+.history-entry-preview-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-entry-preview-line.delete {
+  background: rgba(209, 36, 47, 0.12);
+  color: #f85149;
+}
+
+:root[data-theme='light'] .history-entry-preview-line.delete {
+  color: #cf222e;
+}
+
+.history-entry-preview-line.insert {
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+}
+
+:root[data-theme='light'] .history-entry-preview-line.insert {
+  color: #1a7f37;
+}
+
+/* 差分ボタン */
+.history-entry-diff-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.15s;
+  margin-left: auto;
   flex-shrink: 0;
 }
 
-:root[data-theme='light'] .history-entry-saved-dot {
-  background: #1a7f37;
+.history-entry-diff-btn:hover {
+  background: rgba(128, 128, 128, 0.15);
+  color: var(--text-primary);
+}
+
+/* 差分詳細モーダル */
+.history-diff-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+#custom-titlebar ~ .history-diff-overlay {
+  top: 57px;
+}
+
+.history-diff-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 620px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.history-diff-content {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-diff-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.history-diff-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.history-diff-content::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+  border-radius: 4px;
+}
+
+.history-diff-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
 }
 
 .history-entry-time {

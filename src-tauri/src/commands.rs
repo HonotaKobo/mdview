@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use tauri::command;
 
-use crate::history::{HistoryConfig, HistoryEntryMeta, HistoryFileMeta, HistoryState, UnsavedDiffResult};
+use crate::history::{EntryDiffPreview, EntryFullDiff, HistoryConfig, HistoryEntryMeta, HistoryFileMeta, HistoryState, UnsavedDiffResult};
 use crate::i18n::I18nState;
 use crate::recent::{RecentEntry, RecentState};
 use crate::state::WindowStates;
@@ -97,7 +97,7 @@ pub fn notify_saved(
     };
     // 最近使ったファイルに追加
     let title = std::path::Path::new(&path)
-        .file_name()
+        .file_stem()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| "Untitled".to_string());
     let mut store = recent.lock().unwrap();
@@ -186,7 +186,7 @@ pub fn rename_file(old_path: String, new_path: String, window: tauri::Window, st
     if let Some(state) = states.get_mut(window.label()) {
         state.saved_path = Some(abs_path_str.clone());
         let title = abs_path
-            .file_name()
+            .file_stem()
             .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_else(|| "Untitled".to_string());
         state.title = title;
@@ -460,5 +460,15 @@ pub fn history_get_unsaved_diff(file_hash: String) -> Option<UnsavedDiffResult> 
 pub fn history_delete_unsaved(file_hash: String, history: tauri::State<'_, HistoryState>) -> Result<(), String> {
     let mut hs = history.lock().unwrap();
     hs.delete_unsaved_entries(&file_hash)
+}
+
+#[command]
+pub fn history_get_entry_previews(file_hash: String) -> Result<Vec<EntryDiffPreview>, String> {
+    crate::history::get_entry_previews(&file_hash)
+}
+
+#[command]
+pub fn history_get_entry_diff(file_hash: String, target_timestamp: u64) -> Result<EntryFullDiff, String> {
+    crate::history::get_entry_diff(&file_hash, target_timestamp)
 }
 

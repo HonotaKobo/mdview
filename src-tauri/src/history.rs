@@ -65,6 +65,21 @@ pub struct UnsavedDiffResult {
     pub last_saved_timestamp: u64,
 }
 
+/// エントリ差分プレビュー（モーダル一覧用、最大2行）
+#[derive(Serialize, Deserialize, Clone)]
+pub struct EntryDiffPreview {
+    pub timestamp: u64,
+    pub preview_lines: Vec<DiffLine>,
+    pub total_changes: usize,
+}
+
+/// エントリ完全差分（差分詳細モーダル用）
+#[derive(Serialize, Deserialize, Clone)]
+pub struct EntryFullDiff {
+    pub timestamp: u64,
+    pub diff_lines: Vec<DiffLine>,
+}
+
 /// 履歴エントリのメタ情報（一覧表示用）
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HistoryEntryMeta {
@@ -1007,6 +1022,222 @@ pub fn get_unsaved_diff(file_hash: &str) -> Option<UnsavedDiffResult> {
         unsaved_count,
         last_saved_timestamp,
     })
+}
+
+/// 先頭・末尾一致スキップで変更範囲を特定し、先頭2行のdelete/insertを返す（O(lines)）
+fn quick_diff_preview(before: &str, after: &str) -> (Vec<DiffLine>, usize) {
+    let before_lines: Vec<&str> = before.split('\n').collect();
+    let after_lines: Vec<&str> = after.split('\n').collect();
+    let blen = before_lines.len();
+    let alen = after_lines.len();
+
+    // 先頭から一致する行数
+    let mut prefix = 0;
+    while prefix < blen && prefix < alen && before_lines[prefix] == after_lines[prefix] {
+        prefix += 1;
+    }
+
+    // 末尾から一致する行数（先頭一致分を超えない）
+    let mut suffix = 0;
+    while suffix < (blen - prefix) && suffix < (alen - prefix)
+        && before_lines[blen - 1 - suffix] == after_lines[alen - 1 - suffix]
+    {
+        suffix += 1;
+    }
+
+    let del_count = blen - prefix - suffix;
+    let ins_count = alen - prefix - suffix;
+    let total_changes = del_count + ins_count;
+
+    let mut preview = Vec::new();
+    // 最初の削除行（1行まで）
+    if del_count > 0 {
+        preview.push(DiffLine {
+            op: "delete".to_string(),
+            text: before_lines[prefix].to_string(),
+        });
+    }
+    // 最初の挿入行（1行まで）
+    if ins_count > 0 && preview.len() < 2 {
+        preview.push(DiffLine {
+            op: "insert".to_string(),
+            text: after_lines[prefix].to_string(),
+        });
+    }
+
+    (preview, total_changes)
+}
+
+/// 全エントリの差分プレビューを一括取得する（saved=trueはスキップ）
+pub fn get_entry_previews(file_hash: &str) -> Result<Vec<EntryDiffPreview>, String> {
+    let path = history_file_path(file_hash);
+    let raw = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read history: {}", e))?;
+
+    let dmp = diff_match_patch_rs::DiffMatchPatch::new();
+    let mut current_content = String::new();
+    let mut previews = Vec::new();
+
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let entry: HistoryEntry = match serde_json::from_str(line) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        match &entry {
+            HistoryEntry::Snapshot { t, saved, c, .. } => {
+                if !*saved {
+                    let (preview_lines, total_changes) = quick_diff_preview(&current_content, c);
+                    if total_changes > 0 {
+                        previews.push(EntryDiffPreview {
+                            timestamp: *t,
+                            preview_lines,
+                            total_changes,
+                        });
+                    }
+                }
+                current_content = c.clone();
+            }
+            HistoryEntry::Delta { t, d, saved, .. } => {
+                let before = current_content.clone();
+                match dmp.diff_from_delta::<diff_match_patch_rs::Compat>(&current_content, d) {
+                    Ok(diffs) => {
+                        current_content = diff_match_patch_rs::DiffMatchPatch::diff_text_new(&diffs)
+                            .into_iter()
+                            .collect();
+                    }
+                    Err(_) => continue,
+                }
+                if !*saved {
+                    let (preview_lines, total_changes) = quick_diff_preview(&before, &current_content);
+                    if total_changes > 0 {
+                        previews.push(EntryDiffPreview {
+                            timestamp: *t,
+                            preview_lines,
+                            total_changes,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(previews)
+}
+
+/// 指定タイムスタンプのエントリの完全差分を取得する（LCSベース）
+pub fn get_entry_diff(file_hash: &str, target_timestamp: u64) -> Result<EntryFullDiff, String> {
+    let path = history_file_path(file_hash);
+    let raw = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read history: {}", e))?;
+
+    let dmp = diff_match_patch_rs::DiffMatchPatch::new();
+    let mut current_content = String::new();
+
+    for line in raw.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let entry: HistoryEntry = match serde_json::from_str(line) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let t = match &entry {
+            HistoryEntry::Snapshot { t, .. } => *t,
+            HistoryEntry::Delta { t, .. } => *t,
+        };
+
+        if t == target_timestamp {
+            let before = current_content.clone();
+            let after = match &entry {
+                HistoryEntry::Snapshot { c, .. } => c.clone(),
+                HistoryEntry::Delta { d, .. } => {
+                    match dmp.diff_from_delta::<diff_match_patch_rs::Compat>(&current_content, d) {
+                        Ok(diffs) => {
+                            diff_match_patch_rs::DiffMatchPatch::diff_text_new(&diffs)
+                                .into_iter()
+                                .collect()
+                        }
+                        Err(e) => return Err(format!("Delta error: {:?}", e)),
+                    }
+                }
+            };
+
+            // LCSベースの行単位diff
+            let before_lines: Vec<&str> = before.split('\n').collect();
+            let after_lines: Vec<&str> = after.split('\n').collect();
+            let lcs = line_lcs(&before_lines, &after_lines);
+
+            let mut diff_lines = Vec::new();
+            let mut si = 0;
+            let mut li = 0;
+            let mut ci = 0;
+
+            while si < before_lines.len() || li < after_lines.len() {
+                if ci < lcs.len()
+                    && si < before_lines.len()
+                    && li < after_lines.len()
+                    && before_lines[si] == lcs[ci]
+                    && after_lines[li] == lcs[ci]
+                {
+                    diff_lines.push(DiffLine {
+                        op: "equal".to_string(),
+                        text: before_lines[si].to_string(),
+                    });
+                    si += 1;
+                    li += 1;
+                    ci += 1;
+                } else {
+                    while si < before_lines.len()
+                        && (ci >= lcs.len() || before_lines[si] != lcs[ci])
+                    {
+                        diff_lines.push(DiffLine {
+                            op: "delete".to_string(),
+                            text: before_lines[si].to_string(),
+                        });
+                        si += 1;
+                    }
+                    while li < after_lines.len()
+                        && (ci >= lcs.len() || after_lines[li] != lcs[ci])
+                    {
+                        diff_lines.push(DiffLine {
+                            op: "insert".to_string(),
+                            text: after_lines[li].to_string(),
+                        });
+                        li += 1;
+                    }
+                }
+            }
+
+            return Ok(EntryFullDiff {
+                timestamp: target_timestamp,
+                diff_lines,
+            });
+        }
+
+        // 状態を更新
+        match &entry {
+            HistoryEntry::Snapshot { c, .. } => {
+                current_content = c.clone();
+            }
+            HistoryEntry::Delta { d, .. } => {
+                match dmp.diff_from_delta::<diff_match_patch_rs::Compat>(&current_content, d) {
+                    Ok(diffs) => {
+                        current_content = diff_match_patch_rs::DiffMatchPatch::diff_text_new(&diffs)
+                            .into_iter()
+                            .collect();
+                    }
+                    Err(_) => continue,
+                }
+            }
+        }
+    }
+
+    Err("Entry not found".to_string())
 }
 
 /// 行単位LCS（最長共通部分列）を計算
