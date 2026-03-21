@@ -27,9 +27,6 @@ export class TagAddModal {
       }
     });
 
-    this.overlay.addEventListener('click', (e) => {
-      if (e.target === this.overlay) this.hide();
-    });
   }
 
   async show(): Promise<void> {

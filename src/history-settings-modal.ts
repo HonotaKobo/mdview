@@ -43,9 +43,6 @@ export class HistorySettingsModal {
     this.overlay.appendChild(this.modal);
     document.body.appendChild(this.overlay);
 
-    this.overlay.addEventListener('click', (e) => {
-      if (e.target === this.overlay) this.hide();
-    });
 
     this.buildContent();
   }
@@ -250,7 +247,6 @@ export class HistorySettingsModal {
     openTempBtn.textContent = t('ui.history_unsaved_open_temp');
     openTempBtn.addEventListener('click', () => {
       callbacks.onOpenTemp(diff.latest_content);
-      close();
     });
     actions.appendChild(openTempBtn);
 
@@ -268,10 +264,6 @@ export class HistorySettingsModal {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    // オーバーレイクリックで閉じる
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) close();
-    });
   }
 
   applyTranslations(): void {

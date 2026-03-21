@@ -970,9 +970,6 @@ export class HomeScreen {
 
     const overlay = document.createElement('div');
     overlay.className = 'history-entry-overlay';
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) this.closeEntryModal();
-    });
 
     const modal = document.createElement('div');
     modal.className = 'history-entry-modal';
@@ -1020,7 +1017,7 @@ export class HomeScreen {
       if (selectedIndex !== null) {
         const entry = visibleEntries[selectedIndex];
         if (entry.saved && entry.file_path) {
-          invoke('open_new_window', { file: entry.file_path });
+          invoke('open_new_window', { file: entry.file_path, closeSelf: true });
         }
       }
     });
@@ -1140,9 +1137,6 @@ export class HomeScreen {
 
     const overlay = document.createElement('div');
     overlay.className = 'history-diff-overlay';
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) this.closeDiffModal();
-    });
 
     const modal = document.createElement('div');
     modal.className = 'history-diff-modal';

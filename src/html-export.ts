@@ -77,12 +77,6 @@ function showExportDialog(): Promise<ExportStyle | null> {
     modal.appendChild(actions);
     overlay.appendChild(modal);
 
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        document.body.removeChild(overlay);
-        resolve(null);
-      }
-    });
 
     document.body.appendChild(overlay);
     ok.focus();

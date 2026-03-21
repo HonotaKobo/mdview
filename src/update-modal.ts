@@ -15,9 +15,6 @@ export class UpdateModal {
     this.overlay.appendChild(this.body);
     document.body.appendChild(this.overlay);
 
-    this.overlay.addEventListener('click', (e) => {
-      if (e.target === this.overlay && !this.busy) this.hide();
-    });
   }
 
   async checkForUpdates(silent: boolean): Promise<void> {
