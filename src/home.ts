@@ -939,24 +939,34 @@ export class HomeScreen {
   private async showEntryModal(file: HistoryFileMeta): Promise<void> {
     this.closeEntryModal();
 
-    // エントリとプレビューを並列取得
-    let entries: HistoryEntryMeta[];
-    let previews: EntryDiffPreview[];
-    try {
-      [entries, previews] = await Promise.all([
-        invoke<HistoryEntryMeta[]>('history_get_entries', { fileHash: file.file_hash }),
-        invoke<EntryDiffPreview[]>('history_get_entry_previews', { fileHash: file.file_hash }),
-      ]);
-    } catch (e) {
-      console.error('Failed to get entries:', e);
-      return;
-    }
-
-    // プレビューをtimestampでマップ化
+    // エントリとプレビューを並列取得し、ブロックスコープで中間データを解放
+    let visibleEntries: HistoryEntryMeta[];
     const previewMap = new Map<number, EntryDiffPreview>();
-    for (const p of previews) {
-      previewMap.set(p.timestamp, p);
+    {
+      let entries: HistoryEntryMeta[];
+      let previews: EntryDiffPreview[];
+      try {
+        [entries, previews] = await Promise.all([
+          invoke<HistoryEntryMeta[]>('history_get_entries', { fileHash: file.file_hash }),
+          invoke<EntryDiffPreview[]>('history_get_entry_previews', { fileHash: file.file_hash }),
+        ]);
+      } catch (e) {
+        console.error('Failed to get entries:', e);
+        return;
+      }
+
+      for (const p of previews) {
+        previewMap.set(p.timestamp, p);
+      }
+
+      // スナップショット除外 + 保存済みは最新1件のみ
+      const deltaEntries = entries.filter(e => e.entry_type !== 'snapshot');
+      const lastSavedIdx = deltaEntries.findIndex(e => e.saved);
+      visibleEntries = deltaEntries.filter((e, i) =>
+        !e.saved || i === lastSavedIdx
+      );
     }
+    // entries, previews, deltaEntries はスコープ外になりGC対象
 
     const overlay = document.createElement('div');
     overlay.className = 'history-entry-overlay';
@@ -984,13 +994,6 @@ export class HomeScreen {
     closeBtn.addEventListener('click', () => this.closeEntryModal());
     header.appendChild(closeBtn);
     modal.appendChild(header);
-
-    // スナップショット除外 + 保存済みは最新1件のみ
-    const deltaEntries = entries.filter(e => e.entry_type !== 'snapshot');
-    const lastSavedIdx = deltaEntries.findIndex(e => e.saved);
-    const visibleEntries = deltaEntries.filter((e, i) =>
-      !e.saved || i === lastSavedIdx
-    );
 
     // エントリ一覧
     const list = document.createElement('div');
@@ -1111,6 +1114,8 @@ export class HomeScreen {
       items.push(item);
       list.appendChild(item);
     }
+    // DOM描画完了後、プレビューデータへの参照を解放
+    previewMap.clear();
 
     footer.appendChild(openFileBtn);
     footer.appendChild(openTempBtn);
